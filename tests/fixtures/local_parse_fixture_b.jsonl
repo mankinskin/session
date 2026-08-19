@@ -1,0 +1,3 @@
+{"event":"session_start","ts":1717372014049,"data":{"session_id":"fixture-local-b","producer":"copilot-agent"}}
+{"event":"message","timestamp":"2026-06-02T23:07:00.000Z","role":"user","content":"Local fixture B prompt"}
+{"event":"message","timestamp":"2026-06-02T23:07:05.000Z","data":{"role":"assistant","text":"Local fixture B response"}}

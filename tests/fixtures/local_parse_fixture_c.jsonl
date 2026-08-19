@@ -1,0 +1,2 @@
+{"id":"evt-start-c","type":"session.start","timestamp":"2026-06-02T23:06:54.049Z","data":"{\"sessionId\":\"fixture-local-c\",\"producer\":\"copilot-agent\",\"startTime\":\"2026-06-02T23:06:54.049Z\"}"}
+{"id":"evt-assistant-c","type":"assistant.message","timestamp":"2026-06-02T23:07:05.000Z","data":{"content":"Local fixture C response","arguments":"{\"path\":\"src/lib.rs\",\"line\":42}"}}

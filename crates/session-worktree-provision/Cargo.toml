@@ -1,0 +1,21 @@
+[package]
+name = "session-worktree-provision"
+version = "0.1.0"
+edition = "2024"
+description = "Git access layer for per-session worktree provisioning"
+
+[lib]
+name = "session_worktree_provision"
+path = "src/lib.rs"
+
+[dependencies]
+git2 = "0.20"
+serde_json = "1"
+spec-api = { git = "https://github.com/mankinskin/spec", branch = "main" }
+thiserror = "2"
+ticket-api = { git = "https://github.com/mankinskin/ticket", branch = "main" }
+time = { version = "0.3", features = ["formatting", "parsing"] }
+
+[dev-dependencies]
+filetime = "0.2"
+tempfile = "3"

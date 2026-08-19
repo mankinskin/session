@@ -1,0 +1,3 @@
+{"id":"evt-start-a","type":"session.start","timestamp":"2026-06-02T23:06:54.049Z","data":{"sessionId":"fixture-local-a","producer":"copilot-agent","startTime":"2026-06-02T23:06:54.049Z"}}
+{"id":"evt-user-a","type":"user.message","timestamp":"2026-06-02T23:07:00.000Z","data":{"content":"Local fixture A prompt"}}
+{"id":"evt-assistant-a","type":"assistant.message","timestamp":"2026-06-02T23:07:05.000Z","data":{"content":"Local fixture A response"}}

@@ -1,0 +1,16 @@
+include!("store_tests/capture/basics.rs");
+include!("store_tests/capture/query_and_worktree.rs");
+include!("store_tests/capture/federated_sessions.rs");
+include!("store_tests/capture/ticket_relation.rs");
+include!("store_tests/capture/ticket_backfill.rs");
+include!("store_tests/capture/worktree_capture_inference.rs");
+include!("store_tests/worktree/audit_and_runtime.rs");
+include!("store_tests/runtime/pins_and_workflow_mutation.rs");
+include!("store_tests/workflow/snapshot_and_handoff.rs");
+include!("store_tests/finish/handoff_lifecycle.rs");
+include!("store_tests/finish/validation_authority.rs");
+include!("store_tests/finish/ticket_enforcement.rs");
+include!("store_tests/finish/spec_enforcement.rs");
+include!("store_tests/finish/workspace_mutation_and_locking.rs");
+include!("store_tests/finish/workspace_lock_ordering.rs");
+include!("store_tests/terminals.rs");

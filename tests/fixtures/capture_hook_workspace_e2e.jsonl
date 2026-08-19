@@ -1,0 +1,3 @@
+{"type":"session.start","timestamp":"2026-06-02T23:06:54.049Z","data":{"sessionId":"session-workspace-fixture","producer":"copilot-agent","startTime":"2026-06-02T23:06:54.049Z"}}
+{"type":"user.message","timestamp":"2026-06-02T23:07:00.000Z","data":{"content":"Persist this transcript from fixture"}}
+{"type":"assistant.message","timestamp":"2026-06-02T23:07:05.000Z","data":{"content":"Transcript persisted from fixture."}}
