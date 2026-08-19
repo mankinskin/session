@@ -31,7 +31,7 @@ path = "src/lib.rs"
 [dependencies]
 session-api = { path = "crates/session-api", optional = true }
 session-worktree-provision = { path = "crates/session-worktree-provision", optional = true }
-session-workspace-resolver = { git = "https://github.com/mankinskin/memory-api", branch = "main", optional = true }
+session-workspace-resolver = { path = "crates/session-workspace-resolver", optional = true }
 ticket-api = { git = "https://github.com/mankinskin/ticket", branch = "main", optional = true }
 memory-kernel = { git = "https://github.com/mankinskin/memory-kernel", branch = "main", optional = true }
 chrono = { version = "0.4", features = ["serde"], optional = true }

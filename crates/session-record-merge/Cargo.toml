@@ -1,0 +1,16 @@
+[package]
+name = "session-record-merge"
+version = "0.1.0"
+edition = "2024"
+description = "Git merge driver that resolves session.json/transcript.json conflicts between the main-checkout mirror and a session worktree"
+
+[[bin]]
+name = "session-record-merge"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+session-api = { path = "../session-api" }
+
+[dev-dependencies]
+chrono = { version = "0.4", features = ["serde"] }

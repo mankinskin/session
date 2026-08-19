@@ -1,0 +1,17 @@
+[package]
+name = "session-workspace-resolver"
+version = "0.1.0"
+edition = "2024"
+description = "Session-routed worktree workspace resolution for MCP servers"
+
+[lib]
+name = "session_workspace_resolver"
+path = "src/lib.rs"
+
+[dependencies]
+memory-kernel = { git = "https://github.com/mankinskin/memory-kernel", branch = "main"  }
+serde_json = "1"
+session-api = { path = "../session-api" }
+tempfile = "3"
+thiserror = "2"
+uuid = "1"
