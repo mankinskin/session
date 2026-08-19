@@ -62,3 +62,8 @@ required-features = ["capture-hook"]
 name = "copilot_stop_hook_e2e"
 path = "tests/copilot_stop_hook_e2e.rs"
 required-features = ["capture-hook"]
+
+[[test]]
+name = "cli"
+path = "tests/cli.rs"
+required-features = ["cli"]
