@@ -1,0 +1,42 @@
+[package]
+name = "mcp-toolmon"
+version = "0.1.0"
+edition = "2024"
+description = "Model-aware MCP middleware: requires a per-request caller_model and enforces the price-awareness orchestrator threshold at the tool boundary"
+
+[[bin]]
+name = "mcp-toolmon"
+path = "src/main.rs"
+
+# Test fixtures (T3): two byte-different minimal MCP servers used by the
+# shadow-copy/reload test suite, reachable via env!("CARGO_BIN_EXE_fake-mcp-v1")
+# / "..._v2". CARGO_BIN_EXE_<name> is only set for bin targets of the package
+# under test, not of dependency crates, so these are declared here rather
+# than in a separate fixture crate (verified empirically: a standalone
+# `tests/fixtures/fake-mcp` crate added as a path dev-dependency compiles,
+# but CARGO_BIN_EXE_fake-mcp-v1/v2 is NOT defined when building mcp-toolmon's
+# tests — see ticket completion note).
+[[bin]]
+name = "fake-mcp-v1"
+path = "tests/fixtures/fake-mcp/src/bin/fake-mcp-v1.rs"
+
+[[bin]]
+name = "fake-mcp-v2"
+path = "tests/fixtures/fake-mcp/src/bin/fake-mcp-v2.rs"
+
+[lib]
+name = "mcp_toolmon"
+path = "src/lib.rs"
+
+[dependencies]
+toolmon-policy-api = { path = "../toolmon-policy-api" }
+toolmon-costgate = { path = "../toolmon-costgate" }
+session-workspace-resolver = { path = "../session-workspace-resolver" }
+session-api = { path = "../session-api" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = "0.4"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "process", "io-util", "io-std", "sync", "time"] }
+
+[dev-dependencies]
+tempfile = "3"

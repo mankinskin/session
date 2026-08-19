@@ -1,0 +1,12 @@
+[package]
+name = "worktree-ctl"
+version = "0.1.0"
+edition = "2024"
+description = "Local worktree lifecycle control CLI"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+git2 = "0.20"
+session-worktree-provision = { path = "../session-worktree-provision" }
+[dev-dependencies]
+tempfile = "3"

@@ -9,7 +9,7 @@ use std::{
 
 use crate::SessionError;
 
-/// Model price record from tools/model-prices/model_prices.json
+/// Model price record from workflow-tools/session/crates/model-prices/model_prices.json
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelPrice {
     pub provider_id: String,
@@ -33,9 +33,9 @@ pub struct PriceTable {
     pub models: Vec<ModelPrice>,
 }
 
-/// Load price table from tools/model-prices/model_prices.json relative to repo root.
-/// Repo root is resolved from the session store root by going up to workspace root,
-/// which is typically the repo root.
+/// Load price table from workflow-tools/session/crates/model-prices/model_prices.json
+/// relative to repo root. Repo root is resolved from the session store root by
+/// going up to workspace root, which is typically the repo root.
 pub fn load_price_table(store_root: &Path) -> Result<PriceTable, SessionError> {
     // Resolve repo root: session store is typically at <repo>/.session,
     // so we go up one level.
@@ -43,7 +43,9 @@ pub fn load_price_table(store_root: &Path) -> Result<PriceTable, SessionError> {
         SessionError::InvalidStorePath(store_root.to_path_buf())
     })?;
     let price_file = repo_root
-        .join("tools")
+        .join("workflow-tools")
+        .join("session")
+        .join("crates")
         .join("model-prices")
         .join("model_prices.json");
 
