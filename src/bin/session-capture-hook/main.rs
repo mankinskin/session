@@ -130,7 +130,7 @@ fn run() -> Result<(), SessionError> {
         if let (Some(session_id), Some(event)) =
             (args.session_id.as_deref(), captured_hook_event)
         {
-            config.persist_hook_event(session_id, event)?;
+            persist_hook_event(&config, &store_root, session_id, event)?;
         }
         tracing::warn!(
             transcript_path = %transcript_path.display(),
@@ -144,19 +144,50 @@ fn run() -> Result<(), SessionError> {
         return Ok(());
     }
 
+    if transcript_path
+        .metadata()
+        .map_err(|error| SessionError::Io {
+            path: transcript_path.clone(),
+            source: error,
+        })?
+        .len()
+        == 0
+    {
+        if let (Some(session_id), Some(event)) =
+            (args.session_id.as_deref(), captured_hook_event)
+        {
+            persist_hook_event(&config, &store_root, session_id, event)?;
+        }
+        tracing::debug!("skip: transcript is empty and not flushed yet");
+        emit_hook_payload(routing_outcome.as_ref());
+        return Ok(());
+    }
     let tool_response_override = build_tool_response_override(
         args.tool_call_id.as_deref(),
         args.tool_response_chars,
         args.session_id.as_deref(),
         &transcript_path,
     );
-    let mut plan = config.capture_copilot_transcript_with_tool_response(
+    let mut plan = match config.capture_copilot_transcript_with_tool_response(
         transcript_path,
         args.trigger.clone(),
         tool_response_override,
-    )?;
-    if let Some(event) = captured_hook_event {
-        append_hook_event(&mut plan, event);
+    ) {
+        Ok(plan) => plan,
+        Err(SessionError::EmptyTurns) => {
+            if let (Some(session_id), Some(event)) =
+                (args.session_id.as_deref(), captured_hook_event)
+            {
+                config.persist_hook_event(session_id, event)?;
+            }
+            tracing::debug!("skip: transcript has no messages yet");
+            emit_hook_payload(routing_outcome.as_ref());
+            return Ok(());
+        },
+        Err(error) => return Err(error),
+    };
+    if let Some(event) = captured_hook_event.as_ref() {
+        append_hook_event(&mut plan, event.clone());
     }
     if let Some(outcome) = routing_outcome.as_ref() {
         plan.record.metadata.provisioning =
@@ -164,6 +195,11 @@ fn run() -> Result<(), SessionError> {
     }
     plan.persist()?;
     tracing::info!(session_id = %plan.record.session_id, "persisted capture plan");
+    if let (Some(session_id), Some(event)) =
+        (args.session_id.as_deref(), captured_hook_event)
+    {
+        mirror_user_prompt_to_main(&store_root, session_id, event)?;
+    }
     report_structured_feedback_signals(&plan);
     synthesize_follow_up_tickets(
         &plan,
@@ -203,15 +239,47 @@ fn run() -> Result<(), SessionError> {
     Ok(())
 }
 
+fn persist_hook_event(
+    config: &SessionStoreConfig,
+    store_root: &Path,
+    session_id: &str,
+    event: session_api::CopilotHookEvent,
+) -> Result<(), SessionError> {
+    config.persist_hook_event(session_id, event.clone())?;
+    mirror_user_prompt_to_main(store_root, session_id, event)
+}
+
+fn mirror_user_prompt_to_main(
+    store_root: &Path,
+    session_id: &str,
+    event: session_api::CopilotHookEvent,
+) -> Result<(), SessionError> {
+    if !event.event_type.as_deref().is_some_and(|event_type| {
+        event_type.eq_ignore_ascii_case("UserPromptSubmit")
+    }) {
+        return Ok(());
+    }
+    let Some(worktree_root) = store_root.parent() else {
+        return Ok(());
+    };
+    let Some(anchor) = anchor_checkout_for_worktree(worktree_root) else {
+        return Ok(());
+    };
+    let main_store = anchor.join(".session");
+    if main_store == store_root {
+        return Ok(());
+    }
+    SessionStoreConfig::new(main_store, "default")
+        .persist_hook_event(session_id, event)
+}
 fn ensure_provisioning_succeeded(
-    outcome: Option<&ProvisioningDiagnostic>,
+    outcome: Option<&ProvisioningDiagnostic>
 ) -> Result<(), SessionError> {
     match outcome {
-        Some(ProvisioningDiagnostic::Failed { reason }) => {
+        Some(ProvisioningDiagnostic::Failed { reason }) =>
             Err(SessionError::InvalidHookInput(format!(
                 "worktree provisioning failed: {reason}"
-            )))
-        },
+            ))),
         _ => Ok(()),
     }
 }
@@ -462,7 +530,8 @@ fn provision_session_worktree(
     // Register the assignment in the main checkout's own store (ticket
     // 842d74cb D1: main is the authoritative session-to-worktree registry),
     // independent of and before whatever the worktree's own store captures.
-    let main_config = SessionStoreConfig::new(anchor.join(".session"), "default");
+    let main_config =
+        SessionStoreConfig::new(anchor.join(".session"), "default");
     let branch = worktree
         .branch
         .clone()
@@ -961,7 +1030,8 @@ fn mirror_worktree_assignment_to_main(
     let Some(assignment) = record.metadata.worktree else {
         return;
     };
-    let main_config = SessionStoreConfig::new(anchor.join(".session"), "default");
+    let main_config =
+        SessionStoreConfig::new(anchor.join(".session"), "default");
     if let Err(error) = main_config.register_provisioned_worktree(
         session_id,
         &assignment.path,
