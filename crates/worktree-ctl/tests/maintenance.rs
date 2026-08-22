@@ -139,6 +139,25 @@ fn all(output: &Output) -> String {
     )
 }
 
+fn visible_width(value: &str) -> usize {
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    let mut width = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'\x1b' && bytes.get(index + 1) == Some(&b'[') {
+            index += 2;
+            while index < bytes.len() && !(b'@'..=b'~').contains(&bytes[index])
+            {
+                index += 1;
+            }
+            index += usize::from(index < bytes.len());
+        } else {
+            width += 1;
+            index += 1;
+        }
+    }
+    width
+}
 fn create(
     fixture: &Fixture,
     slug: &str,
@@ -257,7 +276,7 @@ fn list_reports_lifecycle_state_and_rejection_reason() {
         ],
     );
 
-    let output = fixture.run(["list", "--dry-run"]);
+    let output = fixture.run(["list", "--verbose", "--dry-run"]);
 
     assert!(output.status.success(), "list failed: {}", all(&output));
     let report = all(&output);
@@ -288,35 +307,6 @@ fn list_reports_lifecycle_state_and_rejection_reason() {
 }
 
 #[test]
-fn list_reports_dirty_superproject_and_ahead_submodule() {
-    let fixture = fixture_repo();
-    create(&fixture, "live-state");
-    let worktree = fixture.worktree("live-state");
-    fs::write(worktree.join("pending.txt"), "pending\n")
-        .expect("write pending superproject change");
-    let submodule = worktree.join("modules/example");
-    fs::write(submodule.join("file.txt"), "initial\nahead\n")
-        .expect("write submodule change");
-    git(&submodule, &["commit", "-am", "ahead"]);
-
-    let output = fixture.run(["list"]);
-
-    assert!(output.status.success(), "list failed: {}", all(&output));
-    let report = all(&output);
-    assert!(
-        report.contains(
-            "superproject: branch=agent/12345678-1234-1234-1234-123456789abc/live-state changes=dirty ahead=0 behind=0"
-        ),
-        "{report}"
-    );
-    assert!(
-        report.contains(
-            "modules/example: branch=HEAD changes=clean ahead=1 behind=0"
-        ),
-        "{report}"
-    );
-}
-#[test]
 fn merge_refuses_non_fast_forward() {
     let fixture = fixture_repo();
     create(&fixture, "non-ff");
@@ -344,6 +334,37 @@ fn merge_refuses_non_fast_forward() {
     );
 }
 
+#[test]
+fn list_reports_dirty_superproject_and_ahead_submodule() {
+    let fixture = fixture_repo();
+    create(&fixture, "live-state");
+    let worktree = fixture.worktree("live-state");
+    fs::write(worktree.join("pending.txt"), "pending\n")
+        .expect("write pending superproject change");
+    let submodule = worktree.join("modules/example");
+    fs::write(submodule.join("file.txt"), "initial\nahead\n")
+        .expect("write submodule change");
+    git(&submodule, &["commit", "-am", "ahead"]);
+
+    let output = fixture.run(["list"]);
+
+    assert!(output.status.success(), "list failed: {}", all(&output));
+    let report = all(&output);
+    assert!(report.contains(".worktrees"), "{report}");
+    assert!(report.contains("[held]"), "{report}");
+    assert!(report.contains("dirty:super"), "{report}");
+    assert!(report.contains("ahead:modules/example+1"), "{report}");
+    assert!(report.contains("super="), "{report}");
+    assert!(report.contains("modules/example="), "{report}");
+    assert!(!report.contains("branch="), "{report}");
+    assert!(!report.contains("ahead=0"), "{report}");
+    let lines = report.lines().collect::<Vec<_>>();
+    assert!(lines.len() >= 3, "{report}");
+    assert!(
+        lines.iter().all(|line| visible_width(line) <= 100),
+        "compact output exceeds 100 visible characters: {report}"
+    );
+}
 #[test]
 fn doctor_repairs_stale_core_worktree() {
     let fixture = fixture_repo();
