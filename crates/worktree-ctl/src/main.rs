@@ -94,6 +94,10 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    Clean {
+        #[arg(long)]
+        dry_run: bool,
+    },
     Rename {
         source_name: String,
         target_name: String,
@@ -159,6 +163,7 @@ fn dispatch(command: Command) -> Result<(), String> {
             force,
             dry_run,
         } => handle_remove(&name, force, dry_run),
+        Command::Clean { dry_run } => handle_clean(dry_run),
         Command::Rename {
             source_name,
             target_name,
@@ -347,15 +352,30 @@ fn handle_list(_dry_run: bool) -> Result<(), String> {
     let registered = git.list_worktrees().map_err(|error| error.to_string())?;
 
     for worktree in &registered {
-        let submodules = submodule_status(&git, &worktree.path)?;
-        let lifecycle = lifecycle_status(&git, &activity, worktree, &policy)?;
+        println!("worktree: {}", worktree.path.display());
         println!(
-            "path={} branch={} submodules={} lifecycle={}",
-            worktree.path.display(),
-            worktree.branch.as_deref().unwrap_or("detached"),
-            submodules,
-            lifecycle
+            "  lifecycle: {}",
+            lifecycle_status(&git, &activity, worktree, &policy)?
         );
+        println!(
+            "  superproject: {}",
+            live_repository_state(&git, &worktree.path)?
+        );
+        let submodules =
+            git.submodule_paths().map_err(|error| error.to_string())?;
+        if submodules.is_empty() {
+            println!("  submodules: none");
+        } else {
+            println!("  submodules:");
+            for submodule in submodules {
+                let path = worktree.path.join(&submodule);
+                match live_repository_state(&git, &path) {
+                    Ok(state) => println!("    {submodule}: {state}"),
+                    Err(error) =>
+                        println!("    {submodule}: unavailable ({error})"),
+                }
+            }
+        }
     }
 
     let worktree_root = git.main_checkout().join(".worktrees");
@@ -370,16 +390,114 @@ fn handle_list(_dry_run: bool) -> Result<(), String> {
                     worktree.path == path || worktree.path.starts_with(&path)
                 })
             {
-                println!(
-                    "path={} lifecycle=unregistered-debris",
-                    path.display()
-                );
+                println!("worktree: {}", path.display());
+                println!("  lifecycle: unregistered-debris");
             }
         }
     }
     Ok(())
 }
 
+fn live_repository_state(
+    git: &WorktreeGit,
+    path: &Path,
+) -> Result<String, String> {
+    let repository =
+        Repository::open(path).map_err(|error| error.to_string())?;
+    let branch = repository
+        .head()
+        .ok()
+        .and_then(|head| head.shorthand().map(str::to_owned))
+        .unwrap_or_else(|| "unborn".to_owned());
+    let changes = if git.is_dirty(path).map_err(|error| error.to_string())? {
+        "dirty"
+    } else {
+        "clean"
+    };
+    let divergence = match git.ahead_behind(path, "main") {
+        Ok((ahead, behind)) => format!("ahead={ahead} behind={behind}"),
+        Err(error) => format!("ahead=? behind=? ({error})"),
+    };
+    Ok(format!("branch={branch} changes={changes} {divergence}"))
+}
+fn handle_clean(dry_run: bool) -> Result<(), String> {
+    let main_checkout =
+        env::current_dir().map_err(|error| error.to_string())?;
+    let git =
+        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let mut removable = Vec::new();
+    for worktree in git.list_worktrees().map_err(|error| error.to_string())? {
+        if worktree_relative_path(&git, &worktree).is_err() {
+            println!(
+                "preserved path={} reason=outside-worktree-root",
+                worktree.path.display()
+            );
+            continue;
+        }
+        match ensure_safe_to_remove(&git, &worktree) {
+            Ok(()) => removable.push(worktree),
+            Err(reason) => println!(
+                "preserved path={} reason={reason}",
+                worktree.path.display()
+            ),
+        }
+    }
+    if dry_run {
+        for worktree in &removable {
+            println!("[dry-run] remove {} with force", worktree.path.display());
+        }
+        return Ok(());
+    }
+    for worktree in &removable {
+        git.worktree_remove_force(&worktree.path)
+            .map_err(|error| error.to_string())?;
+        remove_empty_nested_parent(git.main_checkout(), &worktree.path)?;
+    }
+    if !removable.is_empty() {
+        git.worktree_prune().map_err(|error| error.to_string())?;
+    }
+    println!("clean: removed {} safe worktree(s)", removable.len());
+    Ok(())
+}
+fn ensure_safe_to_remove(
+    git: &WorktreeGit,
+    worktree: &session_worktree_provision::WorktreeRef,
+) -> Result<(), String> {
+    for submodule in git.submodule_paths().map_err(|error| error.to_string())? {
+        let path = worktree.path.join(&submodule);
+        if !path.is_dir() {
+            return Err(format!("submodule {submodule} is not initialized"));
+        }
+        if git.is_dirty(&path).map_err(|error| error.to_string())? {
+            return Err(format!(
+                "submodule {submodule} has uncommitted changes"
+            ));
+        }
+        let ahead = git
+            .ahead_behind(&path, "main")
+            .map_err(|error| error.to_string())?
+            .0;
+        if ahead != 0 {
+            return Err(format!(
+                "submodule {submodule} is {ahead} commits ahead of main"
+            ));
+        }
+    }
+    if git
+        .is_dirty(&worktree.path)
+        .map_err(|error| error.to_string())?
+    {
+        return Err("superproject has uncommitted changes".to_owned());
+    }
+    let ahead = git
+        .ahead_behind(&worktree.path, "main")
+        .map_err(|error| error.to_string())?
+        .0;
+    if ahead != 0 {
+        return Err(format!("superproject is {ahead} commits ahead of main"));
+    }
+    Ok(())
+}
 fn handle_remove(
     name: &str,
     force: bool,
@@ -390,18 +508,8 @@ fn handle_remove(
     let git =
         WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let worktree = find_worktree(&git, name)?;
-    let dirty_paths = git
-        .dirty_paths(&worktree.path)
-        .map_err(|error| error.to_string())?;
-    if !force && !dirty_paths.is_empty() {
-        let paths = dirty_paths
-            .iter()
-            .map(|path| path.path.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ");
-        return Err(format!(
-            "worktree {name} has uncommitted changes: {paths}"
-        ));
+    if !force {
+        ensure_safe_to_remove(&git, &worktree)?;
     }
 
     let mut plan = LifecyclePlan::default();
@@ -700,23 +808,6 @@ fn handle_doctor(dry_run: bool) -> Result<(), String> {
     git.worktree_prune().map_err(|error| error.to_string())?;
     println!("doctor: repairs complete");
     Ok(())
-}
-
-fn submodule_status(
-    git: &WorktreeGit,
-    worktree: &Path,
-) -> Result<String, String> {
-    let missing = git
-        .submodule_paths()
-        .map_err(|error| error.to_string())?
-        .into_iter()
-        .filter(|submodule| Repository::open(worktree.join(submodule)).is_err())
-        .collect::<Vec<_>>();
-    Ok(if missing.is_empty() {
-        "initialized".to_owned()
-    } else {
-        format!("missing({})", missing.join(","))
-    })
 }
 
 fn lifecycle_status(

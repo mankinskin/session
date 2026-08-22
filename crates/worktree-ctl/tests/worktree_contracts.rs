@@ -365,13 +365,83 @@ fn remove_refuses_dirty_worktree() {
     create(&f, "dirty");
     let worktree = f.worktree("dirty");
     fs::write(worktree.join("dirty.txt"), "do not lose me\n").unwrap();
-    fails_with(&f.run(["remove", &f.name("dirty")]), "dirty.txt");
+    fails_with(
+        &f.run(["remove", &f.name("dirty")]),
+        "superproject has uncommitted changes",
+    );
     assert!(worktree.join("dirty.txt").is_file());
     ok(
         &f.run(["remove", &f.name("dirty"), "--force"]),
         "forced remove",
     );
     assert!(!worktree.exists());
+}
+#[test]
+fn remove_refuses_superproject_ahead_of_main() {
+    let fixture = fixture_repo(&tool());
+    create(&fixture, "ahead");
+    let worktree = fixture.worktree("ahead");
+    fs::write(worktree.join("ahead.txt"), "ahead\n").unwrap();
+    git(&worktree, &["add", "ahead.txt"]);
+    git(&worktree, &["commit", "-m", "ahead"]);
+    fails_with(
+        &fixture.run(["remove", &fixture.name("ahead")]),
+        "superproject is 1 commits ahead of main",
+    );
+    assert!(worktree.is_dir());
+}
+
+#[test]
+fn remove_refuses_dirty_submodule() {
+    let fixture = fixture_repo(&tool());
+    create(&fixture, "submodule-dirty");
+    let worktree = fixture.worktree("submodule-dirty");
+    fs::write(
+        worktree.join("modules/example/file.txt"),
+        "initial\ndirty\n",
+    )
+    .unwrap();
+    fails_with(
+        &fixture.run(["remove", &fixture.name("submodule-dirty")]),
+        "submodule modules/example has uncommitted changes",
+    );
+    assert!(worktree.is_dir());
+}
+
+#[test]
+fn remove_refuses_submodule_ahead_of_main() {
+    let fixture = fixture_repo(&tool());
+    create(&fixture, "submodule-ahead");
+    let worktree = fixture.worktree("submodule-ahead");
+    let submodule = worktree.join("modules/example");
+    fs::write(submodule.join("file.txt"), "initial\nahead\n").unwrap();
+    git(&submodule, &["commit", "-am", "ahead"]);
+    fails_with(
+        &fixture.run(["remove", &fixture.name("submodule-ahead")]),
+        "submodule modules/example is 1 commits ahead of main",
+    );
+    assert!(worktree.is_dir());
+}
+
+#[test]
+fn clean_removes_safe_worktree() {
+    let fixture = fixture_repo(&tool());
+    create(&fixture, "clean");
+    let worktree = fixture.worktree("clean");
+    ok(&fixture.run(["clean"]), "clean safe worktree");
+    assert!(!worktree.exists());
+}
+
+#[test]
+fn clean_preserves_dirty_worktree() {
+    let fixture = fixture_repo(&tool());
+    create(&fixture, "dirty");
+    let worktree = fixture.worktree("dirty");
+    fs::write(worktree.join("dirty.txt"), "preserve\n").unwrap();
+    let output = fixture.run(["clean"]);
+    ok(&output, "clean dirty worktree");
+    assert!(all(&output).contains("superproject has uncommitted changes"));
+    assert!(worktree.is_dir());
 }
 #[test]
 fn rename_is_remove_and_recreate() {

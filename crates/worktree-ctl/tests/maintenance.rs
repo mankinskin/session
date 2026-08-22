@@ -261,20 +261,61 @@ fn list_reports_lifecycle_state_and_rejection_reason() {
 
     assert!(output.status.success(), "list failed: {}", all(&output));
     let report = all(&output);
+    assert!(report.contains("worktree: "), "{report}");
     assert!(
         report.contains(
-            "branch=agent/12345678-1234-1234-1234-123456789abc/state"
+            "superproject: branch=agent/12345678-1234-1234-1234-123456789abc/state changes=clean ahead=0 behind=0"
         ),
         "{report}"
     );
-    assert!(report.contains("branch=agent/legacy-state"), "{report}");
-    assert!(report.contains("submodules=initialized"), "{report}");
     assert!(
-        report.contains("lifecycle=preserved reason=not-idle"),
+        report.contains(
+            "superproject: branch=agent/legacy-state changes=clean ahead=0 behind=0"
+        ),
+        "{report}"
+    );
+    assert!(
+        report.contains(
+            "modules/example: branch=HEAD changes=clean ahead=0 behind=0"
+        ),
+        "{report}"
+    );
+    assert!(report.contains("modules/example: unavailable"), "{report}");
+    assert!(
+        report.contains("lifecycle: preserved reason=not-idle"),
         "{report}"
     );
 }
 
+#[test]
+fn list_reports_dirty_superproject_and_ahead_submodule() {
+    let fixture = fixture_repo();
+    create(&fixture, "live-state");
+    let worktree = fixture.worktree("live-state");
+    fs::write(worktree.join("pending.txt"), "pending\n")
+        .expect("write pending superproject change");
+    let submodule = worktree.join("modules/example");
+    fs::write(submodule.join("file.txt"), "initial\nahead\n")
+        .expect("write submodule change");
+    git(&submodule, &["commit", "-am", "ahead"]);
+
+    let output = fixture.run(["list"]);
+
+    assert!(output.status.success(), "list failed: {}", all(&output));
+    let report = all(&output);
+    assert!(
+        report.contains(
+            "superproject: branch=agent/12345678-1234-1234-1234-123456789abc/live-state changes=dirty ahead=0 behind=0"
+        ),
+        "{report}"
+    );
+    assert!(
+        report.contains(
+            "modules/example: branch=HEAD changes=clean ahead=1 behind=0"
+        ),
+        "{report}"
+    );
+}
 #[test]
 fn merge_refuses_non_fast_forward() {
     let fixture = fixture_repo();
