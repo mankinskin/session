@@ -116,6 +116,7 @@ fn run() -> Result<(), SessionError> {
             );
         }
     }
+    ensure_provisioning_succeeded(routing_outcome.as_ref())?;
     let Some(store_root) = store_root else {
         tracing::warn!("skip: no capture store root resolved");
         emit_hook_payload(routing_outcome.as_ref());
@@ -200,6 +201,19 @@ fn run() -> Result<(), SessionError> {
 
     emit_hook_payload(routing_outcome.as_ref());
     Ok(())
+}
+
+fn ensure_provisioning_succeeded(
+    outcome: Option<&ProvisioningDiagnostic>,
+) -> Result<(), SessionError> {
+    match outcome {
+        Some(ProvisioningDiagnostic::Failed { reason }) => {
+            Err(SessionError::InvalidHookInput(format!(
+                "worktree provisioning failed: {reason}"
+            )))
+        },
+        _ => Ok(()),
+    }
 }
 
 #[derive(Debug)]
@@ -438,9 +452,9 @@ fn provision_session_worktree(
             Ok(ProvisionOutcome::Reclaimed { worktree, .. }) =>
                 ("reclaimed", worktree),
             Err(error) => {
-                report_provision_error(session_id, error);
+                report_provision_error(session_id, &error);
                 return ProvisioningDiagnostic::Failed {
-                    reason: "provisioning_failed".to_string(),
+                    reason: error.to_string(),
                 };
             },
         };
@@ -467,6 +481,9 @@ fn provision_session_worktree(
         eprintln!(
             "[session-capture-hook] main-checkout registration failed for session {session_id}: {error}"
         );
+        return ProvisioningDiagnostic::Failed {
+            reason: format!("main_checkout_registration_failed: {error}"),
+        };
     }
 
     for outcome in rebuild_entity_indexes(&worktree.path) {
@@ -480,7 +497,7 @@ fn provision_session_worktree(
 
 fn report_provision_error(
     session_id: &str,
-    error: ProvisionError,
+    error: &ProvisionError,
 ) {
     match error {
         ProvisionError::CapReached {
