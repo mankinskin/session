@@ -433,6 +433,17 @@ fn clean_removes_safe_worktree() {
 }
 
 #[test]
+fn clean_removes_empty_unregistered_worktree_debris() {
+    let fixture = fixture_repo(&tool());
+    let debris = fixture.main.join(".worktrees").join("stale-session");
+    fs::create_dir_all(&debris).unwrap();
+
+    ok(&fixture.run(["clean", "--all"]), "clean empty debris");
+
+    assert!(!debris.exists());
+}
+
+#[test]
 fn clean_removes_selected_worktree_that_is_fully_behind_main() {
     let fixture = fixture_repo(&tool());
     create(&fixture, "behind");

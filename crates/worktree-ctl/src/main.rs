@@ -604,35 +604,44 @@ fn handle_list(
         }
     }
 
-    let worktree_root = git.main_checkout().join(".worktrees");
-    if worktree_root.is_dir() {
-        for entry in std::fs::read_dir(&worktree_root)
-            .map_err(|error| error.to_string())?
-        {
-            let entry = entry.map_err(|error| error.to_string())?;
-            let path = entry.path();
-            if path.is_dir()
-                && !registered.iter().any(|worktree| {
-                    worktree.path == path || worktree.path.starts_with(&path)
-                })
-            {
-                if verbose {
-                    println!("worktree: {}", path.display());
-                    println!("  lifecycle: unregistered-debris");
-                } else {
-                    println!(
-                        "{} {} {}",
-                        path.strip_prefix(git.main_checkout())
-                            .unwrap_or(&path)
-                            .display(),
-                        color(ANSI_RED, "[debris]"),
-                        color(ANSI_RED, "unregistered")
-                    );
-                }
-            }
+    for path in unregistered_worktree_debris(&git, &registered)? {
+        if verbose {
+            println!("worktree: {}", path.display());
+            println!("  lifecycle: unregistered-debris");
+        } else {
+            println!(
+                "{} {} {}",
+                path.strip_prefix(git.main_checkout())
+                    .unwrap_or(&path)
+                    .display(),
+                color(ANSI_RED, "[debris]"),
+                color(ANSI_RED, "unregistered")
+            );
         }
     }
     Ok(())
+}
+
+fn unregistered_worktree_debris(
+    git: &WorktreeGit,
+    registered: &[session_worktree_provision::WorktreeRef],
+) -> Result<Vec<PathBuf>, String> {
+    let worktree_root = git.main_checkout().join(".worktrees");
+    if !worktree_root.is_dir() {
+        return Ok(Vec::new());
+    }
+    let debris = std::fs::read_dir(worktree_root)
+        .map_err(|error| error.to_string())?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.is_dir()
+                && !registered.iter().any(|worktree| {
+                    worktree.path == *path || worktree.path.starts_with(path)
+                })
+        })
+        .collect();
+    Ok(debris)
 }
 
 fn live_submodule_states(
@@ -885,8 +894,9 @@ fn handle_clean(
         env::current_dir().map_err(|error| error.to_string())?;
     let git =
         WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let registered = selected_worktrees(&git, &selection)?;
     let mut removable = Vec::new();
-    for worktree in selected_worktrees(&git, &selection)? {
+    for worktree in registered {
         if worktree_relative_path(&git, &worktree).is_err() {
             println!(
                 "preserved path={} reason=outside-worktree-root",
@@ -902,9 +912,32 @@ fn handle_clean(
             ),
         }
     }
+    let mut removable_debris = Vec::new();
+    if selection.all {
+        let registered =
+            git.list_worktrees().map_err(|error| error.to_string())?;
+        for path in unregistered_worktree_debris(&git, &registered)? {
+            let mut entries =
+                std::fs::read_dir(&path).map_err(|error| error.to_string())?;
+            if entries.next().is_none() {
+                removable_debris.push(path);
+            } else {
+                println!(
+                    "preserved path={} reason=unregistered-debris-not-empty",
+                    path.display()
+                );
+            }
+        }
+    }
     if dry_run {
         for worktree in &removable {
             println!("[dry-run] remove {} with force", worktree.path.display());
+        }
+        for path in &removable_debris {
+            println!(
+                "[dry-run] remove empty unregistered debris {}",
+                path.display()
+            );
         }
         return Ok(());
     }
@@ -916,7 +949,16 @@ fn handle_clean(
     if !removable.is_empty() {
         git.worktree_prune().map_err(|error| error.to_string())?;
     }
+    for path in &removable_debris {
+        std::fs::remove_dir(path).map_err(|error| error.to_string())?;
+    }
     println!("clean: removed {} safe worktree(s)", removable.len());
+    if !removable_debris.is_empty() {
+        println!(
+            "clean: removed {} empty unregistered debris directory(s)",
+            removable_debris.len()
+        );
+    }
     Ok(())
 }
 fn ensure_safe_to_remove(
