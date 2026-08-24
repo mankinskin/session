@@ -12,6 +12,8 @@ use session_worktree_provision::WorktreeGit;
 
 use crate::{
     LifecyclePlan,
+    checkpoint_owned_session_changes,
+    checkpoint_session_mirror_changes,
     find_worktree,
     git::{
         git_command,
@@ -22,8 +24,10 @@ use crate::{
 
 const AUTOSTASH_MESSAGE: &str = "worktree-ctl autostash";
 const AUTO_COMMIT_MESSAGE: &str = "worktree-ctl auto-commit before sync";
-const REBASED_GITLINK_BASE_COMMIT_PREFIX: &str = "rebase submodule bases onto local main";
-const REBASED_GITLINK_TIP_COMMIT_PREFIX: &str = "rebase submodule tips onto local main";
+const REBASED_GITLINK_BASE_COMMIT_PREFIX: &str =
+    "rebase submodule bases onto local main";
+const REBASED_GITLINK_TIP_COMMIT_PREFIX: &str =
+    "rebase submodule tips onto local main";
 const REBASED_GITLINK_BRIDGE_PREFIX: &str = "worktree-ctl-rebase-bridge";
 
 #[derive(Debug)]
@@ -44,6 +48,7 @@ pub(crate) fn handle_rebase(
     )
     .map_err(|error| error.to_string())?;
     let worktree = find_worktree(&git, name)?;
+    checkpoint_owned_session_changes(&git, &worktree, dry_run)?;
     let branch = worktree.branch.as_deref().ok_or_else(|| {
         format!("worktree {name} is detached and cannot be rebased")
     })?;
@@ -136,6 +141,7 @@ pub(crate) fn handle_merge(
     )
     .map_err(|error| error.to_string())?;
     let worktree = find_worktree(&git, name)?;
+    checkpoint_owned_session_changes(&git, &worktree, dry_run)?;
     let branch = worktree.branch.as_deref().ok_or_else(|| {
         format!("worktree {name} is detached and cannot be merged")
     })?;
@@ -222,6 +228,13 @@ pub(crate) fn handle_sync(
     dry_run: bool,
     auto_commit: bool,
 ) -> Result<(), String> {
+    let git = WorktreeGit::open(
+        env::current_dir().map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    let worktree = find_worktree(&git, name)?;
+    checkpoint_owned_session_changes(&git, &worktree, dry_run)?;
+    checkpoint_session_mirror_changes(&git, &worktree, dry_run)?;
     handle_rebase(name, dry_run, auto_commit)?;
     handle_merge(name, dry_run, auto_commit)
 }
@@ -279,7 +292,9 @@ fn stash_tip(path: &Path) -> Result<Option<String>, String> {
         .output()
         .map_err(|error| format!("failed to inspect stash state: {error}"))?;
     if output.status.success() {
-        Ok(Some(String::from_utf8_lossy(&output.stdout).trim().to_owned()))
+        Ok(Some(
+            String::from_utf8_lossy(&output.stdout).trim().to_owned(),
+        ))
     } else if output.status.code() == Some(1) {
         Ok(None)
     } else {
@@ -434,11 +449,15 @@ fn resolve_bridged_gitlink_conflicts(worktree: &Path) -> Result<bool, String> {
     Ok(true)
 }
 
-fn reset_redundant_gitlink_only_branch(worktree: &Path) -> Result<bool, String> {
+fn reset_redundant_gitlink_only_branch(
+    worktree: &Path
+) -> Result<bool, String> {
     let output = git_command(worktree)
         .args(["diff", "--raw", "--no-abbrev", "main", "HEAD"])
         .output()
-        .map_err(|error| format!("failed to inspect gitlink rebase candidates: {error}"))?;
+        .map_err(|error| {
+            format!("failed to inspect gitlink rebase candidates: {error}")
+        })?;
     if !output.status.success() {
         return Err(format!(
             "failed to inspect gitlink rebase candidates: {}",
@@ -446,7 +465,10 @@ fn reset_redundant_gitlink_only_branch(worktree: &Path) -> Result<bool, String> 
         ));
     }
     let changes = String::from_utf8_lossy(&output.stdout);
-    let changes = changes.lines().filter(|line| !line.is_empty()).collect::<Vec<_>>();
+    let changes = changes
+        .lines()
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>();
     if changes.is_empty() {
         return Ok(false);
     }
@@ -456,8 +478,10 @@ fn reset_redundant_gitlink_only_branch(worktree: &Path) -> Result<bool, String> 
         if fields.len() < 6 || fields[0] != ":160000" || fields[1] != "160000" {
             return Ok(false);
         }
-        let main = Oid::from_str(fields[2]).map_err(|error| error.to_string())?;
-        let branch = Oid::from_str(fields[3]).map_err(|error| error.to_string())?;
+        let main =
+            Oid::from_str(fields[2]).map_err(|error| error.to_string())?;
+        let branch =
+            Oid::from_str(fields[3]).map_err(|error| error.to_string())?;
         let repository = match Repository::open(worktree.join(fields[5])) {
             Ok(repository) => repository,
             Err(_) => return Ok(false),
@@ -477,14 +501,17 @@ fn reset_redundant_gitlink_only_branch(worktree: &Path) -> Result<bool, String> 
     Ok(true)
 }
 
-fn resolve_redundant_gitlink_conflicts(worktree: &Path) -> Result<bool, String> {
+fn resolve_redundant_gitlink_conflicts(
+    worktree: &Path
+) -> Result<bool, String> {
     let paths = conflicted_paths(worktree)?;
     if paths.is_empty() {
         return Ok(false);
     }
 
     for path in &paths {
-        let Some((ours, theirs)) = conflicted_gitlink_tips(worktree, path)? else {
+        let Some((ours, theirs)) = conflicted_gitlink_tips(worktree, path)?
+        else {
             return Ok(false);
         };
         let repository = match Repository::open(worktree.join(path)) {
@@ -513,7 +540,9 @@ fn conflicted_paths(worktree: &Path) -> Result<Vec<String>, String> {
     let output = git_command(worktree)
         .args(["diff", "--name-only", "--diff-filter=U"])
         .output()
-        .map_err(|error| format!("failed to inspect rebase conflicts: {error}"))?;
+        .map_err(|error| {
+            format!("failed to inspect rebase conflicts: {error}")
+        })?;
     if !output.status.success() {
         return Err(format!(
             "failed to inspect rebase conflicts: {}",
@@ -534,7 +563,9 @@ fn conflicted_gitlink_tips(
     let entries = git_command(worktree)
         .args(["ls-files", "-u", "--", path])
         .output()
-        .map_err(|error| format!("failed to inspect conflicted gitlink {path}: {error}"))?;
+        .map_err(|error| {
+            format!("failed to inspect conflicted gitlink {path}: {error}")
+        })?;
     if !entries.status.success() {
         return Err(format!(
             "failed to inspect conflicted gitlink {path}: {}",
@@ -549,9 +580,17 @@ fn conflicted_gitlink_tips(
             return Ok(None);
         }
         match fields[2] {
-            "2" => ours = Some(Oid::from_str(fields[1]).map_err(|error| error.to_string())?),
-            "3" => theirs = Some(Oid::from_str(fields[1]).map_err(|error| error.to_string())?),
-            _ => {}
+            "2" =>
+                ours = Some(
+                    Oid::from_str(fields[1])
+                        .map_err(|error| error.to_string())?,
+                ),
+            "3" =>
+                theirs = Some(
+                    Oid::from_str(fields[1])
+                        .map_err(|error| error.to_string())?,
+                ),
+            _ => {},
         }
     }
     Ok(ours.zip(theirs))
@@ -561,7 +600,9 @@ fn continue_or_skip_rebase(worktree: &Path) -> Result<(), String> {
     let staged = git_command(worktree)
         .args(["diff", "--cached", "--quiet"])
         .status()
-        .map_err(|error| format!("failed to inspect resolved rebase: {error}"))?;
+        .map_err(|error| {
+            format!("failed to inspect resolved rebase: {error}")
+        })?;
     let command = if staged.success() {
         ["rebase", "--skip"]
     } else if staged.code() == Some(1) {
@@ -573,9 +614,9 @@ fn continue_or_skip_rebase(worktree: &Path) -> Result<(), String> {
         .env("GIT_EDITOR", "true")
         .args(command)
         .output()
-        .map_err(|error| format!(
-            "failed to continue automatic rebase resolution: {error}"
-        ))?;
+        .map_err(|error| {
+            format!("failed to continue automatic rebase resolution: {error}")
+        })?;
     if output.status.success() {
         Ok(())
     } else {
@@ -596,7 +637,10 @@ fn commit_rebased_gitlink_bridges(
     }
     for bridge in bridges {
         let cache_info = format!("160000,{},{}", bridge.base, bridge.path);
-        run_git(worktree, ["update-index", "--add", "--cacheinfo", &cache_info])?;
+        run_git(
+            worktree,
+            ["update-index", "--add", "--cacheinfo", &cache_info],
+        )?;
     }
     commit_index_if_changed(
         worktree,
@@ -613,22 +657,21 @@ fn commit_rebased_gitlink_bridges(
 }
 
 fn discard_current_gitlink_bridge_pair(worktree: &Path) -> Result<(), String> {
-    let repository = Repository::open(worktree).map_err(|error| error.to_string())?;
+    let repository =
+        Repository::open(worktree).map_err(|error| error.to_string())?;
     let head = repository
         .head()
         .and_then(|head| head.peel_to_commit())
         .map_err(|error| error.to_string())?;
-    if !head
-        .message()
-        .is_some_and(|message| message.starts_with(REBASED_GITLINK_TIP_COMMIT_PREFIX))
-    {
+    if !head.message().is_some_and(|message| {
+        message.starts_with(REBASED_GITLINK_TIP_COMMIT_PREFIX)
+    }) {
         return Ok(());
     }
     let parent = head.parent(0).map_err(|error| error.to_string())?;
-    if parent
-        .message()
-        .is_some_and(|message| message.starts_with(REBASED_GITLINK_BASE_COMMIT_PREFIX))
-    {
+    if parent.message().is_some_and(|message| {
+        message.starts_with(REBASED_GITLINK_BASE_COMMIT_PREFIX)
+    }) {
         run_git(worktree, ["reset", "--soft", "HEAD^^"])?;
         run_git(worktree, ["reset"])?;
         println!("replaced previous generated gitlink bridge checkpoint");
@@ -643,7 +686,9 @@ fn commit_index_if_changed(
     let status = git_command(worktree)
         .args(["diff", "--cached", "--quiet"])
         .status()
-        .map_err(|error| format!("failed to inspect generated gitlink checkpoint: {error}"))?;
+        .map_err(|error| {
+            format!("failed to inspect generated gitlink checkpoint: {error}")
+        })?;
     if status.success() {
         return Ok(());
     }
@@ -659,19 +704,25 @@ fn bridge_message(
 ) -> String {
     let records = bridges
         .iter()
-        .map(|bridge| format!(
-            "{REBASED_GITLINK_BRIDGE_PREFIX} path={} old={} base={} tip={}",
-            bridge.path, bridge.old, bridge.base, bridge.tip
-        ))
+        .map(|bridge| {
+            format!(
+                "{REBASED_GITLINK_BRIDGE_PREFIX} path={} old={} base={} tip={}",
+                bridge.path, bridge.old, bridge.base, bridge.tip
+            )
+        })
         .collect::<Vec<_>>();
     format!("{prefix}\n\n{}", records.join("\n"))
 }
 
-fn recorded_gitlink_bridges(worktree: &Path) -> Result<Vec<RebasedGitlink>, String> {
+fn recorded_gitlink_bridges(
+    worktree: &Path
+) -> Result<Vec<RebasedGitlink>, String> {
     let output = git_command(worktree)
         .args(["log", "--format=%B", "ORIG_HEAD"])
         .output()
-        .map_err(|error| format!("failed to inspect original rebase history: {error}"))?;
+        .map_err(|error| {
+            format!("failed to inspect original rebase history: {error}")
+        })?;
     if !output.status.success() {
         return Ok(Vec::new());
     }
@@ -706,11 +757,16 @@ fn parse_bridge_record(line: &str) -> Option<Result<RebasedGitlink, String>> {
                 Ok(value) => tip = Some(value),
                 Err(error) => return Some(Err(error.to_string())),
             },
-            _ => {}
+            _ => {},
         }
     }
     Some(match (path, old, base, tip) {
-        (Some(path), Some(old), Some(base), Some(tip)) => Ok(RebasedGitlink { path, old, base, tip }),
+        (Some(path), Some(old), Some(base), Some(tip)) => Ok(RebasedGitlink {
+            path,
+            old,
+            base,
+            tip,
+        }),
         _ => Err("incomplete generated gitlink bridge record".to_owned()),
     })
 }
@@ -719,7 +775,8 @@ fn gitlink_at_head(
     worktree: &Path,
     path: &str,
 ) -> Result<Oid, String> {
-    let repository = Repository::open(worktree).map_err(|error| error.to_string())?;
+    let repository =
+        Repository::open(worktree).map_err(|error| error.to_string())?;
     let commit = repository
         .head()
         .and_then(|head| head.peel_to_commit())
@@ -732,7 +789,8 @@ fn gitlink_at_head(
 }
 
 fn local_main_tip(repository: &Path) -> Result<Oid, String> {
-    let repository = Repository::open(repository).map_err(|error| error.to_string())?;
+    let repository =
+        Repository::open(repository).map_err(|error| error.to_string())?;
     repository
         .find_branch("main", BranchType::Local)
         .and_then(|branch| branch.get().peel_to_commit())
@@ -741,7 +799,8 @@ fn local_main_tip(repository: &Path) -> Result<Oid, String> {
 }
 
 fn head_tip(repository: &Path) -> Result<Oid, String> {
-    let repository = Repository::open(repository).map_err(|error| error.to_string())?;
+    let repository =
+        Repository::open(repository).map_err(|error| error.to_string())?;
     repository
         .head()
         .and_then(|head| head.peel_to_commit())

@@ -21,6 +21,7 @@ use git2::Repository;
 use session_worktree_provision::{
     ReclaimEligibility,
     ReclaimRejectionReason,
+    SessionActivity,
     SessionStoreActivity,
     WorktreeGit,
     evaluate_reclaim_candidate,
@@ -254,6 +255,73 @@ fn worktree_selector(
             .ok_or_else(|| "worktree path must be valid UTF-8".to_owned()),
         Err(_) => Ok(worktree.name.clone()),
     }
+}
+
+pub(crate) fn checkpoint_owned_session_changes(
+    git: &WorktreeGit,
+    worktree: &session_worktree_provision::WorktreeRef,
+    dry_run: bool,
+) -> Result<(), String> {
+    let activity = SessionStoreActivity::with_default_staleness(
+        git.main_checkout().join(".session"),
+    );
+    let session_worktree_provision::WorktreeOwnership::Owned(owner_session_id) =
+        activity.worktree_ownership(&worktree.path)
+    else {
+        return Ok(());
+    };
+    if dry_run {
+        println!(
+            "[dry-run] checkpoint owned session {} in {} when it is the only dirty path",
+            owner_session_id,
+            worktree.path.display()
+        );
+        return Ok(());
+    }
+    if git
+        .checkpoint_owned_session_changes(&worktree.path, &owner_session_id)
+        .map_err(|error| error.to_string())?
+    {
+        println!(
+            "checkpointed owned session {} in {}",
+            owner_session_id,
+            worktree.path.display()
+        );
+    }
+    Ok(())
+}
+
+pub(crate) fn checkpoint_session_mirror_changes(
+    git: &WorktreeGit,
+    worktree: &session_worktree_provision::WorktreeRef,
+    dry_run: bool,
+) -> Result<(), String> {
+    let activity = SessionStoreActivity::with_default_staleness(
+        git.main_checkout().join(".session"),
+    );
+    let session_worktree_provision::WorktreeOwnership::Owned(owner_session_id) =
+        activity.worktree_ownership(&worktree.path)
+    else {
+        return Ok(());
+    };
+    if dry_run {
+        println!(
+            "[dry-run] checkpoint main session mirror {} when it is dirty",
+            owner_session_id
+        );
+        return Ok(());
+    }
+    if git
+        .checkpoint_session_mirror_changes(&worktree.path, &owner_session_id)
+        .map_err(|error| error.to_string())?
+    {
+        println!(
+            "checkpointed main session mirror {} for {}",
+            owner_session_id,
+            worktree.path.display()
+        );
+    }
+    Ok(())
 }
 
 fn handle_rebase(
@@ -894,6 +962,9 @@ fn handle_clean(
         env::current_dir().map_err(|error| error.to_string())?;
     let git =
         WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let activity = SessionStoreActivity::with_default_staleness(
+        git.main_checkout().join(".session"),
+    );
     let registered = selected_worktrees(&git, &selection)?;
     let mut removable = Vec::new();
     for worktree in registered {
@@ -904,6 +975,14 @@ fn handle_clean(
             );
             continue;
         }
+        if activity.is_active(&worktree.path) {
+            println!(
+                "preserved path={} reason=session-active",
+                worktree.path.display()
+            );
+            continue;
+        }
+        checkpoint_owned_session_changes(&git, &worktree, dry_run)?;
         match ensure_safe_to_remove(&git, &worktree) {
             Ok(()) => removable.push(worktree),
             Err(reason) => println!(

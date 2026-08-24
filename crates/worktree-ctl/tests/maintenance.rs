@@ -166,6 +166,33 @@ fn create(
     assert!(output.status.success(), "new failed: {}", all(&output));
 }
 
+fn write_owned_session_record(
+    worktree: &Path,
+    captured_at: Option<&str>,
+) {
+    write_session_record(worktree, worktree, captured_at);
+}
+
+fn write_session_record(
+    root: &Path,
+    owner_worktree: &Path,
+    captured_at: Option<&str>,
+) {
+    let session_dir = root.join(".session").join("sessions").join(SESSION_UUID);
+    fs::create_dir_all(&session_dir).expect("create local session record");
+    let captured_at = captured_at
+        .map(|value| format!(",\"captured_at\":\"{value}\""))
+        .unwrap_or_default();
+    fs::write(
+        session_dir.join("session.json"),
+        format!(
+            "{{\"session_id\":\"{SESSION_UUID}\"{captured_at},\"metadata\":{{\"worktree\":{{\"path\":\"{}\"}}}}}}",
+            owner_worktree.display().to_string().replace('\\', "\\\\")
+        ),
+    )
+    .expect("write local session record");
+}
+
 fn create_legacy_worktree(
     fixture: &Fixture,
     name: &str,
@@ -834,37 +861,46 @@ fn rebase_amends_the_current_generated_gitlink_checkpoint() {
         .expect("write first superproject main change");
     git(&fixture.main, &["add", "main-one.txt"]);
     git(&fixture.main, &["commit", "-m", "superproject main one"]);
-    let first = fixture.run([
-        "rebase",
-        "12345678-1234-1234-1234-123456789abc/checkpoint",
-    ]);
+    let first = fixture
+        .run(["rebase", "12345678-1234-1234-1234-123456789abc/checkpoint"]);
     assert!(first.status.success(), "rebase failed: {}", all(&first));
 
-    fs::write(main_submodule.join("file.txt"), "initial\nmain one\nmain two\n")
-        .expect("write second main change");
+    fs::write(
+        main_submodule.join("file.txt"),
+        "initial\nmain one\nmain two\n",
+    )
+    .expect("write second main change");
     git(&main_submodule, &["commit", "-am", "main two"]);
     fs::write(fixture.main.join("main-two.txt"), "main\n")
         .expect("write second superproject main change");
     git(&fixture.main, &["add", "main-two.txt"]);
     git(&fixture.main, &["commit", "-m", "superproject main two"]);
-    let second = fixture.run([
-        "rebase",
-        "12345678-1234-1234-1234-123456789abc/checkpoint",
-    ]);
+    let second = fixture
+        .run(["rebase", "12345678-1234-1234-1234-123456789abc/checkpoint"]);
     assert!(second.status.success(), "rebase failed: {}", all(&second));
 
     assert_eq!(
         "1",
         git_revision(
             &worktree,
-            &["rev-list", "--count", "--grep=^rebase submodule bases onto local main", "HEAD"],
+            &[
+                "rev-list",
+                "--count",
+                "--grep=^rebase submodule bases onto local main",
+                "HEAD"
+            ],
         )
     );
     assert_eq!(
         "1",
         git_revision(
             &worktree,
-            &["rev-list", "--count", "--grep=^rebase submodule tips onto local main", "HEAD"],
+            &[
+                "rev-list",
+                "--count",
+                "--grep=^rebase submodule tips onto local main",
+                "HEAD"
+            ],
         )
     );
     assert_eq!(
@@ -890,6 +926,97 @@ fn rebase_reports_missing_submodule_branch_as_skipped() {
 }
 
 #[test]
+fn rebase_checkpoints_owned_session_artifacts_before_mutating() {
+    let fixture = fixture_repo();
+    create(&fixture, "session-checkpoint");
+    let worktree = fixture.worktree("session-checkpoint");
+    write_owned_session_record(&worktree, None);
+
+    let output = fixture.run([
+        "rebase",
+        "12345678-1234-1234-1234-123456789abc/session-checkpoint",
+    ]);
+
+    assert!(output.status.success(), "rebase failed: {}", all(&output));
+    assert!(
+        all(&output).contains("checkpointed owned session"),
+        "{output:?}"
+    );
+    assert_eq!(
+        "",
+        git_revision(&worktree, &["status", "--porcelain"]),
+        "session-only changes should be committed before rebase"
+    );
+    assert!(
+        git_revision(&worktree, &["show", "--format=", "--name-only", "HEAD"])
+            .contains(".session/sessions/12345678-1234-1234-1234-123456789abc/session.json")
+    );
+}
+
+#[test]
+fn sync_checkpoints_main_session_mirror_before_stashing_other_changes() {
+    let fixture = fixture_repo();
+    create(&fixture, "session-mirror");
+    let worktree = fixture.worktree("session-mirror");
+    write_owned_session_record(&worktree, None);
+    write_session_record(&fixture.main, &worktree, None);
+    fs::write(fixture.main.join("unrelated.txt"), "preserve me\n")
+        .expect("write unrelated main change");
+
+    let output = fixture.run([
+        "sync",
+        "12345678-1234-1234-1234-123456789abc/session-mirror",
+    ]);
+
+    assert!(output.status.success(), "sync failed: {}", all(&output));
+    assert!(
+        all(&output).contains("checkpointed main session mirror"),
+        "{}",
+        all(&output)
+    );
+    assert!(
+        fixture.main.join("unrelated.txt").is_file(),
+        "unrelated main change must be restored"
+    );
+    assert_eq!(
+        "",
+        git_revision(&fixture.main, &["stash", "list"]),
+        "session mirror must not collide with stash restoration"
+    );
+    assert!(
+        git_revision(&fixture.main, &["log", "--format=%s", "-2"])
+            .contains("worktree-ctl checkpoint session mirror")
+    );
+}
+
+#[test]
+fn clean_refuses_checkpoint_when_an_unrelated_path_is_dirty() {
+    let fixture = fixture_repo();
+    create(&fixture, "session-plus-code");
+    let worktree = fixture.worktree("session-plus-code");
+    write_owned_session_record(&worktree, None);
+    fs::write(worktree.join("unrelated.txt"), "keep me\n")
+        .expect("write unrelated change");
+
+    let output = fixture.run([
+        "clean",
+        "12345678-1234-1234-1234-123456789abc/session-plus-code",
+    ]);
+
+    assert!(output.status.success(), "clean failed: {}", all(&output));
+    assert!(
+        worktree.is_dir(),
+        "unrelated changes must preserve worktree"
+    );
+    let status = git_revision(&worktree, &["status", "--porcelain"]);
+    assert!(status.contains("unrelated.txt"), "{status}");
+    assert!(
+        status.contains(".session/"),
+        "session artifacts must remain uncommitted when unrelated changes exist: {status}"
+    );
+}
+
+#[test]
 fn rebase_skips_redundant_descendant_gitlink_update() {
     let fixture = fixture_repo();
     create(&fixture, "redundant-gitlink");
@@ -906,8 +1033,11 @@ fn rebase_skips_redundant_descendant_gitlink_update() {
     git(&worktree, &["add", "modules/example"]);
     git(&worktree, &["commit", "-m", "record intermediate gitlink"]);
 
-    fs::write(main_submodule.join("file.txt"), "initial\nintermediate\nlatest\n")
-        .expect("write latest submodule commit");
+    fs::write(
+        main_submodule.join("file.txt"),
+        "initial\nintermediate\nlatest\n",
+    )
+    .expect("write latest submodule commit");
     git(&main_submodule, &["commit", "-am", "latest"]);
     git(&fixture.main, &["add", "modules/example"]);
     git(&fixture.main, &["commit", "-m", "record latest gitlink"]);

@@ -326,13 +326,26 @@ pub fn evaluate_reclaim_candidate(
             ));
         }
     }
-    if git.is_dirty(&worktree.path)? {
-        return Ok(ReclaimEligibility::Rejected(ReclaimRejectionReason::Dirty));
-    }
-    if git.ahead_behind(&worktree.path, "main")?.0 != 0 {
+    let ownership = activity.worktree_ownership(&worktree.path);
+    let ahead = git.ahead_behind(&worktree.path, "main")?.0;
+    let checkpoint_only = matches!(
+        &ownership,
+        WorktreeOwnership::Owned(owner_session_id)
+            if ahead == 1 && git.is_owned_session_checkpoint(&worktree.path, owner_session_id)?
+    );
+    if ahead != 0 && !checkpoint_only {
         return Ok(ReclaimEligibility::Rejected(
             ReclaimRejectionReason::AheadOfMain,
         ));
+    }
+    if let WorktreeOwnership::Owned(owner_session_id) = ownership {
+        git.checkpoint_owned_session_changes(
+            &worktree.path,
+            &owner_session_id,
+        )?;
+    }
+    if git.is_dirty(&worktree.path)? {
+        return Ok(ReclaimEligibility::Rejected(ReclaimRejectionReason::Dirty));
     }
     Ok(ReclaimEligibility::Reclaimable)
 }
@@ -719,6 +732,7 @@ mod tests {
     };
 
     const SESSION_ID: &str = "12345678-1234-4234-8234-123456789abc";
+    const OLD_SESSION_ID: &str = "abcdefab-cdef-4def-8def-abcdefabcdef";
     const SAME_PREFIX_SESSION_ID: &str = "12345678-5678-4678-9678-123456789abc";
 
     struct ActiveWorktree(PathBuf);
@@ -1427,6 +1441,58 @@ mod tests {
         assert!(
             !git.branch_exists(
                 "agent/12345678-1234-4234-8234-123456789abc/session"
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn reclaims_worktree_after_checkpointing_its_owned_session_record() {
+        let fixture = Fixture::new();
+        let git = fixture.git();
+        let old = git
+            .create_worktree_at(
+                &PathBuf::from(OLD_SESSION_ID).join("session"),
+                &format!("agent/{OLD_SESSION_ID}/session"),
+                "main",
+            )
+            .unwrap();
+        persist_worktree_owner(
+            &fixture.main.join(".session"),
+            OLD_SESSION_ID,
+            &old,
+        );
+        persist_worktree_owner(
+            &old.path.join(".session"),
+            OLD_SESSION_ID,
+            &old,
+        );
+
+        let activity = SessionStoreActivity::with_default_staleness(
+            fixture.main.join(".session"),
+        );
+        let eligibility =
+            evaluate_reclaim_candidate(&git, &activity, &old, &policy(1))
+                .unwrap();
+        assert_eq!(eligibility, ReclaimEligibility::Reclaimable);
+        assert_eq!(git.ahead_behind(&old.path, "main").unwrap().0, 1);
+        assert!(
+            git.is_owned_session_checkpoint(&old.path, OLD_SESSION_ID)
+                .unwrap()
+        );
+
+        let outcome =
+            provision_for_session(&git, &activity, SESSION_ID, &policy(1))
+                .unwrap();
+
+        assert!(matches!(outcome, ProvisionOutcome::Reclaimed { .. }));
+        assert!(
+            !git.is_dirty(
+                &fixture
+                    .main
+                    .join(".worktrees")
+                    .join(SESSION_ID)
+                    .join("session")
             )
             .unwrap()
         );
