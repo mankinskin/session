@@ -428,7 +428,23 @@ fn clean_removes_safe_worktree() {
     let fixture = fixture_repo(&tool());
     create(&fixture, "clean");
     let worktree = fixture.worktree("clean");
-    ok(&fixture.run(["clean"]), "clean safe worktree");
+    ok(&fixture.run(["clean", "--all"]), "clean safe worktree");
+    assert!(!worktree.exists());
+}
+
+#[test]
+fn clean_removes_selected_worktree_that_is_fully_behind_main() {
+    let fixture = fixture_repo(&tool());
+    create(&fixture, "behind");
+    let worktree = fixture.worktree("behind");
+    fs::write(fixture.main.join("main-only.txt"), "main\n").unwrap();
+    git(&fixture.main, &["add", "main-only.txt"]);
+    git(&fixture.main, &["commit", "-m", "advance main"]);
+
+    ok(
+        &fixture.run(["clean", &fixture.name("behind")]),
+        "clean fully behind worktree",
+    );
     assert!(!worktree.exists());
 }
 
@@ -438,7 +454,7 @@ fn clean_preserves_dirty_worktree() {
     create(&fixture, "dirty");
     let worktree = fixture.worktree("dirty");
     fs::write(worktree.join("dirty.txt"), "preserve\n").unwrap();
-    let output = fixture.run(["clean"]);
+    let output = fixture.run(["clean", "--all"]);
     ok(&output, "clean dirty worktree");
     assert!(all(&output).contains("superproject has uncommitted changes"));
     assert!(worktree.is_dir());

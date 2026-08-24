@@ -116,7 +116,20 @@ fn run() -> Result<(), SessionError> {
             );
         }
     }
-    ensure_provisioning_succeeded(routing_outcome.as_ref())?;
+    if store_root.is_none()
+        && matches!(
+            routing_outcome,
+            Some(ProvisioningDiagnostic::Failed { .. })
+        )
+    {
+        store_root = resolve_main_checkout_store_root();
+        if let Some(store_root) = store_root.as_ref() {
+            tracing::warn!(
+                store_root = %store_root.display(),
+                "worktree provisioning failed; capturing transcript in the main checkout store"
+            );
+        }
+    }
     let Some(store_root) = store_root else {
         tracing::warn!("skip: no capture store root resolved");
         emit_hook_payload(routing_outcome.as_ref());
@@ -272,18 +285,6 @@ fn mirror_user_prompt_to_main(
     SessionStoreConfig::new(main_store, "default")
         .persist_hook_event(session_id, event)
 }
-fn ensure_provisioning_succeeded(
-    outcome: Option<&ProvisioningDiagnostic>
-) -> Result<(), SessionError> {
-    match outcome {
-        Some(ProvisioningDiagnostic::Failed { reason }) =>
-            Err(SessionError::InvalidHookInput(format!(
-                "worktree provisioning failed: {reason}"
-            ))),
-        _ => Ok(()),
-    }
-}
-
 #[derive(Debug)]
 enum ProvisioningDiagnostic {
     Provisioned {
@@ -928,6 +929,12 @@ fn resolve_capture_store_root(
             None
         },
     }
+}
+
+fn resolve_main_checkout_store_root() -> Option<PathBuf> {
+    let current_dir = std::env::current_dir().ok()?;
+    let store_root = anchor_checkout(&current_dir).join(".session");
+    store_root.is_dir().then_some(store_root)
 }
 
 fn hook_event_name(args: &args::Args) -> String {

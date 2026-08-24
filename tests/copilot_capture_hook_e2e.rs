@@ -239,6 +239,67 @@ fn e2e_session_start_provisions_and_captures_a_fresh_session() {
 }
 
 #[test]
+fn e2e_session_start_captures_in_main_checkout_when_provisioning_fails() {
+    let fixture = tempdir().expect("temp fixture dir");
+    let checkout = fixture.path().join("checkout");
+    create_fixture_checkout(&checkout);
+    let session_id = "12121212-1212-4121-8121-121212121212";
+    let transcript = local_fixture_a().replace(FIXTURE_SESSION_ID, session_id);
+    let transcript_path = write_fixture_transcript(
+        &checkout,
+        "provisioning-failure.jsonl",
+        &transcript,
+    );
+    let hook_bin = std::env::var("CARGO_BIN_EXE_session-capture-hook")
+        .expect("cargo should expose session-capture-hook binary path for integration tests");
+
+    let mut child = Command::new(hook_bin)
+        .arg("--from-hook-stdin")
+        .current_dir(&checkout)
+        .env("MCP_MAIN_CHECKOUT", &checkout)
+        .env("WORKTREE_MAX", "0")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn session-capture-hook");
+    child
+        .stdin
+        .take()
+        .expect("child stdin")
+        .write_all(
+            serde_json::json!({
+                "hook_event_name": "SessionStart",
+                "session_id": session_id,
+                "transcript_path": transcript_path,
+            })
+            .to_string()
+            .as_bytes(),
+        )
+        .expect("write hook stdin payload");
+    let output = child
+        .wait_with_output()
+        .expect("wait for session-capture-hook");
+
+    assert!(
+        output.status.success(),
+        "session-capture-hook should fall back to the main checkout: stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !checkout.join(".worktrees").exists(),
+        "a capped provision must not create a worktree"
+    );
+    let record = SessionStoreConfig::new(checkout.join(".session"), "default")
+        .read_session(session_id)
+        .expect("fallback capture should persist in the main checkout store");
+    assert_eq!(
+        record.metadata.provisioning.map(|value| value.outcome),
+        Some("failed".to_string())
+    );
+}
+
+#[test]
 fn e2e_session_start_registers_in_main_checkout_without_disturbing_other_sessions()
  {
     let fixture = tempdir().expect("temp fixture dir");

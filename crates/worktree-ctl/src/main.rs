@@ -3,6 +3,7 @@ mod gitlink;
 mod sync;
 
 use std::{
+    collections::HashSet,
     env,
     path::{
         Path,
@@ -12,6 +13,7 @@ use std::{
 };
 
 use clap::{
+    Args,
     Parser,
     Subcommand,
 };
@@ -44,6 +46,16 @@ struct Cli {
     command: Command,
 }
 
+#[derive(Debug, Args, PartialEq, Eq)]
+struct WorktreeSelection {
+    #[arg(value_name = "WORKTREE")]
+    names: Vec<String>,
+    #[arg(long = "worktree", short = 'w', value_name = "WORKTREE")]
+    worktrees: Vec<String>,
+    #[arg(long)]
+    all: bool,
+}
+
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 enum Command {
     New {
@@ -69,21 +81,24 @@ enum Command {
         verbose: bool,
     },
     Rebase {
-        name: String,
+        #[command(flatten)]
+        selection: WorktreeSelection,
         #[arg(long)]
         dry_run: bool,
         #[arg(long)]
         auto_commit: bool,
     },
     Merge {
-        name: String,
+        #[command(flatten)]
+        selection: WorktreeSelection,
         #[arg(long)]
         dry_run: bool,
         #[arg(long)]
         auto_commit: bool,
     },
     Sync {
-        name: String,
+        #[command(flatten)]
+        selection: WorktreeSelection,
         #[arg(long)]
         dry_run: bool,
         #[arg(long)]
@@ -97,6 +112,18 @@ enum Command {
         dry_run: bool,
     },
     Clean {
+        #[command(flatten)]
+        selection: WorktreeSelection,
+        #[arg(long)]
+        dry_run: bool,
+    },
+    Commit {
+        #[command(flatten)]
+        selection: WorktreeSelection,
+        #[arg(short, long, default_value = "worktree-ctl commit")]
+        message: String,
+        #[arg(last = true, value_name = "PATHSPEC")]
+        paths: Vec<PathBuf>,
         #[arg(long)]
         dry_run: bool,
     },
@@ -146,26 +173,33 @@ fn dispatch(command: Command) -> Result<(), String> {
         ),
         Command::List { dry_run, verbose } => handle_list(dry_run, verbose),
         Command::Rebase {
-            name,
+            selection,
             dry_run,
             auto_commit,
-        } => sync::handle_rebase(&name, dry_run, auto_commit),
+        } => handle_rebase(selection, dry_run, auto_commit),
         Command::Merge {
-            name,
+            selection,
             dry_run,
             auto_commit,
-        } => sync::handle_merge(&name, dry_run, auto_commit),
+        } => handle_merge(selection, dry_run, auto_commit),
         Command::Sync {
-            name,
+            selection,
             dry_run,
             auto_commit,
-        } => sync::handle_sync(&name, dry_run, auto_commit),
+        } => handle_sync(selection, dry_run, auto_commit),
         Command::Remove {
             name,
             force,
             dry_run,
         } => handle_remove(&name, force, dry_run),
-        Command::Clean { dry_run } => handle_clean(dry_run),
+        Command::Clean { selection, dry_run } =>
+            handle_clean(selection, dry_run),
+        Command::Commit {
+            selection,
+            message,
+            paths,
+            dry_run,
+        } => handle_commit(selection, &message, &paths, dry_run),
         Command::Rename {
             source_name,
             target_name,
@@ -174,6 +208,178 @@ fn dispatch(command: Command) -> Result<(), String> {
         Command::Finish { name, dry_run } => handle_finish(&name, dry_run),
         Command::Doctor { dry_run } => handle_doctor(dry_run),
     }
+}
+
+fn selected_worktrees(
+    git: &WorktreeGit,
+    selection: &WorktreeSelection,
+) -> Result<Vec<session_worktree_provision::WorktreeRef>, String> {
+    let selectors = selection
+        .names
+        .iter()
+        .chain(&selection.worktrees)
+        .collect::<Vec<_>>();
+    if selection.all {
+        if !selectors.is_empty() {
+            return Err(
+                "--all cannot be combined with explicit worktree selectors"
+                    .to_owned(),
+            );
+        }
+        return git.list_worktrees().map_err(|error| error.to_string());
+    }
+    if selectors.is_empty() {
+        return Err("select at least one worktree or pass --all".to_owned());
+    }
+
+    let mut paths = HashSet::new();
+    let mut worktrees = Vec::new();
+    for selector in selectors {
+        let worktree = find_worktree(git, selector)?;
+        if paths.insert(worktree.path.clone()) {
+            worktrees.push(worktree);
+        }
+    }
+    Ok(worktrees)
+}
+
+fn worktree_selector(
+    git: &WorktreeGit,
+    worktree: &session_worktree_provision::WorktreeRef,
+) -> Result<String, String> {
+    match worktree_relative_path(git, worktree) {
+        Ok(path) => path
+            .to_str()
+            .map(|path| path.replace('\\', "/"))
+            .ok_or_else(|| "worktree path must be valid UTF-8".to_owned()),
+        Err(_) => Ok(worktree.name.clone()),
+    }
+}
+
+fn handle_rebase(
+    selection: WorktreeSelection,
+    dry_run: bool,
+    auto_commit: bool,
+) -> Result<(), String> {
+    let main_checkout =
+        env::current_dir().map_err(|error| error.to_string())?;
+    let git =
+        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    for worktree in selected_worktrees(&git, &selection)? {
+        let selector = worktree_selector(&git, &worktree)?;
+        sync::handle_rebase(&selector, dry_run, auto_commit)
+            .map_err(|error| format!("rebase {selector} failed: {error}"))?;
+    }
+    Ok(())
+}
+
+fn handle_merge(
+    selection: WorktreeSelection,
+    dry_run: bool,
+    auto_commit: bool,
+) -> Result<(), String> {
+    let main_checkout =
+        env::current_dir().map_err(|error| error.to_string())?;
+    let git =
+        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    for worktree in selected_worktrees(&git, &selection)? {
+        let selector = worktree_selector(&git, &worktree)?;
+        sync::handle_merge(&selector, dry_run, auto_commit)
+            .map_err(|error| format!("merge {selector} failed: {error}"))?;
+    }
+    Ok(())
+}
+
+fn handle_sync(
+    selection: WorktreeSelection,
+    dry_run: bool,
+    auto_commit: bool,
+) -> Result<(), String> {
+    let main_checkout =
+        env::current_dir().map_err(|error| error.to_string())?;
+    let git =
+        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let mut ordered = selected_worktrees(&git, &selection)?
+        .into_iter()
+        .map(|worktree| {
+            let modified = std::fs::metadata(&worktree.path)
+                .and_then(|metadata| metadata.modified())
+                .map_err(|error| {
+                    format!(
+                        "could not read modification time for {}: {error}",
+                        worktree.path.display()
+                    )
+                })?;
+            Ok((modified, worktree))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    ordered.sort_by(|(left_time, left), (right_time, right)| {
+        left_time
+            .cmp(right_time)
+            .then_with(|| left.path.cmp(&right.path))
+    });
+    for (_, worktree) in ordered {
+        let selector = worktree_selector(&git, &worktree)?;
+        sync::handle_sync(&selector, dry_run, auto_commit)
+            .map_err(|error| format!("sync {selector} failed: {error}"))?;
+    }
+    Ok(())
+}
+
+fn handle_commit(
+    selection: WorktreeSelection,
+    message: &str,
+    paths: &[PathBuf],
+    dry_run: bool,
+) -> Result<(), String> {
+    let main_checkout =
+        env::current_dir().map_err(|error| error.to_string())?;
+    let git =
+        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    for worktree in selected_worktrees(&git, &selection)? {
+        if dry_run {
+            let target = if paths.is_empty() {
+                "all changes".to_owned()
+            } else {
+                paths
+                    .iter()
+                    .map(|path| path.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            };
+            println!(
+                "[dry-run] stage {target} and commit {} with message {message:?}",
+                worktree.path.display()
+            );
+            continue;
+        }
+        let mut add = ProcessCommand::new("git");
+        add.arg("add").current_dir(&worktree.path);
+        if paths.is_empty() {
+            add.arg("-A");
+        } else {
+            add.arg("--").args(paths);
+        }
+        let status = add.status().map_err(|error| error.to_string())?;
+        if !status.success() {
+            return Err(format!(
+                "could not stage changes in {}",
+                worktree.path.display()
+            ));
+        }
+        let status = ProcessCommand::new("git")
+            .args(["commit", "-m", message])
+            .current_dir(&worktree.path)
+            .status()
+            .map_err(|error| error.to_string())?;
+        if !status.success() {
+            return Err(format!(
+                "could not commit changes in {}",
+                worktree.path.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -667,13 +873,16 @@ fn live_repository_state(
         behind,
     })
 }
-fn handle_clean(dry_run: bool) -> Result<(), String> {
+fn handle_clean(
+    selection: WorktreeSelection,
+    dry_run: bool,
+) -> Result<(), String> {
     let main_checkout =
         env::current_dir().map_err(|error| error.to_string())?;
     let git =
         WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let mut removable = Vec::new();
-    for worktree in git.list_worktrees().map_err(|error| error.to_string())? {
+    for worktree in selected_worktrees(&git, &selection)? {
         if worktree_relative_path(&git, &worktree).is_err() {
             println!(
                 "preserved path={} reason=outside-worktree-root",
@@ -1162,6 +1371,7 @@ mod tests {
         PRESERVE_MAIN_CHANGES_HINT,
         WORKTREE_PATH_OUTPUT_PREFIX,
         WORKTREE_PATH_TEMPLATE,
+        WorktreeSelection,
     };
 
     #[test]
@@ -1229,7 +1439,11 @@ mod tests {
         assert_eq!(
             cli.command,
             Command::Rebase {
-                name: "example".to_owned(),
+                selection: WorktreeSelection {
+                    names: vec!["example".to_owned()],
+                    worktrees: Vec::new(),
+                    all: false,
+                },
                 dry_run: true,
                 auto_commit: false,
             }
@@ -1249,7 +1463,11 @@ mod tests {
         assert_eq!(
             cli.command,
             Command::Merge {
-                name: "example".to_owned(),
+                selection: WorktreeSelection {
+                    names: vec!["example".to_owned()],
+                    worktrees: Vec::new(),
+                    all: false,
+                },
                 dry_run: true,
                 auto_commit: false,
             }
@@ -1269,7 +1487,11 @@ mod tests {
         assert_eq!(
             cli.command,
             Command::Sync {
-                name: "example".to_owned(),
+                selection: WorktreeSelection {
+                    names: vec!["example".to_owned()],
+                    worktrees: Vec::new(),
+                    all: false,
+                },
                 dry_run: true,
                 auto_commit: false,
             }
@@ -1289,9 +1511,78 @@ mod tests {
         assert_eq!(
             cli.command,
             Command::Sync {
-                name: "example".to_owned(),
+                selection: WorktreeSelection {
+                    names: vec!["example".to_owned()],
+                    worktrees: Vec::new(),
+                    all: false,
+                },
                 dry_run: false,
                 auto_commit: true,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_repeated_worktree_selection_and_all() {
+        let selected = Cli::try_parse_from([
+            "worktree-ctl",
+            "rebase",
+            "--worktree",
+            "first",
+            "--worktree",
+            "second",
+        ])
+        .unwrap();
+        assert_eq!(
+            selected.command,
+            Command::Rebase {
+                selection: WorktreeSelection {
+                    names: Vec::new(),
+                    worktrees: vec!["first".to_owned(), "second".to_owned()],
+                    all: false,
+                },
+                dry_run: false,
+                auto_commit: false,
+            }
+        );
+
+        let all =
+            Cli::try_parse_from(["worktree-ctl", "clean", "--all"]).unwrap();
+        assert_eq!(
+            all.command,
+            Command::Clean {
+                selection: WorktreeSelection {
+                    names: Vec::new(),
+                    worktrees: Vec::new(),
+                    all: true,
+                },
+                dry_run: false,
+            }
+        );
+    }
+
+    #[test]
+    fn parses_commit_pathspecs_after_double_dash() {
+        let cli = Cli::try_parse_from([
+            "worktree-ctl",
+            "commit",
+            "example",
+            "--",
+            "src/lib.rs",
+            "README.md",
+        ])
+        .unwrap();
+        assert_eq!(
+            cli.command,
+            Command::Commit {
+                selection: WorktreeSelection {
+                    names: vec!["example".to_owned()],
+                    worktrees: Vec::new(),
+                    all: false,
+                },
+                message: "worktree-ctl commit".to_owned(),
+                paths: vec!["src/lib.rs".into(), "README.md".into()],
+                dry_run: false,
             }
         );
     }

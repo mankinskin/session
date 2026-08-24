@@ -166,6 +166,25 @@ fn create(
     assert!(output.status.success(), "new failed: {}", all(&output));
 }
 
+fn create_legacy_worktree(
+    fixture: &Fixture,
+    name: &str,
+) -> PathBuf {
+    let worktree = fixture.legacy_worktree(name);
+    git(
+        &fixture.main,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            &format!("agent/{name}"),
+            worktree.to_str().expect("utf-8 worktree path"),
+            "main",
+        ],
+    );
+    worktree
+}
+
 #[test]
 fn new_creates_nested_worktree_and_branch() {
     let fixture = fixture_repo();
@@ -851,4 +870,67 @@ fn rebase_conflict_stops_before_superproject_rebase() {
         all(&output)
     );
     assert_eq!(before, git_revision(&worktree, &["rev-parse", "HEAD"]));
+}
+
+#[test]
+fn commit_stages_only_requested_pathspecs() {
+    let fixture = fixture_repo();
+    create(&fixture, "commit-filter");
+    let worktree = fixture.worktree("commit-filter");
+    fs::write(worktree.join("included.txt"), "included\n")
+        .expect("write included change");
+    fs::write(worktree.join("excluded.txt"), "excluded\n")
+        .expect("write excluded change");
+
+    let output = fixture.run([
+        "commit",
+        "12345678-1234-1234-1234-123456789abc/commit-filter",
+        "--",
+        "included.txt",
+    ]);
+
+    assert!(output.status.success(), "commit failed: {}", all(&output));
+    assert!(
+        git_revision(&worktree, &["show", "--format=", "--name-only", "HEAD"])
+            .contains("included.txt")
+    );
+    assert!(
+        git_revision(&worktree, &["status", "--porcelain"])
+            .contains("excluded.txt"),
+        "unselected path must remain uncommitted"
+    );
+}
+
+#[test]
+fn sync_all_stops_after_the_oldest_worktree_conflicts() {
+    let fixture = fixture_repo();
+    let first = create_legacy_worktree(&fixture, "first");
+    let second = create_legacy_worktree(&fixture, "second");
+    fs::write(first.join("README"), "first\n")
+        .expect("write first branch change");
+    git(&first, &["commit", "-am", "first branch change"]);
+    fs::write(second.join("second.txt"), "second\n")
+        .expect("write second branch change");
+    git(&second, &["add", "second.txt"]);
+    git(&second, &["commit", "-m", "second branch change"]);
+    fs::write(fixture.main.join("README"), "main\n")
+        .expect("write main conflict");
+    git(&fixture.main, &["commit", "-am", "main conflict"]);
+
+    let output = fixture.run(["sync", "--all"]);
+
+    assert!(
+        !output.status.success(),
+        "sync unexpectedly succeeded: {}",
+        all(&output)
+    );
+    assert!(
+        all(&output).contains("sync first failed"),
+        "oldest worktree should be attempted first: {}",
+        all(&output)
+    );
+    assert!(
+        !fixture.main.join("second.txt").exists(),
+        "sync must stop before attempting the newer worktree"
+    );
 }
