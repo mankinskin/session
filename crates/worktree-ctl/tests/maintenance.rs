@@ -810,6 +810,63 @@ fn rebase_rebases_submodule_before_superproject() {
 }
 
 #[test]
+fn rebase_amends_the_current_generated_gitlink_checkpoint() {
+    let fixture = fixture_repo();
+    create(&fixture, "checkpoint");
+    let worktree = fixture.worktree("checkpoint");
+    let submodule = worktree.join("modules/example");
+    let branch = "agent/12345678-1234-1234-1234-123456789abc/checkpoint";
+    git(&submodule, &["checkout", "-b", branch]);
+    fs::write(submodule.join("feature.txt"), "feature\n")
+        .expect("write nested feature");
+    git(&submodule, &["add", "feature.txt"]);
+    git(&submodule, &["commit", "-m", "nested feature"]);
+    fs::write(worktree.join("feature.txt"), "feature\n")
+        .expect("write superproject feature");
+    git(&worktree, &["add", "feature.txt"]);
+    git(&worktree, &["commit", "-m", "superproject feature"]);
+
+    let main_submodule = fixture.main.join("modules/example");
+    fs::write(main_submodule.join("file.txt"), "initial\nmain one\n")
+        .expect("write first main change");
+    git(&main_submodule, &["commit", "-am", "main one"]);
+    fs::write(fixture.main.join("main-one.txt"), "main\n")
+        .expect("write first superproject main change");
+    git(&fixture.main, &["add", "main-one.txt"]);
+    git(&fixture.main, &["commit", "-m", "superproject main one"]);
+    let first = fixture.run([
+        "rebase",
+        "12345678-1234-1234-1234-123456789abc/checkpoint",
+    ]);
+    assert!(first.status.success(), "rebase failed: {}", all(&first));
+
+    fs::write(main_submodule.join("file.txt"), "initial\nmain one\nmain two\n")
+        .expect("write second main change");
+    git(&main_submodule, &["commit", "-am", "main two"]);
+    fs::write(fixture.main.join("main-two.txt"), "main\n")
+        .expect("write second superproject main change");
+    git(&fixture.main, &["add", "main-two.txt"]);
+    git(&fixture.main, &["commit", "-m", "superproject main two"]);
+    let second = fixture.run([
+        "rebase",
+        "12345678-1234-1234-1234-123456789abc/checkpoint",
+    ]);
+    assert!(second.status.success(), "rebase failed: {}", all(&second));
+
+    assert_eq!(
+        "1",
+        git_revision(
+            &worktree,
+            &["rev-list", "--count", "--grep=^rebase submodules onto local main", "HEAD"],
+        )
+    );
+    assert_eq!(
+        git_revision(&submodule, &["rev-parse", branch]),
+        git_revision(&worktree, &["rev-parse", "HEAD:modules/example"]),
+    );
+}
+
+#[test]
 fn rebase_reports_missing_submodule_branch_as_skipped() {
     let fixture = fixture_repo();
     create(&fixture, "skipped");

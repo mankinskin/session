@@ -22,6 +22,7 @@ use crate::{
 
 const AUTOSTASH_MESSAGE: &str = "worktree-ctl autostash";
 const AUTO_COMMIT_MESSAGE: &str = "worktree-ctl auto-commit before sync";
+const REBASED_GITLINK_COMMIT_PREFIX: &str = "rebase submodules onto local main";
 
 pub(crate) fn handle_rebase(
     name: &str,
@@ -37,6 +38,7 @@ pub(crate) fn handle_rebase(
         format!("worktree {name} is detached and cannot be rebased")
     })?;
     let mut plan = LifecyclePlan::default();
+    let mut rebased_submodules = Vec::new();
 
     for submodule in git.submodule_paths().map_err(|error| error.to_string())? {
         let nested = worktree.path.join(&submodule);
@@ -71,7 +73,11 @@ pub(crate) fn handle_rebase(
             "submodule {submodule} branch {branch} could not rebase onto local main: {error}; resolve the conflict in {} and continue or abort the rebase", nested.display()
         ));
         combine_results(rebase, restore_dirty_tree(&nested, stashed))?;
-        commit_rebased_gitlink(&worktree.path, &submodule)?;
+        rebased_submodules.push(submodule);
+    }
+
+    if !dry_run {
+        commit_rebased_gitlinks(&worktree.path, &rebased_submodules)?;
     }
 
     plan.add(format!(
@@ -470,10 +476,13 @@ fn continue_or_skip_rebase(worktree: &Path) -> Result<(), String> {
     ))
 }
 
-fn commit_rebased_gitlink(
+fn commit_rebased_gitlinks(
     worktree: &Path,
-    submodule: &str,
+    submodules: &[String],
 ) -> Result<(), String> {
+    if submodules.is_empty() {
+        return Ok(());
+    }
     let repository =
         Repository::open(worktree).map_err(|error| error.to_string())?;
     let parent = repository
@@ -481,9 +490,11 @@ fn commit_rebased_gitlink(
         .and_then(|head| head.peel_to_commit())
         .map_err(|error| error.to_string())?;
     let mut index = repository.index().map_err(|error| error.to_string())?;
-    index
-        .add_path(Path::new(submodule))
-        .map_err(|error| error.to_string())?;
+    for submodule in submodules {
+        index
+            .add_path(Path::new(submodule))
+            .map_err(|error| error.to_string())?;
+    }
     let tree = repository
         .find_tree(index.write_tree().map_err(|error| error.to_string())?)
         .map_err(|error| error.to_string())?;
@@ -491,14 +502,24 @@ fn commit_rebased_gitlink(
         return Ok(());
     }
     index.write().map_err(|error| error.to_string())?;
+    if parent
+        .message()
+        .is_some_and(|message| message.starts_with(REBASED_GITLINK_COMMIT_PREFIX))
+    {
+        return run_git(worktree, ["commit", "--amend", "--no-edit"]);
+    }
     let signature =
         repository.signature().map_err(|error| error.to_string())?;
+    let message = format!(
+        "{REBASED_GITLINK_COMMIT_PREFIX}: {}",
+        submodules.join(", ")
+    );
     repository
         .commit(
             Some("HEAD"),
             &signature,
             &signature,
-            &format!("rebase submodule {submodule} onto local main"),
+            &message,
             &tree,
             &[&parent],
         )
