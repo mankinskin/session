@@ -253,6 +253,7 @@ fn guard_dirty_tree(
     if dry_run {
         return Ok(false);
     }
+    let stash_before = stash_tip(path)?;
     run_git(
         path,
         [
@@ -263,8 +264,30 @@ fn guard_dirty_tree(
             AUTOSTASH_MESSAGE,
         ],
     )?;
-    println!("stashed uncommitted changes in {label} (restored afterward)");
-    Ok(true)
+    let stashed = stash_tip(path)? != stash_before;
+    if stashed {
+        println!("stashed uncommitted changes in {label} (restored afterward)");
+    } else {
+        println!("no stash created for {label}; working tree was unchanged");
+    }
+    Ok(stashed)
+}
+
+fn stash_tip(path: &Path) -> Result<Option<String>, String> {
+    let output = git_command(path)
+        .args(["rev-parse", "-q", "--verify", "refs/stash"])
+        .output()
+        .map_err(|error| format!("failed to inspect stash state: {error}"))?;
+    if output.status.success() {
+        Ok(Some(String::from_utf8_lossy(&output.stdout).trim().to_owned()))
+    } else if output.status.code() == Some(1) {
+        Ok(None)
+    } else {
+        Err(format!(
+            "failed to inspect stash state: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+    }
 }
 
 fn restore_dirty_tree(
