@@ -1,5 +1,5 @@
-//! Git low-level merge driver for `.session/sessions/**/session.json` and
-//! `transcript.json`. These files are independently written by the
+//! Git low-level merge driver for `.session/sessions/**/session.json`,
+//! `transcript.json`, and `events.json`. These files are independently written by the
 //! main-checkout mirror (`session-worktree-inference`, a thin registry stub)
 //! and by the session's own worktree branch (the full `copilot-hook`
 //! capture), so a textual/diff3 merge on the same session id routinely
@@ -22,6 +22,8 @@ use std::{
 };
 
 use session_api::{
+    CopilotHookEvent,
+    PersistedSessionEvents,
     PersistedSessionManifest,
     PersistedSessionTranscript,
     SessionLinks,
@@ -35,42 +37,46 @@ fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let [ours_path, theirs_path, orig_path] = match args.as_slice() {
         [_base, ours, theirs] => [ours.clone(), theirs.clone(), ours.clone()],
-        [_base, ours, theirs, orig] => {
-            [ours.clone(), theirs.clone(), orig.clone()]
-        }
+        [_base, ours, theirs, orig] =>
+            [ours.clone(), theirs.clone(), orig.clone()],
         _ => {
             eprintln!(
                 "session-record-merge: expected `%O %A %B [%P]`, got {} args",
                 args.len()
             );
             return ExitCode::FAILURE;
-        }
+        },
     };
 
     let ours_text = match fs::read_to_string(&ours_path) {
         Ok(text) => text,
         Err(error) => {
-            eprintln!("session-record-merge: cannot read ours ({ours_path}): {error}");
+            eprintln!(
+                "session-record-merge: cannot read ours ({ours_path}): {error}"
+            );
             return ExitCode::FAILURE;
-        }
+        },
     };
     let theirs_text = match fs::read_to_string(&theirs_path) {
         Ok(text) => text,
         Err(error) => {
-            eprintln!("session-record-merge: cannot read theirs ({theirs_path}): {error}");
+            eprintln!(
+                "session-record-merge: cannot read theirs ({theirs_path}): {error}"
+            );
             return ExitCode::FAILURE;
-        }
+        },
     };
 
-    let is_transcript = Path::new(&orig_path)
+    let file_name = Path::new(&orig_path)
         .file_name()
         .and_then(|name| name.to_str())
-        .is_some_and(|name| name == "transcript.json");
+        .unwrap_or_default();
 
-    let merged = if is_transcript {
-        merge_transcript_json(&ours_text, &theirs_text)
-    } else {
-        merge_manifest_json(&ours_text, &theirs_text)
+    let merged = match file_name {
+        "transcript.json" => merge_transcript_json(&ours_text, &theirs_text),
+        "events.json" => merge_events_json(&ours_text, &theirs_text),
+        "session.json" => merge_manifest_json(&ours_text, &theirs_text),
+        _ => Err(format!("unsupported session artifact {orig_path}")),
     };
 
     match merged {
@@ -82,11 +88,11 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
             ExitCode::SUCCESS
-        }
+        },
         Err(reason) => {
             eprintln!("session-record-merge: {reason}");
             ExitCode::FAILURE
-        }
+        },
     }
 }
 
@@ -95,9 +101,13 @@ fn merge_manifest_json(
     theirs_text: &str,
 ) -> Result<String, String> {
     let ours: PersistedSessionManifest = serde_json::from_str(ours_text)
-        .map_err(|error| format!("ours is not a valid session.json: {error}"))?;
+        .map_err(|error| {
+            format!("ours is not a valid session.json: {error}")
+        })?;
     let theirs: PersistedSessionManifest = serde_json::from_str(theirs_text)
-        .map_err(|error| format!("theirs is not a valid session.json: {error}"))?;
+        .map_err(|error| {
+            format!("theirs is not a valid session.json: {error}")
+        })?;
     if ours.session_id != theirs.session_id {
         return Err(format!(
             "refusing to merge mismatched session ids: {} vs {}",
@@ -111,7 +121,9 @@ fn merge_manifest_json(
             text.push('\n');
             text
         })
-        .map_err(|error| format!("failed to serialize merged session.json: {error}"))
+        .map_err(|error| {
+            format!("failed to serialize merged session.json: {error}")
+        })
 }
 
 fn merge_transcript_json(
@@ -119,9 +131,13 @@ fn merge_transcript_json(
     theirs_text: &str,
 ) -> Result<String, String> {
     let ours: PersistedSessionTranscript = serde_json::from_str(ours_text)
-        .map_err(|error| format!("ours is not a valid transcript.json: {error}"))?;
+        .map_err(|error| {
+            format!("ours is not a valid transcript.json: {error}")
+        })?;
     let theirs: PersistedSessionTranscript = serde_json::from_str(theirs_text)
-        .map_err(|error| format!("theirs is not a valid transcript.json: {error}"))?;
+        .map_err(|error| {
+            format!("theirs is not a valid transcript.json: {error}")
+        })?;
     if ours.session_id != theirs.session_id {
         return Err(format!(
             "refusing to merge mismatched session ids: {} vs {}",
@@ -135,7 +151,37 @@ fn merge_transcript_json(
             text.push('\n');
             text
         })
-        .map_err(|error| format!("failed to serialize merged transcript.json: {error}"))
+        .map_err(|error| {
+            format!("failed to serialize merged transcript.json: {error}")
+        })
+}
+
+fn merge_events_json(
+    ours_text: &str,
+    theirs_text: &str,
+) -> Result<String, String> {
+    let ours: PersistedSessionEvents = serde_json::from_str(ours_text)
+        .map_err(|error| format!("ours is not a valid events.json: {error}"))?;
+    let theirs: PersistedSessionEvents = serde_json::from_str(theirs_text)
+        .map_err(|error| {
+            format!("theirs is not a valid events.json: {error}")
+        })?;
+    if ours.session_id != theirs.session_id {
+        return Err(format!(
+            "refusing to merge mismatched session ids: {} vs {}",
+            ours.session_id, theirs.session_id
+        ));
+    }
+
+    let merged = merge_events(ours, theirs)?;
+    serde_json::to_string_pretty(&merged)
+        .map(|mut text| {
+            text.push('\n');
+            text
+        })
+        .map_err(|error| {
+            format!("failed to serialize merged events.json: {error}")
+        })
 }
 
 /// The main-checkout mirror writes a minimal stub record (`source ==
@@ -247,7 +293,9 @@ fn merge_metadata(
             .vscode_version
             .clone()
             .or(secondary.vscode_version.clone()),
-        protocol_version: primary.protocol_version.or(secondary.protocol_version),
+        protocol_version: primary
+            .protocol_version
+            .or(secondary.protocol_version),
         worktree: primary.worktree.clone().or(secondary.worktree.clone()),
     }
 }
@@ -302,6 +350,47 @@ fn merge_transcript(
     }
 }
 
+fn merge_events(
+    a: PersistedSessionEvents,
+    b: PersistedSessionEvents,
+) -> Result<PersistedSessionEvents, String> {
+    let mut by_key: BTreeMap<String, CopilotHookEvent> = BTreeMap::new();
+    for event in a.events.into_iter().chain(b.events) {
+        let key = event_key(&event)?;
+        if let Some(existing) = by_key.get(&key) {
+            if existing != &event {
+                return Err(format!("conflicting event payload for {key}"));
+            }
+        } else {
+            by_key.insert(key, event);
+        }
+    }
+    let mut events = by_key.into_iter().collect::<Vec<_>>();
+    events.sort_by(|(left_key, left), (right_key, right)| {
+        left.captured_at
+            .cmp(&right.captured_at)
+            .then_with(|| left_key.cmp(right_key))
+    });
+
+    Ok(PersistedSessionEvents {
+        schema_version: a.schema_version.max(b.schema_version),
+        session_id: a.session_id,
+        captured_at: a.captured_at.max(b.captured_at),
+        events: events.into_iter().map(|(_, event)| event).collect(),
+    })
+}
+
+fn event_key(event: &CopilotHookEvent) -> Result<String, String> {
+    match event.event_id.as_deref() {
+        Some(id) if !id.trim().is_empty() => Ok(format!("event:{id}")),
+        _ => serde_json::to_string(event)
+            .map(|serialized| format!("legacy:{serialized}"))
+            .map_err(|error| {
+                format!("could not fingerprint legacy event: {error}")
+            }),
+    }
+}
+
 fn union_sorted(
     a: &[String],
     b: &[String],
@@ -340,7 +429,11 @@ mod tests {
 
     use super::*;
 
-    fn time(hour: u32, minute: u32, second: u32) -> DateTimeUtc {
+    fn time(
+        hour: u32,
+        minute: u32,
+        second: u32,
+    ) -> DateTimeUtc {
         chrono::Utc
             .with_ymd_and_hms(2026, 8, 19, hour, minute, second)
             .single()
@@ -391,7 +484,10 @@ mod tests {
         }
     }
 
-    fn full_manifest(started_at: DateTimeUtc, captured_at: DateTimeUtc) -> PersistedSessionManifest {
+    fn full_manifest(
+        started_at: DateTimeUtc,
+        captured_at: DateTimeUtc,
+    ) -> PersistedSessionManifest {
         let mut record = stub_manifest(captured_at);
         record.source = "copilot-hook".to_string();
         record.started_at = started_at;
@@ -469,12 +565,67 @@ mod tests {
 
     #[test]
     fn manifest_json_roundtrip_rejects_mismatched_session_ids() {
-        let ours = serde_json::to_string(&stub_manifest(time(1, 0, 0))).unwrap();
+        let ours =
+            serde_json::to_string(&stub_manifest(time(1, 0, 0))).unwrap();
         let mut theirs_record = stub_manifest(time(1, 0, 0));
         theirs_record.session_id = "s-2".to_string();
         let theirs = serde_json::to_string(&theirs_record).unwrap();
 
         let result = merge_manifest_json(&ours, &theirs);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn events_union_by_id_and_reject_conflicting_reuse() {
+        let event = |id: &str, captured_at| CopilotHookEvent {
+            event_id: Some(id.to_owned()),
+            parent_event_id: None,
+            event_type: Some("UserPromptSubmit".to_owned()),
+            captured_at: Some(captured_at),
+            turn_id: None,
+            message_id: None,
+            tool_call_id: None,
+            tool_name: None,
+            tool_success: None,
+            reasoning_text: None,
+            tool_requests_json: None,
+            tool_arguments_json: None,
+            data_json: None,
+            raw_event_json: None,
+        };
+        let a = PersistedSessionEvents {
+            schema_version: 1,
+            session_id: "s-1".to_owned(),
+            captured_at: time(1, 20, 0),
+            events: vec![event("one", time(1, 10, 0))],
+        };
+        let b = PersistedSessionEvents {
+            schema_version: 1,
+            session_id: "s-1".to_owned(),
+            captured_at: time(1, 30, 0),
+            events: vec![
+                event("one", time(1, 10, 0)),
+                event("two", time(1, 20, 0)),
+            ],
+        };
+        let merged = merge_events(a.clone(), b).unwrap();
+        assert_eq!(merged.events.len(), 2);
+        assert_eq!(merged.events[0].event_id.as_deref(), Some("one"));
+        assert_eq!(merged.events[1].event_id.as_deref(), Some("two"));
+
+        let mut conflicting = a;
+        conflicting.events[0].event_type = Some("Stop".to_owned());
+        assert!(
+            merge_events(
+                conflicting,
+                PersistedSessionEvents {
+                    schema_version: 1,
+                    session_id: "s-1".to_owned(),
+                    captured_at: time(1, 20, 0),
+                    events: vec![event("one", time(1, 10, 0))],
+                }
+            )
+            .is_err()
+        );
     }
 }
