@@ -179,7 +179,7 @@ pub(crate) fn handle_merge(
             continue;
         }
         let main_submodule = git.main_checkout().join(&submodule);
-        reject_unmerged_submodule_branch(&main_submodule, branch, &submodule)?;
+        ensure_submodule_branch_rebased(&main_submodule, branch, &submodule)?;
         plan.add(format!(
             "fast-forward {} local main from nested branch {branch}",
             main_submodule.display()
@@ -344,7 +344,7 @@ fn repository_has_branch(
     }
 }
 
-fn reject_unmerged_submodule_branch(
+fn ensure_submodule_branch_rebased(
     path: &Path,
     branch: &str,
     submodule: &str,
@@ -365,15 +365,15 @@ fn reject_unmerged_submodule_branch(
         .get()
         .target()
         .ok_or_else(|| format!("submodule {submodule} main has no target"))?;
-    if main == feature
+    if feature == main
         || repository
-            .graph_descendant_of(main, feature)
+            .graph_descendant_of(feature, main)
             .map_err(|error| error.to_string())?
     {
         Ok(())
     } else {
         Err(format!(
-            "submodule {submodule} branch {branch} ({feature}) is not contained in local main ({main}); run `git -C {submodule} checkout main && git -C {submodule} merge --ff-only {branch}` before merging the superproject"
+            "submodule {submodule} branch {branch} ({feature}) is not rebased onto local main ({main}); run `worktree-ctl rebase` before merging the superproject"
         ))
     }
 }

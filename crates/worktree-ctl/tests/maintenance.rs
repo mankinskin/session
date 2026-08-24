@@ -485,14 +485,6 @@ fn merge_accepts_bottom_up_gitlink_integration() {
     fs::write(nested.join("file.txt"), "initial\nbottom-up\n")
         .expect("write nested change");
     git(&nested, &["commit", "-am", "nested feature"]);
-    git(
-        &fixture.main.join("modules/example"),
-        &[
-            "merge",
-            "--ff-only",
-            "agent/12345678-1234-1234-1234-123456789abc/bottom-up",
-        ],
-    );
     git(&worktree, &["add", "modules/example"]);
     git(&worktree, &["commit", "-m", "bump nested gitlink"]);
 
