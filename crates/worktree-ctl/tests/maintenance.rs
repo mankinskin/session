@@ -826,6 +826,47 @@ fn rebase_reports_missing_submodule_branch_as_skipped() {
 }
 
 #[test]
+fn rebase_skips_redundant_descendant_gitlink_update() {
+    let fixture = fixture_repo();
+    create(&fixture, "redundant-gitlink");
+    let worktree = fixture.worktree("redundant-gitlink");
+    let feature_submodule = worktree.join("modules/example");
+    let main_submodule = fixture.main.join("modules/example");
+
+    fs::write(main_submodule.join("file.txt"), "initial\nintermediate\n")
+        .expect("write intermediate submodule commit");
+    git(&main_submodule, &["commit", "-am", "intermediate"]);
+    let intermediate = git_revision(&main_submodule, &["rev-parse", "HEAD"]);
+
+    git(&feature_submodule, &["checkout", &intermediate]);
+    git(&worktree, &["add", "modules/example"]);
+    git(&worktree, &["commit", "-m", "record intermediate gitlink"]);
+
+    fs::write(main_submodule.join("file.txt"), "initial\nintermediate\nlatest\n")
+        .expect("write latest submodule commit");
+    git(&main_submodule, &["commit", "-am", "latest"]);
+    git(&fixture.main, &["add", "modules/example"]);
+    git(&fixture.main, &["commit", "-m", "record latest gitlink"]);
+
+    let output = fixture.run([
+        "rebase",
+        "12345678-1234-1234-1234-123456789abc/redundant-gitlink",
+    ]);
+
+    assert!(output.status.success(), "rebase failed: {}", all(&output));
+    assert!(
+        all(&output).contains("skipped redundant gitlink-only branch changes"),
+        "{}",
+        all(&output)
+    );
+    assert_eq!(
+        git_revision(&fixture.main, &["rev-parse", "HEAD"]),
+        git_revision(&worktree, &["rev-parse", "HEAD"]),
+        "the redundant feature commit should be skipped"
+    );
+}
+
+#[test]
 fn rebase_conflict_stops_before_superproject_rebase() {
     let fixture = fixture_repo();
     create(&fixture, "conflict");

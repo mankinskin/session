@@ -5,6 +5,7 @@ use std::{
 
 use git2::{
     BranchType,
+    Oid,
     Repository,
 };
 use session_worktree_provision::WorktreeGit;
@@ -318,18 +319,155 @@ fn checkout_and_rebase(
 }
 
 pub(crate) fn rebase_onto_local_main(worktree: &Path) -> Result<(), String> {
+    if reset_redundant_gitlink_only_branch(worktree)? {
+        return Ok(());
+    }
     let output = git_command(worktree)
         .args(["rebase", "main"])
         .output()
         .map_err(|error| format!("failed to start git rebase: {error}"))?;
     if output.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "git rebase main failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
+        return Ok(());
     }
+
+    if resolve_redundant_gitlink_conflicts(worktree)? {
+        return continue_or_skip_rebase(worktree);
+    }
+
+    Err(format!(
+        "git rebase main failed: {}",
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
+}
+
+fn reset_redundant_gitlink_only_branch(worktree: &Path) -> Result<bool, String> {
+    let output = git_command(worktree)
+        .args(["diff", "--raw", "--no-abbrev", "main", "HEAD"])
+        .output()
+        .map_err(|error| format!("failed to inspect gitlink rebase candidates: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "failed to inspect gitlink rebase candidates: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let changes = String::from_utf8_lossy(&output.stdout);
+    let changes = changes.lines().filter(|line| !line.is_empty()).collect::<Vec<_>>();
+    if changes.is_empty() {
+        return Ok(false);
+    }
+
+    for change in &changes {
+        let fields = change.split_whitespace().collect::<Vec<_>>();
+        if fields.len() < 6 || fields[0] != ":160000" || fields[1] != "160000" {
+            return Ok(false);
+        }
+        let main = Oid::from_str(fields[2]).map_err(|error| error.to_string())?;
+        let branch = Oid::from_str(fields[3]).map_err(|error| error.to_string())?;
+        let repository = match Repository::open(worktree.join(fields[5])) {
+            Ok(repository) => repository,
+            Err(_) => return Ok(false),
+        };
+        if !repository
+            .graph_descendant_of(main, branch)
+            .map_err(|error| error.to_string())?
+        {
+            return Ok(false);
+        }
+    }
+
+    run_git(worktree, ["reset", "--hard", "main"])?;
+    println!(
+        "skipped redundant gitlink-only branch changes: main already records descendant submodule commits"
+    );
+    Ok(true)
+}
+
+fn resolve_redundant_gitlink_conflicts(worktree: &Path) -> Result<bool, String> {
+    let output = git_command(worktree)
+        .args(["diff", "--name-only", "--diff-filter=U"])
+        .output()
+        .map_err(|error| format!("failed to inspect rebase conflicts: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "failed to inspect rebase conflicts: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    let paths = String::from_utf8_lossy(&output.stdout);
+    let paths = paths.lines().filter(|path| !path.is_empty()).collect::<Vec<_>>();
+    if paths.is_empty() {
+        return Ok(false);
+    }
+
+    for path in &paths {
+        let entries = git_command(worktree)
+            .args(["ls-files", "-u", "--", path])
+            .output()
+            .map_err(|error| format!("failed to inspect conflicted gitlink {path}: {error}"))?;
+        if !entries.status.success() {
+            return Err(format!(
+                "failed to inspect conflicted gitlink {path}: {}",
+                String::from_utf8_lossy(&entries.stderr).trim()
+            ));
+        }
+        let mut ours = None;
+        let mut theirs = None;
+        let entries = String::from_utf8_lossy(&entries.stdout);
+        for entry in entries.lines() {
+            let fields = entry.split_whitespace().collect::<Vec<_>>();
+            if fields.len() < 3 || fields[0] != "160000" {
+                return Ok(false);
+            }
+            match fields[2] {
+                "2" => ours = Some(fields[1]),
+                "3" => theirs = Some(fields[1]),
+                _ => {}
+            }
+        }
+        let (Some(ours), Some(theirs)) = (ours, theirs) else {
+            return Ok(false);
+        };
+        let repository = match Repository::open(worktree.join(path)) {
+            Ok(repository) => repository,
+            Err(_) => return Ok(false),
+        };
+        let ours = Oid::from_str(ours).map_err(|error| error.to_string())?;
+        let theirs = Oid::from_str(theirs).map_err(|error| error.to_string())?;
+        if !repository
+            .graph_descendant_of(ours, theirs)
+            .map_err(|error| error.to_string())?
+        {
+            return Ok(false);
+        }
+    }
+
+    for path in paths {
+        run_git(worktree, ["checkout", "--ours", "--", path])?;
+        run_git(worktree, ["add", "--", path])?;
+        println!(
+            "resolved redundant gitlink conflict in {path}: retained the rebase target's descendant commit"
+        );
+    }
+    Ok(true)
+}
+
+fn continue_or_skip_rebase(worktree: &Path) -> Result<(), String> {
+    let staged = git_command(worktree)
+        .args(["diff", "--cached", "--quiet"])
+        .status()
+        .map_err(|error| format!("failed to inspect resolved rebase: {error}"))?;
+    let command = if staged.success() {
+        ["rebase", "--skip"]
+    } else if staged.code() == Some(1) {
+        ["rebase", "--continue"]
+    } else {
+        return Err("failed to inspect resolved rebase".to_owned());
+    };
+    run_git(worktree, command).map_err(|error| format!(
+        "automatic redundant gitlink resolution could not finish the rebase: {error}; resolve the remaining conflict in {} and continue or abort the rebase",
+        worktree.display()
+    ))
 }
 
 fn commit_rebased_gitlink(
