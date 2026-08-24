@@ -267,6 +267,10 @@ fn handle_rebase(
         WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     for worktree in selected_worktrees(&git, &selection)? {
         let selector = worktree_selector(&git, &worktree)?;
+        if selection.all && worktree.branch.is_none() {
+            println!("skip {selector} because the worktree is detached");
+            continue;
+        }
         sync::handle_rebase(&selector, dry_run, auto_commit)
             .map_err(|error| format!("rebase {selector} failed: {error}"))?;
     }

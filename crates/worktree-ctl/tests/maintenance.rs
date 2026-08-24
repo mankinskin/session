@@ -857,7 +857,14 @@ fn rebase_amends_the_current_generated_gitlink_checkpoint() {
         "1",
         git_revision(
             &worktree,
-            &["rev-list", "--count", "--grep=^rebase submodules onto local main", "HEAD"],
+            &["rev-list", "--count", "--grep=^rebase submodule bases onto local main", "HEAD"],
+        )
+    );
+    assert_eq!(
+        "1",
+        git_revision(
+            &worktree,
+            &["rev-list", "--count", "--grep=^rebase submodule tips onto local main", "HEAD"],
         )
     );
     assert_eq!(
