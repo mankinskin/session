@@ -79,7 +79,7 @@ fn run_hook_with_payload(
 }
 
 #[test]
-fn e2e_session_start_provisions_and_captures_a_fresh_session() {
+fn e2e_session_start_captures_a_fresh_session_in_main_checkout() {
     let fixture = tempdir().expect("temp fixture dir");
     let checkout = fixture.path().join("checkout");
     create_fixture_checkout(&checkout);
@@ -106,14 +106,12 @@ fn e2e_session_start_provisions_and_captures_a_fresh_session() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    let worktree = checkout.join(".worktrees").join(session_id).join("session");
     assert!(
-        worktree.is_dir(),
-        "fresh SessionStart must provision a worktree; stderr={}",
-        String::from_utf8_lossy(&output.stderr)
+        !checkout.join(".worktrees").exists(),
+        "fresh SessionStart must not provision a worktree"
     );
     assert!(
-        worktree
+        checkout
             .join(".session")
             .join("sessions")
             .join(&session_id)
@@ -148,7 +146,7 @@ fn e2e_session_start_provisions_and_captures_a_fresh_session() {
     );
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
-            worktree
+            checkout
                 .join(".session")
                 .join("sessions")
                 .join(session_id)
@@ -209,7 +207,7 @@ fn e2e_session_start_provisions_and_captures_a_fresh_session() {
     }
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
-            worktree
+            checkout
                 .join(".session")
                 .join("sessions")
                 .join(session_id)
@@ -257,7 +255,6 @@ fn e2e_session_start_captures_in_main_checkout_when_provisioning_fails() {
         .arg("--from-hook-stdin")
         .current_dir(&checkout)
         .env("MCP_MAIN_CHECKOUT", &checkout)
-        .env("WORKTREE_MAX", "0")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -288,14 +285,14 @@ fn e2e_session_start_captures_in_main_checkout_when_provisioning_fails() {
     );
     assert!(
         !checkout.join(".worktrees").exists(),
-        "a capped provision must not create a worktree"
+        "unassigned sessions must not create a worktree"
     );
     let record = SessionStoreConfig::new(checkout.join(".session"), "default")
         .read_session(session_id)
-        .expect("fallback capture should persist in the main checkout store");
+        .expect("capture should persist in the main checkout store");
     assert_eq!(
         record.metadata.provisioning.map(|value| value.outcome),
-        Some("failed".to_string())
+        Some("skipped".to_string())
     );
 }
 
@@ -323,7 +320,6 @@ fn e2e_session_start_registers_in_main_checkout_without_disturbing_other_session
     );
     let hook_bin = std::env::var("CARGO_BIN_EXE_session-capture-hook")
         .expect("cargo should expose session-capture-hook binary path for integration tests");
-
     let output = run_hook_with_payload(
         &hook_bin,
         &checkout,
@@ -425,10 +421,9 @@ fn e2e_empty_transcript_skips_capture_and_persists_session_events() {
         );
     }
 
-    let worktree = checkout.join(".worktrees").join(session_id).join("session");
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
-            worktree
+            checkout
                 .join(".session")
                 .join("sessions")
                 .join(session_id)
@@ -438,26 +433,6 @@ fn e2e_empty_transcript_skips_capture_and_persists_session_events() {
     )
     .expect("deserialize persisted hook events");
     assert!(events.events.iter().any(|event| {
-        event.event_type.as_deref() == Some("UserPromptSubmit")
-            && event
-                .data_json
-                .as_ref()
-                .and_then(|data| data.get("prompt"))
-                .and_then(serde_json::Value::as_str)
-                == Some("persist despite empty transcript")
-    }));
-    let main_events: PersistedSessionEvents = serde_json::from_str(
-        &fs::read_to_string(
-            checkout
-                .join(".session")
-                .join("sessions")
-                .join(session_id)
-                .join("events.json"),
-        )
-        .expect("read main-checkout hook events"),
-    )
-    .expect("deserialize main-checkout hook events");
-    assert!(main_events.events.iter().any(|event| {
         event.event_type.as_deref() == Some("UserPromptSubmit")
             && event
                 .data_json
@@ -509,7 +484,7 @@ fn e2e_lifecycle_only_transcript_skips_empty_turns() {
     );
 }
 #[test]
-fn e2e_missing_transcript_session_start_provisions_but_stop_does_not() {
+fn e2e_missing_transcript_session_start_and_stop_do_not_provision() {
     let fixture = tempdir().expect("temp fixture dir");
     let prompt_checkout = fixture.path().join("prompt-checkout");
     create_fixture_checkout(&prompt_checkout);
@@ -533,14 +508,9 @@ fn e2e_missing_transcript_session_start_provisions_but_stop_does_not() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    let worktree = prompt_checkout
-        .join(".worktrees")
-        .join(&prompt_session_id)
-        .join("session");
     assert!(
-        worktree.is_dir(),
-        "SessionStart must provision despite a missing transcript; stderr={}",
-        String::from_utf8_lossy(&output.stderr)
+        !prompt_checkout.join(".worktrees").exists(),
+        "SessionStart must not provision for a missing transcript"
     );
 
     let prompt = "Preserve this prompt before transcript flush.";
@@ -557,7 +527,7 @@ fn e2e_missing_transcript_session_start_provisions_but_stop_does_not() {
     assert!(output.status.success());
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
-            worktree
+            prompt_checkout
                 .join(".session")
                 .join("sessions")
                 .join(prompt_session_id)
@@ -597,7 +567,7 @@ fn e2e_missing_transcript_session_start_provisions_but_stop_does_not() {
 }
 
 #[test]
-fn e2e_user_prompt_submit_lazily_provisions_a_missed_session_start() {
+fn e2e_user_prompt_submit_captures_in_main_checkout_without_session_start() {
     let fixture = tempdir().expect("temp fixture dir");
     let checkout = fixture.path().join("checkout");
     create_fixture_checkout(&checkout);
@@ -629,23 +599,18 @@ fn e2e_user_prompt_submit_lazily_provisions_a_missed_session_start() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    let worktree = checkout
-        .join(".worktrees")
-        .join(&session_id)
-        .join("session");
     assert!(
-        worktree.is_dir(),
-        "UserPromptSubmit must lazily provision a missed SessionStart; stderr={}",
-        String::from_utf8_lossy(&output.stderr)
+        !checkout.join(".worktrees").exists(),
+        "UserPromptSubmit must not provision a missed SessionStart"
     );
     assert!(
-        worktree
+        checkout
             .join(".session")
             .join("sessions")
             .join(&session_id)
             .join("session.json")
             .is_file(),
-        "capture should persist once lazy provisioning resolves a store root"
+        "capture should persist in the main checkout"
     );
 }
 
@@ -861,10 +826,7 @@ fn e2e_session_start_with_external_store_does_not_provision_cwd_checkout() {
         .provisioning
         .expect("provisioning diagnostic");
     assert_eq!(diagnostic.outcome, "skipped");
-    assert_eq!(
-        diagnostic.reason.as_deref(),
-        Some("external_store_mismatch")
-    );
+    assert_eq!(diagnostic.reason.as_deref(), Some("no_registered_worktree"));
     assert_eq!(diagnostic.hook_event_name, "SessionStart");
     assert!(
         !store_root
@@ -873,11 +835,6 @@ fn e2e_session_start_with_external_store_does_not_provision_cwd_checkout() {
             .join("provisioning.json")
             .exists(),
         "provisioning.json must not be written under the session store"
-    );
-    assert!(
-        String::from_utf8_lossy(&output.stderr)
-            .contains("worktree provisioning skipped"),
-        "mismatched store should be diagnosed on stderr"
     );
     assert!(
         !cwd_checkout.path().join(".worktrees").exists(),
@@ -932,11 +889,7 @@ fn e2e_mismatched_store_emits_nonblocking_observability_payload() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stdout, b"{}\n");
-    assert!(
-        String::from_utf8_lossy(&output.stderr)
-            .contains("worktree provisioning skipped"),
-        "mismatched provisioning should be diagnosed on stderr"
-    );
+    assert!(String::from_utf8_lossy(&output.stderr).is_empty());
 }
 
 const TOOL_CALL_TRANSCRIPT: &str = concat!(

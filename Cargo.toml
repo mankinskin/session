@@ -8,7 +8,7 @@ publish = false
 default = []
 cli = ["dep:chrono", "dep:clap", "dep:memory-kernel", "dep:serde", "dep:serde_json", "dep:session-api", "dep:thiserror", "dep:toon-format", "dep:uuid"]
 mcp = ["dep:chrono", "dep:memory-kernel", "dep:rmcp", "dep:serde", "dep:serde_json", "dep:session-api", "dep:tokio", "dep:tracing", "dep:tracing-subscriber", "dep:uuid"]
-capture-hook = ["dep:memory-kernel", "dep:serde_json", "dep:session-api", "dep:session-worktree-provision", "dep:session-workspace-resolver", "dep:ticket-api", "dep:tracing", "dep:tracing-appender", "dep:tracing-subscriber"]
+capture-hook = ["dep:memory-kernel", "dep:serde_json", "dep:session-api", "dep:session-workspace-resolver", "dep:ticket-api", "dep:tracing", "dep:tracing-appender", "dep:tracing-subscriber"]
 
 [[bin]]
 name = "session"
@@ -30,7 +30,6 @@ path = "src/lib.rs"
 
 [dependencies]
 session-api = { path = "crates/session-api", optional = true }
-session-worktree-provision = { path = "crates/session-worktree-provision", optional = true }
 session-workspace-resolver = { path = "crates/session-workspace-resolver", optional = true }
 ticket-api = { git = "https://github.com/mankinskin/ticket", branch = "main", optional = true }
 memory-kernel = { git = "https://github.com/mankinskin/memory-kernel", branch = "main", optional = true }

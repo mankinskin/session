@@ -28,16 +28,6 @@ use session_workspace_resolver::{
     ResolverConfig,
     SessionWorkspaceResolver,
 };
-use session_worktree_provision::{
-    IndexRebuildOutcome,
-    ProvisionError,
-    ProvisionOutcome,
-    ProvisionPolicy,
-    SessionStoreActivity,
-    WorktreeGit,
-    provision_for_session,
-    rebuild_entity_indexes,
-};
 use ticket_api::storage::TicketStore;
 
 mod args;
@@ -81,55 +71,14 @@ fn run() -> Result<(), SessionError> {
     );
 
     let transcript_path = normalize_transcript_path(&args.transcript_path);
-    let mut routing_outcome = initialize_session_routing(
-        &args.trigger,
+    let routing_outcome = initialize_session_routing(
         args.session_id.as_deref(),
         args.store_root.as_deref(),
     );
-    let mut store_root = resolve_capture_store_root(
+    let store_root = resolve_capture_store_root(
         args.store_root.clone(),
         args.session_id.as_deref(),
     );
-    // SessionStart provisions the worktree assignment; if that hook was
-    // missed (e.g. hooks were reconfigured mid-session), lazily provision on
-    // the first later event that carries a session id instead of skipping
-    // capture for the rest of the session's lifetime. Stop is excluded: a
-    // session that never provisioned during its own lifetime should not
-    // spring a fresh worktree into existence only at its very end.
-    if store_root.is_none()
-        && !args.trigger.eq_ignore_ascii_case("SessionStart")
-        && !args.trigger.eq_ignore_ascii_case("Stop")
-    {
-        tracing::warn!(
-            "no store root resolved on non-SessionStart trigger; attempting lazy provisioning fallback for a missed SessionStart"
-        );
-        let lazy_outcome = initialize_session_routing(
-            "SessionStart",
-            args.session_id.as_deref(),
-            args.store_root.as_deref(),
-        );
-        if lazy_outcome.is_some() {
-            routing_outcome = lazy_outcome;
-            store_root = resolve_capture_store_root(
-                args.store_root.clone(),
-                args.session_id.as_deref(),
-            );
-        }
-    }
-    if store_root.is_none()
-        && matches!(
-            routing_outcome,
-            Some(ProvisioningDiagnostic::Failed { .. })
-        )
-    {
-        store_root = resolve_main_checkout_store_root();
-        if let Some(store_root) = store_root.as_ref() {
-            tracing::warn!(
-                store_root = %store_root.display(),
-                "worktree provisioning failed; capturing transcript in the main checkout store"
-            );
-        }
-    }
     let Some(store_root) = store_root else {
         tracing::warn!("skip: no capture store root resolved");
         emit_hook_payload(routing_outcome.as_ref());
@@ -287,48 +236,25 @@ fn mirror_user_prompt_to_main(
 }
 #[derive(Debug)]
 enum ProvisioningDiagnostic {
-    Provisioned {
-        outcome: &'static str,
-        worktree: PathBuf,
-    },
     Skipped {
         reason: &'static str,
         worktree: Option<PathBuf>,
     },
-    Failed {
-        reason: String,
-    },
 }
 
 impl ProvisioningDiagnostic {
-    fn worktree(&self) -> Option<&Path> {
-        match self {
-            Self::Provisioned { worktree, .. } => Some(worktree.as_path()),
-            Self::Skipped {
-                worktree: Some(worktree),
-                ..
-            } => Some(worktree.as_path()),
-            Self::Skipped { worktree: None, .. } | Self::Failed { .. } => None,
-        }
-    }
-
     fn set_worktree(
         &mut self,
         resolved_worktree: &Path,
     ) {
         match self {
-            Self::Provisioned {
-                worktree: diagnostic_worktree,
-                ..
-            }
-            | Self::Skipped {
+            Self::Skipped {
                 worktree: Some(diagnostic_worktree),
                 ..
             } => *diagnostic_worktree = resolved_worktree.to_path_buf(),
             Self::Skipped { worktree, .. } => {
                 *worktree = Some(resolved_worktree.to_path_buf());
             },
-            Self::Failed { .. } => {},
         }
     }
 
@@ -337,20 +263,9 @@ impl ProvisioningDiagnostic {
         hook_event_name: &str,
     ) -> SessionProvisioningDiagnostic {
         match self {
-            Self::Provisioned { outcome, .. } =>
-                SessionProvisioningDiagnostic {
-                    outcome: (*outcome).to_string(),
-                    reason: None,
-                    hook_event_name: hook_event_name.to_string(),
-                },
             Self::Skipped { reason, .. } => SessionProvisioningDiagnostic {
                 outcome: "skipped".to_string(),
                 reason: Some((*reason).to_string()),
-                hook_event_name: hook_event_name.to_string(),
-            },
-            Self::Failed { reason } => SessionProvisioningDiagnostic {
-                outcome: "failed".to_string(),
-                reason: Some(reason.clone()),
                 hook_event_name: hook_event_name.to_string(),
             },
         }
@@ -375,16 +290,9 @@ fn anchor_checkout(current_dir: &Path) -> PathBuf {
 }
 
 fn initialize_session_routing(
-    trigger: &str,
     session_id: Option<&str>,
     store_root: Option<&Path>,
 ) -> Option<ProvisioningDiagnostic> {
-    if !trigger.eq_ignore_ascii_case("SessionStart") {
-        return Some(ProvisioningDiagnostic::Skipped {
-            reason: "trigger_not_session_start",
-            worktree: None,
-        });
-    }
     let Some(session_id) =
         session_id.filter(|session_id| !session_id.trim().is_empty())
     else {
@@ -416,195 +324,35 @@ fn initialize_session_routing(
             worktree: None,
         });
     }
-    let mut diagnostic = if eager_provisioning_enabled() {
-        provision_session_worktree(&anchor, store_root, session_id)
-    } else {
-        ProvisioningDiagnostic::Skipped {
-            reason: "eager_provisioning_disabled",
-            worktree: None,
-        }
+    let mut diagnostic = ProvisioningDiagnostic::Skipped {
+        reason: "no_registered_worktree",
+        worktree: None,
     };
-
-    // SessionStart can provision a worktree before an assignment exists;
-    // in that case route assignment repair through the provisioned path first.
-    let resolved_worktree = if let Some(worktree) = diagnostic.worktree() {
-        worktree.to_path_buf()
-    } else {
-        let resolver = match SessionWorkspaceResolver::new(ResolverConfig {
-            main_checkout: anchor.clone(),
-            workspace_slug: "default".to_string(),
-        }) {
-            Ok(resolver) => resolver,
-            Err(error) => {
-                eprintln!(
-                    "[session-capture-hook] session routing skipped: could not configure session workspace resolver: {error}"
-                );
-                return Some(diagnostic);
-            },
-        };
-        let workspace = match resolver.resolve(ResolveRequest {
-            session_id,
-            relative_workspace: None,
-            store_dir: ".session",
-        }) {
-            Ok(workspace) if workspace.is_worktree() => workspace,
-            Ok(_) => {
-                eprintln!(
-                    "[session-capture-hook] session routing skipped: resolver selected the main checkout for session {session_id}"
-                );
-                return Some(diagnostic);
-            },
-            Err(error) => {
-                eprintln!(
-                    "[session-capture-hook] session routing skipped: no active worktree assignment for session {session_id}: {error}"
-                );
-                return Some(diagnostic);
-            },
-        };
-        workspace.target_root().to_path_buf()
-    };
-
-    diagnostic.set_worktree(&resolved_worktree);
-    Some(diagnostic)
-}
-
-fn eager_provisioning_enabled() -> bool {
-    std::env::var_os("WORKTREE_EAGER_PROVISION")
-        .is_none_or(|value| value != "0")
-}
-
-fn provision_session_worktree(
-    anchor: &Path,
-    store_root: Option<&Path>,
-    session_id: &str,
-) -> ProvisioningDiagnostic {
-    if let Some(store_root) = store_root {
-        let anchor_store = anchor.join(".session");
-        let anchor_root = anchor.canonicalize();
-        let resolved_store_root = store_root.canonicalize();
-        let store_belongs_to_anchor = anchor_store.is_dir()
-            && matches!(
-                (&anchor_root, &resolved_store_root),
-                (Ok(anchor_root), Ok(store_root)) if store_root.starts_with(anchor_root)
-            );
-        if !store_belongs_to_anchor {
-            eprintln!(
-                "[session-capture-hook] worktree provisioning skipped for session {session_id}: anchor checkout '{}' and resolved session store '{}' do not match",
-                anchor.display(),
-                store_root.display()
-            );
-            return ProvisioningDiagnostic::Skipped {
-                reason: "external_store_mismatch",
-                worktree: None,
-            };
-        }
+    if store_root.is_some() {
+        return Some(diagnostic);
     }
-    let git = match WorktreeGit::open(anchor) {
-        Ok(git) => git,
+    let resolver = match SessionWorkspaceResolver::new(ResolverConfig {
+        main_checkout: anchor,
+        workspace_slug: "default".to_string(),
+    }) {
+        Ok(resolver) => resolver,
         Err(error) => {
             eprintln!(
-                "[session-capture-hook] worktree provisioning failed for session {session_id}: {error}"
+                "[session-capture-hook] session routing skipped: could not configure session workspace resolver: {error}"
             );
-            return ProvisioningDiagnostic::Failed {
-                reason: format!("worktree_git_open_failed: {error}"),
-            };
+            return Some(diagnostic);
         },
     };
-    let policy = ProvisionPolicy::default();
-    let activity =
-        SessionStoreActivity::new(anchor.join(".session"), policy.stale_after);
-    let (outcome, worktree) =
-        match provision_for_session(&git, &activity, session_id, &policy) {
-            Ok(ProvisionOutcome::AlreadyProvisioned(worktree)) =>
-                ("reused", worktree),
-            Ok(ProvisionOutcome::Created(worktree)) => ("created", worktree),
-            Ok(ProvisionOutcome::Reclaimed { worktree, .. }) =>
-                ("reclaimed", worktree),
-            Err(error) => {
-                report_provision_error(session_id, &error);
-                return ProvisioningDiagnostic::Failed {
-                    reason: error.to_string(),
-                };
-            },
-        };
-
-    // Register the assignment in the main checkout's own store (ticket
-    // 842d74cb D1: main is the authoritative session-to-worktree registry),
-    // independent of and before whatever the worktree's own store captures.
-    let main_config =
-        SessionStoreConfig::new(anchor.join(".session"), "default");
-    let branch = worktree
-        .branch
-        .clone()
-        .unwrap_or_else(|| format!("agent/{session_id}/session"));
-    let allocation_mode = match outcome {
-        "reused" => session_api::SessionWorktreeAllocationMode::Reused,
-        "reclaimed" => session_api::SessionWorktreeAllocationMode::Rotated,
-        _ => session_api::SessionWorktreeAllocationMode::New,
-    };
-    if let Err(error) = main_config.register_provisioned_worktree(
+    if let Ok(workspace) = resolver.resolve(ResolveRequest {
         session_id,
-        &worktree.path,
-        &branch,
-        allocation_mode,
-    ) {
-        eprintln!(
-            "[session-capture-hook] main-checkout registration failed for session {session_id}: {error}"
-        );
-        return ProvisioningDiagnostic::Failed {
-            reason: format!("main_checkout_registration_failed: {error}"),
-        };
+        relative_workspace: None,
+        store_dir: ".session",
+    }) {
+        if workspace.is_worktree() {
+            diagnostic.set_worktree(workspace.target_root());
+        }
     }
-
-    for outcome in rebuild_entity_indexes(&worktree.path) {
-        report_index_rebuild_outcome(&worktree.path, outcome);
-    }
-    ProvisioningDiagnostic::Provisioned {
-        outcome,
-        worktree: worktree.path,
-    }
-}
-
-fn report_provision_error(
-    session_id: &str,
-    error: &ProvisionError,
-) {
-    match error {
-        ProvisionError::CapReached {
-            max_worktrees,
-            current_count,
-            reason,
-        } => eprintln!(
-            "[session-capture-hook] === WORKTREE PROVISION CAP REACHED ===\n\
-             session: {session_id}\n\
-             cap: {max_worktrees}\n\
-             registered worktrees: {current_count}\n\
-             reclaimable worktrees: none ({reason})\n\
-             remediation: remove a finished worktree, or raise WORKTREE_MAX\n\
-             session will continue on the main checkout\n\
-             [session-capture-hook] === END WORKTREE PROVISION CAP MESSAGE ==="
-        ),
-        error => eprintln!(
-            "[session-capture-hook] worktree provisioning failed for session {session_id}: {error}"
-        ),
-    }
-}
-
-fn report_index_rebuild_outcome(
-    worktree: &Path,
-    outcome: IndexRebuildOutcome,
-) {
-    match outcome {
-        IndexRebuildOutcome::Rebuilt { .. } => {},
-        IndexRebuildOutcome::Failed { store, error, .. } => eprintln!(
-            "[session-capture-hook] index rebuild failed for {store:?} store in {}: {error}",
-            worktree.display()
-        ),
-        IndexRebuildOutcome::Skipped { store, reason, .. } => eprintln!(
-            "[session-capture-hook] index rebuild skipped for {store:?} store in {}: {reason}",
-            worktree.display()
-        ),
-    }
+    Some(diagnostic)
 }
 
 /// Build the layered output-size override for the tool call that triggered
@@ -896,6 +644,7 @@ fn resolve_capture_store_root(
         );
         return None;
     }
+    let main_store_root = anchor.join(".session");
     let resolver = match SessionWorkspaceResolver::new(ResolverConfig {
         main_checkout: anchor,
         workspace_slug: "default".to_string(),
@@ -922,19 +671,8 @@ fn resolve_capture_store_root(
                 None
             },
         },
-        Err(error) => {
-            eprintln!(
-                "[session-capture-hook] capture skipped: no active worktree assignment for session {session_id}: {error}"
-            );
-            None
-        },
+        Err(_) => Some(main_store_root),
     }
-}
-
-fn resolve_main_checkout_store_root() -> Option<PathBuf> {
-    let current_dir = std::env::current_dir().ok()?;
-    let store_root = anchor_checkout(&current_dir).join(".session");
-    store_root.is_dir().then_some(store_root)
 }
 
 fn hook_event_name(args: &args::Args) -> String {
@@ -1081,7 +819,6 @@ mod tests {
     use tempfile::tempdir;
 
     use super::{
-        eager_provisioning_enabled,
         infer_capture_worktree,
         initialize_session_routing,
         resolve_capture_store_root,
@@ -1195,7 +932,7 @@ mod tests {
     }
 
     #[test]
-    fn capture_without_assignment_warns_and_does_not_write_main_checkout() {
+    fn capture_without_assignment_uses_main_checkout() {
         let _env_lock = ENV_LOCK.lock().unwrap();
         let fixture = tempdir().unwrap();
         let main_checkout = fixture.path().join("main");
@@ -1208,19 +945,16 @@ mod tests {
         let original_main_checkout = env::var_os("MCP_MAIN_CHECKOUT");
         unsafe { env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
 
-        assert_eq!(resolve_capture_store_root(None, Some("missing")), None);
+        assert_eq!(
+            resolve_capture_store_root(None, Some("missing")),
+            Some(main_checkout.join(".session"))
+        );
         unsafe {
             match original_main_checkout {
                 Some(value) => env::set_var("MCP_MAIN_CHECKOUT", value),
                 None => env::remove_var("MCP_MAIN_CHECKOUT"),
             }
         }
-        assert!(
-            std::fs::read_dir(main_checkout.join(".session"))
-                .unwrap()
-                .next()
-                .is_none()
-        );
     }
 
     #[test]
@@ -1350,7 +1084,7 @@ mod tests {
         unsafe { env::set_var("MCP_MAIN_CHECKOUT", main_checkout) };
         env::set_current_dir(process_directory).unwrap();
 
-        initialize_session_routing("SessionStart", session_id, None);
+        initialize_session_routing(session_id, None);
 
         env::set_current_dir(original_cwd).unwrap();
         unsafe {
@@ -1362,7 +1096,7 @@ mod tests {
     }
 
     #[test]
-    fn session_start_provisions_a_positional_worktree_without_anchor_state() {
+        fn session_start_does_not_provision_a_worktree_without_registration() {
         let _cwd_lock = CWD_LOCK.lock().unwrap();
         let _env_lock = ENV_LOCK.lock().unwrap();
         let fixture = tempdir().unwrap();
@@ -1373,24 +1107,8 @@ mod tests {
 
         run_session_start(&main_checkout, &main_checkout, Some(session_id));
 
-        assert!(
-            main_checkout
-                .join(".worktrees")
-                .join(session_id)
-                .join("session")
-                .is_dir()
-        );
-        // Ticket 842d74cb D1: the main checkout is the authoritative
-        // session-to-worktree registry, so SessionStart seeds a minimal
-        // registration record there in addition to provisioning the worktree.
-        assert!(
-            main_checkout
-                .join(".session")
-                .join("sessions")
-                .join(session_id)
-                .join("session.json")
-                .is_file()
-        );
+        assert!(!main_checkout.join(".worktrees").exists());
+        assert!(!main_checkout.join(".session").join("sessions").exists());
     }
 
     #[test]
@@ -1423,7 +1141,6 @@ mod tests {
         env::set_current_dir(&worktree).unwrap();
 
         initialize_session_routing(
-            "Stop",
             Some("session-one"),
             Some(&main_checkout.join(".session")),
         );
@@ -1437,22 +1154,6 @@ mod tests {
         }
         assert!(!main_checkout.join(".session").exists());
         assert!(!main_checkout.join(".worktrees").exists());
-    }
-
-    #[test]
-    fn eager_provision_kill_switch_disables_provisioning() {
-        let _env_lock = ENV_LOCK.lock().unwrap();
-        let original = env::var_os("WORKTREE_EAGER_PROVISION");
-        unsafe { env::set_var("WORKTREE_EAGER_PROVISION", "0") };
-
-        assert!(!eager_provisioning_enabled());
-
-        unsafe {
-            match original {
-                Some(value) => env::set_var("WORKTREE_EAGER_PROVISION", value),
-                None => env::remove_var("WORKTREE_EAGER_PROVISION"),
-            }
-        }
     }
 
     #[test]
@@ -1470,7 +1171,6 @@ mod tests {
         env::set_current_dir(&worktree).unwrap();
 
         initialize_session_routing(
-            "SessionStart",
             Some("session-one"),
             Some(&invalid_main_checkout.join(".session")),
         );
