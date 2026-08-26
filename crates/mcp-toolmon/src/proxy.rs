@@ -4,34 +4,22 @@
 //! tested without spawning processes. The wiring in `main.rs` reads/writes
 //! newline-delimited JSON on stdio and calls into here.
 
+mod gating;
+mod path_rewriting;
+mod telemetry;
+mod workspace_resolution;
+
 use std::{
     collections::{
         HashMap,
         HashSet,
     },
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::Path,
 };
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
 use serde_json::{
     Value,
     json,
-};
-use session_api::{
-    SessionError,
-    store::SessionStoreConfig,
-};
-use session_workspace_resolver::{
-    ResolutionError,
-    ResolveRequest,
-    ResolverConfig,
-    SessionWorkspaceResolver,
 };
 
 use toolmon_policy_api::{
@@ -42,167 +30,26 @@ use toolmon_policy_api::{
     inject_caller_model_schema,
 };
 
+use path_rewriting::{
+    PathArgument,
+    PathArgumentKind,
+    registered_path_argument,
+};
+pub use telemetry::{
+    CallTelemetry,
+    PendingCall,
+    PendingCalls,
+};
+use telemetry::{
+    compute_payload_telemetry,
+    id_key,
+    normalize_caller_model,
+    now_rfc3339,
+};
+use workspace_resolution::resolve_workspace_for_tool;
+
 /// Optional grant id argument for budget offset.
 pub const GRANT_ID_ARG: &str = "grant_id";
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum PathArgumentKind {
-    Workspace,
-    Path,
-}
-
-#[derive(Clone, Copy, Debug)]
-struct PathArgument {
-    name: &'static str,
-    kind: PathArgumentKind,
-}
-
-const PATH_ARGUMENT_REGISTRY: &[(&str, PathArgument)] = &[
-    (
-        "fs_list_dir",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_stat",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_move_file",
-        PathArgument {
-            name: "from",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_move_file",
-        PathArgument {
-            name: "to",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_move_file",
-        PathArgument {
-            name: "root",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_rename_file",
-        PathArgument {
-            name: "from",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_rename_file",
-        PathArgument {
-            name: "root",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_copy_file",
-        PathArgument {
-            name: "from",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_copy_file",
-        PathArgument {
-            name: "to",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_copy_file",
-        PathArgument {
-            name: "root",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_delete_file",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_delete_file",
-        PathArgument {
-            name: "root",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_delete_dir",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "fs_delete_dir",
-        PathArgument {
-            name: "root",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "peek_read",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "peek_grep",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "peek_count",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-    (
-        "peek_skeleton",
-        PathArgument {
-            name: "path",
-            kind: PathArgumentKind::Path,
-        },
-    ),
-];
-
-fn registered_path_argument(
-    tool: &str,
-    name: &str,
-) -> Option<PathArgument> {
-    if name == "workspace" {
-        return Some(PathArgument {
-            name: "workspace",
-            kind: PathArgumentKind::Workspace,
-        });
-    }
-    PATH_ARGUMENT_REGISTRY
-        .iter()
-        .find(|(registered_tool, argument)| {
-            *registered_tool == tool && argument.name == name
-        })
-        .map(|(_, argument)| *argument)
-}
 
 /// What the proxy should do with a client→server message.
 #[derive(Debug)]
@@ -270,117 +117,6 @@ impl PendingList {
     }
 }
 
-fn id_key(id: &Value) -> String {
-    serde_json::to_string(id).unwrap_or_default()
-}
-
-/// Payload telemetry for an MCP tool call (ticket 9d527ad1).
-///
-/// `tokens_estimated` is a rough chars/4 estimate over the combined
-/// request+response payloads — never an observed token count, and never a
-/// dollar cost (tools have no dollar cost; see spec 7be68a48 R4).
-///
-/// Coverage is intentionally partial: this proxy only measures MCP
-/// `tools/call` traffic that traverses this middleware.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CallTelemetry {
-    pub timestamp: String,
-    pub tool_name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub caller_model: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub grant_id: Option<String>,
-    pub decision: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub request_bytes: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub request_chars: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_bytes: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub response_chars: Option<u64>,
-    pub duration_ms: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub tokens_estimated: Option<u64>,
-}
-
-/// A `tools/call` forwarded to the real server, awaiting its response.
-///
-/// Captured at the moment of forwarding so `handle_server_message` can
-/// compute `duration_ms` and emit a `CallTelemetry` once the matching
-/// response arrives (correlated by JSON-RPC id).
-#[derive(Debug, Clone)]
-pub struct PendingCall {
-    pub tool_name: String,
-    pub caller_model: Option<String>,
-    pub grant_id: Option<String>,
-    pub decision: String,
-    pub request_bytes: u64,
-    pub request_chars: u64,
-    pub started_at: std::time::Instant,
-    /// Soft warning to surface on the eventual server response when the
-    /// `caller_model` only resolved after fallback normalization.
-    pub warning: Option<String>,
-}
-
-/// Tracks in-flight forwarded `tools/call` requests by JSON-RPC id.
-#[derive(Default)]
-pub struct PendingCalls {
-    calls: std::collections::HashMap<String, PendingCall>,
-}
-
-impl PendingCalls {
-    pub fn record(
-        &mut self,
-        id: &Value,
-        call: PendingCall,
-    ) {
-        self.calls.insert(id_key(id), call);
-    }
-
-    pub fn take(
-        &mut self,
-        id: &Value,
-    ) -> Option<PendingCall> {
-        self.calls.remove(&id_key(id))
-    }
-}
-
-fn now_rfc3339() -> String {
-    chrono::Utc::now().to_rfc3339()
-}
-
-/// Fallback normalization for `caller_model` strings, applied only when the
-/// raw value fails the gate's exact/substring resolution. Strips a trailing
-/// parenthetical client qualifier (e.g. `"Claude Sonnet 5 (copilot)"` ->
-/// `"Claude Sonnet 5"`), then folds spaces and underscores to hyphens, then
-/// lowercases. No fuzzy or edit-distance matching.
-pub fn normalize_caller_model(model: &str) -> String {
-    let trimmed = model.trim();
-    let stripped = if trimmed.ends_with(')') {
-        trimmed
-            .rfind('(')
-            .map(|idx| trimmed[..idx].trim_end())
-            .unwrap_or(trimmed)
-    } else {
-        trimmed
-    };
-    stripped
-        .chars()
-        .map(|c| if c == ' ' || c == '_' { '-' } else { c })
-        .collect::<String>()
-        .to_lowercase()
-}
-
-/// Compute payload size and estimated tokens from a JSON value.
-pub fn compute_payload_telemetry(value: &Value) -> (u64, u64, u64) {
-    let json_str = serde_json::to_string(value).unwrap_or_default();
-    let bytes = json_str.as_bytes().len() as u64;
-    let chars = json_str.chars().count() as u64;
-    let tokens_estimated = chars / 4; // chars/4 divisor per ticket spec
-    (bytes, chars, tokens_estimated)
-}
-
 /// Build a `tools/call` result carrying an error message (isError=true).
 fn error_result(
     id: &Value,
@@ -394,395 +130,6 @@ fn error_result(
             "isError": true
         }
     })
-}
-
-const MAIN_CHECKOUT_ENV: &str = "MCP_MAIN_CHECKOUT";
-const DEFAULT_STORE_DIR: &str = ".session";
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ToolAccess {
-    Read,
-    Mutation,
-}
-
-const KNOWN_READ_TOOLS: &[&str] = &[
-    "fs_list_dir",
-    "fs_stat",
-    "get_part",
-    "get_ticket",
-    "get_ticket_description",
-    "health",
-    "health_check",
-    "list_edges",
-    "list_parts",
-    "list_tickets",
-    "list_workspaces",
-    "next_tickets",
-    "peek_count",
-    "peek_grep",
-    "peek_read",
-    "peek_skeleton",
-    "session_capabilities",
-    "session_escalation_get",
-    "session_escalation_list",
-    "session_grant_list",
-    "session_lookup",
-    "session_peek_range",
-    "session_peek_skeleton",
-    "session_query",
-    "session_runtime_render_instructions",
-    "session_runtime_view",
-    "session_sessions_for_ticket",
-    "session_subagent_rollups",
-    "session_terminal_peek",
-    "session_terminal_status",
-    "session_tool_metrics",
-    "session_workflow_render_mermaid",
-    "session_workflow_render_terminal",
-    "spec_get",
-    "spec_health",
-    "spec_list",
-    "spec_refs_validate",
-    "spec_search",
-    "spec_section_get",
-    "spec_section_list",
-    "spec_tree",
-    "subgraph",
-    "test_get_execution",
-    "test_get_spec",
-    "test_list_executions",
-    "test_list_specs",
-    "ticket_capabilities",
-    "topgraph",
-    "workflow",
-];
-
-/// Classifies MCP operations at the routing boundary. Unrecognized names are
-/// mutations so newly added tools remain protected until explicitly reviewed.
-fn tool_access(tool: &str) -> ToolAccess {
-    if KNOWN_READ_TOOLS.contains(&tool) {
-        ToolAccess::Read
-    } else {
-        ToolAccess::Mutation
-    }
-}
-
-/// Builds the resolver anchored on the checkout the servers were launched in.
-///
-/// The anchor is inferred from the process working directory, which is the
-/// checkout the MCP servers were started in. `MCP_MAIN_CHECKOUT` remains an
-/// override for callers that cannot control that working directory; it is not
-/// required for normal operation.
-fn anchored_resolver() -> Result<SessionWorkspaceResolver, String> {
-    let config = match std::env::var(MAIN_CHECKOUT_ENV)
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-    {
-        Some(override_path) => ResolverConfig {
-            main_checkout: PathBuf::from(override_path),
-            workspace_slug: "default".to_string(),
-        },
-        None => ResolverConfig::from_working_dir("default")
-            .map_err(|error| error.to_string())?,
-    };
-    SessionWorkspaceResolver::new(config).map_err(|error| error.to_string())
-}
-
-fn resolve_workspace(
-    session_id: &str,
-    workspace: Option<&str>,
-    access: ToolAccess,
-) -> Result<(String, PathBuf), String> {
-    let store_dir = DEFAULT_STORE_DIR.to_string();
-    let resolver = anchored_resolver()?;
-    let absolute_workspace = workspace
-        .filter(|value| Path::new(value).is_absolute())
-        .map(PathBuf::from);
-    let relative_workspace = workspace
-        .filter(|value| !value.is_empty() && *value != "default")
-        .filter(|value| !Path::new(value).is_absolute())
-        .map(Path::new);
-
-    // Resolve the checkout scope first, independent of how `workspace` was
-    // expressed (unset, "default", empty, relative, or absolute): the
-    // argument only ever selects a sub-path within whichever checkout the
-    // session resolves to, never which checkout that is. Gating below runs
-    // against that resolved scope, not the literal input string.
-    let (canonical_target_root, store_root) = match resolver.resolve(ResolveRequest {
-        session_id,
-        relative_workspace,
-        store_dir: &store_dir,
-    }) {
-        Ok(resolved) => {
-            if access == ToolAccess::Mutation {
-                resolved
-                    .require_mutation_target()
-                    .map_err(|error| error.to_string())?;
-            }
-            let store_root = resolved
-                .store_root(&store_dir)
-                .map_err(|error| error.to_string())?;
-            let canonical_target_root =
-                std::fs::canonicalize(resolved.target_root()).map_err(|error| {
-                    format!(
-                        "resolved session worktree '{}' could not be canonicalized: {error}",
-                        resolved.target_root().display()
-                    )
-                })?;
-            (canonical_target_root, store_root)
-        },
-        Err(ResolutionError::MissingSessionWorktree { .. }) =>
-            resolve_unassigned_session_target(&resolver, session_id, &store_dir, access)?,
-        Err(other) => return Err(other.to_string()),
-    };
-    let target_root = absolute_workspace
-        .map(|workspace| {
-            let canonical_workspace = std::fs::canonicalize(&workspace).map_err(|error| {
-                format!("workspace '{}' could not be canonicalized: {error}", workspace.display())
-            })?;
-            if !canonical_workspace.starts_with(&canonical_target_root) {
-                return Err(format!(
-                    "workspace '{}' (canonical '{}') is outside resolved session worktree '{}'",
-                    workspace.display(),
-                    canonical_workspace.display(),
-                    canonical_target_root.display()
-                ));
-            }
-            Ok(canonical_workspace)
-        })
-        .transpose()?
-        .unwrap_or(canonical_target_root)
-        .to_string_lossy()
-        .replace('\\', "/")
-        .trim_start_matches("//?/")
-        .trim_end_matches('/')
-        .to_string();
-    Ok((target_root, store_root))
-}
-
-/// Resolves the checkout scope for a session with no discoverable worktree
-/// (never checked in, or an assignment that no longer resolves on disk).
-///
-/// Reads always fall back to the repository's main-checkout store: a stale
-/// read has no destructive effect, so there is nothing to gate. Mutations
-/// only fall back when the session genuinely never opted into worktree
-/// isolation (`session_is_unassigned`); a session that did opt in but whose
-/// assignment is now broken stays blocked from mutating the main checkout.
-fn resolve_unassigned_session_target(
-    resolver: &SessionWorkspaceResolver,
-    session_id: &str,
-    store_dir: &str,
-    access: ToolAccess,
-) -> Result<(PathBuf, PathBuf), String> {
-    let candidates = resolver.refused_candidates(store_dir).unwrap_or_default();
-    let looks_like_repository_root = candidates.len() == 1
-        && candidates[0]
-            .parent()
-            .is_some_and(|root| root.join(".worktrees").is_dir());
-    if !looks_like_repository_root {
-        return Err(ResolutionError::UnanchoredDefault {
-            session_id: session_id.to_string(),
-            candidates,
-        }
-        .to_string());
-    }
-    if access == ToolAccess::Mutation {
-        let repository_root = candidates[0]
-            .parent()
-            .expect("looks_like_repository_root guarantees a parent");
-        if !session_is_unassigned(repository_root, session_id)? {
-            return Err(ResolutionError::MainCheckoutMutationBlocked.to_string());
-        }
-    }
-    repository_root_target(resolver, store_dir)
-}
-
-fn normalized_path(path: &Path) -> String {
-    path.to_string_lossy()
-        .replace('\\', "/")
-        .trim_start_matches("//?/")
-        .to_string()
-}
-
-/// Targets the repository's main-checkout store directly, bypassing worktree
-/// resolution. Used for reads always, and for mutations from a session that
-/// has never opted into worktree isolation via `session_check_in`.
-///
-/// Returns a canonicalized target root so callers can apply the same
-/// absolute-workspace containment check used for a resolved session worktree.
-fn repository_root_target(
-    resolver: &SessionWorkspaceResolver,
-    store_dir: &str,
-) -> Result<(PathBuf, PathBuf), String> {
-    let store_root = resolver
-        .refused_candidates(store_dir)
-        .map_err(|error| error.to_string())?
-        .into_iter()
-        .next()
-        .ok_or_else(|| {
-            "workspace resolution could not derive repository anchor".to_string()
-        })?;
-    let target_root = store_root.parent().ok_or_else(|| {
-        format!(
-            "repository store root '{}' has no repository parent",
-            normalized_path(&store_root)
-        )
-    })?;
-    let canonical_target_root = std::fs::canonicalize(target_root).map_err(|error| {
-        format!(
-            "repository checkout '{}' could not be canonicalized: {error}",
-            normalized_path(target_root)
-        )
-    })?;
-    Ok((canonical_target_root, store_root))
-}
-
-/// A worktree assignment whose own `path` is the repository's main checkout
-/// (e.g. left over from a stale hook-inference bug, or a failed provisioning
-/// attempt that fell back to main) is not worktree isolation. Treating it as
-/// "assigned" would then require a matching `.worktrees/<id>/...` checkout
-/// that never existed, permanently blocking a session that only ever worked
-/// in the main checkout. Such an assignment is treated the same as no
-/// assignment at all. A failed provisioning attempt (the assignment points
-/// at a worktree path that was never created, or was since removed) is the
-/// same story: the path won't canonicalize, and that broken assignment must
-/// not permanently wall the session off from the main checkout either.
-fn session_is_unassigned(
-    repository_root: &Path,
-    session_id: &str,
-) -> Result<bool, String> {
-    let config = SessionStoreConfig::new(
-        repository_root.join(DEFAULT_STORE_DIR),
-        "default",
-    );
-    match config.read_session(session_id) {
-        Ok(record) => Ok(match record.metadata.worktree {
-            None => true,
-            Some(assignment) => {
-                assignment_targets_repository_root(repository_root, &assignment.path)
-                    || !assignment.path.is_dir()
-            },
-        }),
-        Err(SessionError::NotFound { .. }) => Ok(true),
-        Err(error) => Err(error.to_string()),
-    }
-}
-
-fn assignment_targets_repository_root(
-    repository_root: &Path,
-    assignment_path: &Path,
-) -> bool {
-    match (
-        std::fs::canonicalize(repository_root),
-        std::fs::canonicalize(assignment_path),
-    ) {
-        (Ok(repository_root), Ok(assignment_path)) => {
-            repository_root == assignment_path
-        },
-        _ => false,
-    }
-}
-
-fn try_resolve_session_check_in_bootstrap_workspace(
-    tool: &str,
-    session_id: &str,
-    workspace: Option<&str>,
-) -> Result<Option<(String, PathBuf)>, String> {
-    if tool != "session_check_in" {
-        return Ok(None);
-    }
-    let Some(selector) = workspace else {
-        return Ok(None);
-    };
-    if selector.is_empty() || selector == "default" {
-        return Ok(None);
-    }
-    let workspace_path = PathBuf::from(selector);
-    if !workspace_path.is_absolute() {
-        return Ok(None);
-    }
-
-    let resolver = anchored_resolver()?;
-    let canonical_workspace =
-        std::fs::canonicalize(&workspace_path).map_err(|error| {
-            format!(
-                "workspace '{}' could not be canonicalized: {error}",
-                workspace_path.display()
-            )
-        })?;
-    let anchor_candidate = resolver
-        .refused_candidates(DEFAULT_STORE_DIR)
-        .map_err(|error| error.to_string())?
-        .into_iter()
-        .next()
-        .ok_or_else(|| {
-            "session_check_in bootstrap could not derive repository anchor"
-                .to_string()
-        })?;
-    let repository = anchor_candidate
-        .parent()
-        .ok_or_else(|| {
-            format!(
-                "session_check_in bootstrap anchor '{}' has no repository parent",
-                normalized_path(&anchor_candidate)
-            )
-        })?
-        .to_path_buf();
-    let canonical_repository = std::fs::canonicalize(&repository).map_err(|error| {
-        format!(
-            "session_check_in bootstrap repository '{}' could not be canonicalized: {error}",
-            normalized_path(&repository)
-        )
-    })?;
-    if !session_is_unassigned(&canonical_repository, session_id)? {
-        return Ok(None);
-    }
-    let canonical_worktrees = canonical_repository.join(".worktrees");
-    let canonical_nested_parent = canonical_worktrees.join(session_id);
-    let is_nested_child =
-        canonical_workspace.parent() == Some(canonical_nested_parent.as_path());
-    let is_legacy_flat_child =
-        canonical_workspace.parent() == Some(canonical_worktrees.as_path());
-    if !is_nested_child && !is_legacy_flat_child {
-        return Err(format!(
-            "session_check_in bootstrap workspace '{}' must be a direct child of '{}' or '{}'; received '{}'.",
-            workspace_path.display(),
-            normalized_path(&canonical_nested_parent),
-            normalized_path(&canonical_worktrees),
-            normalized_path(&canonical_workspace)
-        ));
-    }
-    let git_entry = canonical_workspace.join(".git");
-    if !git_entry.exists() {
-        return Err(format!(
-            "session_check_in bootstrap workspace '{}' is missing required '.git' entry",
-            normalized_path(&canonical_workspace)
-        ));
-    }
-    Ok(Some((
-        normalized_path(&canonical_workspace),
-        canonical_workspace.join(DEFAULT_STORE_DIR),
-    )))
-}
-
-fn resolve_workspace_for_tool(
-    tool: &str,
-    session_id: &str,
-    workspace: Option<&str>,
-) -> Result<(String, PathBuf), String> {
-    // `session_check_in` bootstrap enforces a stricter shape (a direct
-    // `.worktrees/<session>/<slug>` child with a `.git` entry) than the
-    // general containment check in `resolve_workspace`, and only applies to
-    // an unassigned session naming an absolute workspace. Run it first so a
-    // nested path that would otherwise pass the looser "anywhere under the
-    // main checkout" containment check still gets rejected.
-    if let Some(resolved) =
-        try_resolve_session_check_in_bootstrap_workspace(tool, session_id, workspace)?
-    {
-        return Ok(resolved);
-    }
-    let access = tool_access(tool);
-    resolve_workspace(session_id, workspace, access)
 }
 
 /// Handle a client→server message.
@@ -1144,6 +491,11 @@ pub fn handle_server_message(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::workspace_resolution::{
+        DEFAULT_STORE_DIR,
+        MAIN_CHECKOUT_ENV,
+        anchored_resolver,
+    };
 
     const TEST_SESSION_ID: &str = "66666666-6666-4666-8666-666666666666";
     use session_api::{
@@ -1649,26 +1001,6 @@ mod tests {
             json!(normalized(&worktree))
         );
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
-    }
-
-    #[test]
-    fn tool_access_allows_registered_reads_and_guards_writes() {
-        for tool in KNOWN_READ_TOOLS {
-            assert_eq!(tool_access(tool), ToolAccess::Read, "{tool}");
-        }
-
-        for tool in [
-            "fs_copy_file",
-            "fs_delete_dir",
-            "fs_delete_file",
-            "fs_move_file",
-            "fs_rename_file",
-            "session_check_in",
-            "update_ticket",
-            "unknown_tool",
-        ] {
-            assert_eq!(tool_access(tool), ToolAccess::Mutation, "{tool}");
-        }
     }
 
     #[test]
@@ -2345,50 +1677,6 @@ mod tests {
         );
         assert_eq!(tool["inputSchema"]["required"][0], json!(CALLER_MODEL_ARG));
         assert_eq!(tool["inputSchema"]["required"][1], json!(SESSION_ID_ARG));
-    }
-
-    #[test]
-    fn telemetry_computation_is_monotonic() {
-        // AC3: larger payloads yield larger estimates
-        let small = json!({"a": 1});
-        let medium = json!({"a": 1, "b": "hello", "c": [1,2,3]});
-        let large = json!({"a": 1, "b": "hello", "c": [1,2,3], "d": {"nested": "structure with more data"}});
-
-        let (bytes_s, chars_s, tokens_s) = compute_payload_telemetry(&small);
-        let (bytes_m, chars_m, tokens_m) = compute_payload_telemetry(&medium);
-        let (bytes_l, chars_l, tokens_l) = compute_payload_telemetry(&large);
-
-        assert!(
-            bytes_s < bytes_m && bytes_m < bytes_l,
-            "bytes should be monotonic"
-        );
-        assert!(
-            chars_s < chars_m && chars_m < chars_l,
-            "chars should be monotonic"
-        );
-        assert!(
-            tokens_s < tokens_m && tokens_m < tokens_l,
-            "tokens_estimated should be monotonic"
-        );
-
-        // Verify the chars/4 relationship
-        assert_eq!(tokens_s, chars_s / 4);
-        assert_eq!(tokens_m, chars_m / 4);
-        assert_eq!(tokens_l, chars_l / 4);
-    }
-
-    #[test]
-    fn telemetry_computation_returns_nonzero() {
-        // AC1/AC2: non-empty payloads yield non-zero counts
-        let payload = json!({"method": "tools/call", "params": {"name": "read_file", "arguments": {}}});
-        let (bytes, chars, tokens) = compute_payload_telemetry(&payload);
-
-        assert!(bytes > 0, "bytes should be non-zero for non-empty payload");
-        assert!(chars > 0, "chars should be non-zero for non-empty payload");
-        assert!(
-            tokens > 0,
-            "tokens_estimated should be non-zero for non-empty payload"
-        );
     }
 
     #[test]
