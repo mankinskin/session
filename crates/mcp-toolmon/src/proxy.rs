@@ -513,50 +513,41 @@ fn resolve_workspace(
                 && workspace.is_none_or(|value| {
                     value.is_empty() || value == "default"
                 }) =>
-        {
-            let store_root = resolver
-                .refused_candidates(&store_dir)
-                .map_err(|error| error.to_string())?
-                .into_iter()
-                .next()
-                .ok_or_else(|| {
-                    "read workspace resolution could not derive repository anchor"
-                        .to_string()
-                })?;
-            let target_root = store_root.parent().ok_or_else(|| {
-                format!(
-                    "read workspace store root '{}' has no repository parent",
-                    normalized_path(&store_root)
-                )
-            })?;
-            return Ok((normalized_path(target_root), store_root));
-        },
-        Err(error) =>
-            return Err(match error {
-                ResolutionError::MissingSessionWorktree { .. }
-                    if workspace.is_none_or(|value| {
-                        value.is_empty() || value == "default"
-                    }) =>
-                {
-                    let candidates = resolver
-                        .refused_candidates(&store_dir)
-                        .unwrap_or_default();
-                    let looks_like_repository_root = candidates.len() == 1
-                        && candidates[0].parent().is_some_and(|root| {
-                            root.join(".worktrees").is_dir()
-                        });
-                    if looks_like_repository_root {
-                        ResolutionError::MainCheckoutMutationBlocked.to_string()
-                    } else {
-                        ResolutionError::UnanchoredDefault {
-                            session_id: session_id.to_string(),
-                            candidates,
-                        }
-                        .to_string()
+            return repository_root_target(&resolver, &store_dir),
+        Err(error) => match error {
+            ResolutionError::MissingSessionWorktree { .. }
+                if workspace.is_none_or(|value| {
+                    value.is_empty() || value == "default"
+                }) =>
+            {
+                let candidates = resolver
+                    .refused_candidates(&store_dir)
+                    .unwrap_or_default();
+                let looks_like_repository_root = candidates.len() == 1
+                    && candidates[0].parent().is_some_and(|root| {
+                        root.join(".worktrees").is_dir()
+                    });
+                if !looks_like_repository_root {
+                    return Err(ResolutionError::UnanchoredDefault {
+                        session_id: session_id.to_string(),
+                        candidates,
                     }
-                },
-                other => other.to_string(),
-            }),
+                    .to_string());
+                }
+                // Worktree assignment is opt-in: a session that never
+                // called session_check_in is not "blocked", it simply
+                // hasn't chosen isolation. The block applies only once an
+                // assignment exists and still resolves back to main.
+                let repository_root = candidates[0]
+                    .parent()
+                    .expect("looks_like_repository_root guarantees a parent");
+                if session_is_unassigned(repository_root, session_id)? {
+                    return repository_root_target(&resolver, &store_dir);
+                }
+                return Err(ResolutionError::MainCheckoutMutationBlocked.to_string());
+            },
+            other => return Err(other.to_string()),
+        },
     };
     if access == ToolAccess::Mutation {
         resolved
@@ -602,6 +593,30 @@ fn normalized_path(path: &Path) -> String {
         .replace('\\', "/")
         .trim_start_matches("//?/")
         .to_string()
+}
+
+/// Targets the repository's main-checkout store directly, bypassing worktree
+/// resolution. Used for reads always, and for mutations from a session that
+/// has never opted into worktree isolation via `session_check_in`.
+fn repository_root_target(
+    resolver: &SessionWorkspaceResolver,
+    store_dir: &str,
+) -> Result<(String, PathBuf), String> {
+    let store_root = resolver
+        .refused_candidates(store_dir)
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .next()
+        .ok_or_else(|| {
+            "workspace resolution could not derive repository anchor".to_string()
+        })?;
+    let target_root = store_root.parent().ok_or_else(|| {
+        format!(
+            "repository store root '{}' has no repository parent",
+            normalized_path(&store_root)
+        )
+    })?;
+    Ok((normalized_path(target_root), store_root))
 }
 
 fn session_is_unassigned(
@@ -1412,22 +1427,53 @@ mod tests {
     }
 
     #[test]
-    fn mutations_and_unknown_tools_remain_blocked_from_main_checkout() {
+    fn unassigned_session_mutations_are_forwarded_from_main_checkout() {
+        // Worktree assignment is opt-in: a session that never called
+        // session_check_in is not blocked, it simply hasn't opted into
+        // isolation. Mutations proceed against the main checkout, same as
+        // reads.
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout) = main_checkout_fixture();
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
         for tool in ["update_ticket", "unknown_tool", "get_unknown"] {
-            let text = response_text(
-                route_with_schema(
-                    call(tool, Some("gpt-5-mini")),
-                    &test_gate(),
-                    tool,
-                    json!({"workspace": {"type": "string"}}),
-                )
-                .0,
+            let (ClientAction::Forward(forwarded), _) = route_with_schema(
+                call(tool, Some("gpt-5-mini")),
+                &test_gate(),
+                tool,
+                json!({"workspace": {"type": "string"}}),
+            ) else {
+                panic!("{tool} should forward from an unassigned session");
+            };
+            assert_eq!(
+                forwarded["params"]["arguments"]["workspace"],
+                json!(normalized(&main_checkout))
             );
-            assert!(text.contains("main checkout mutations are blocked"));
         }
+        unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
+    }
+
+    #[test]
+    fn assigned_session_without_discoverable_worktree_remains_blocked_for_mutations()
+     {
+        // Once a session has an assignment recorded in the session store, a
+        // resolution that still lands on the main checkout (assignment
+        // vanished from disk, or a stale legacy entry) stays blocked; the
+        // opt-in carve-out is only for sessions that never checked in.
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        std::fs::remove_dir_all(&worktree).unwrap();
+        unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
+        let text = response_text(
+            route_with_schema(
+                call("update_ticket", Some("gpt-5-mini")),
+                &test_gate(),
+                "update_ticket",
+                json!({"workspace": {"type": "string"}}),
+            )
+            .0,
+        );
+        assert!(text.contains("main checkout mutations are blocked"));
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
