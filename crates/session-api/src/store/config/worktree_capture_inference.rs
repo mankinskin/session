@@ -22,10 +22,18 @@ impl SessionStoreConfig {
     /// persisted a record, and the assignment must exist before the first
     /// tool call routes on it. Nothing is written unless a branch resolves,
     /// so a non-git directory still leaves the store untouched.
+    ///
+    /// Never records a worktree assignment when `working_dir` resolves to
+    /// `main_checkout` itself: a resolvable branch there (e.g. `main`) is
+    /// ordinary unassigned activity, not worktree isolation. Recording one
+    /// anyway would make a main-checkout session indistinguishable from a
+    /// session that opted into isolation, and later block its own mutations
+    /// once no matching `.worktrees/<id>/...` checkout exists.
     pub fn infer_worktree_from_environment(
         &self,
         session_id: &str,
         working_dir: &Path,
+        main_checkout: &Path,
     ) -> Result<(), SessionError> {
         let mut record = match self.read_session(session_id) {
             Ok(record) => record,
@@ -57,14 +65,16 @@ impl SessionStoreConfig {
                 resolve_ticket_prefix(ticket_store.as_ref(), &short_id)
             });
 
-        record.metadata.worktree = Some(SessionWorktreeAssignment {
-            path: worktree_path,
-            branch,
-            allocation_mode: SessionWorktreeAllocationMode::New,
-            status: SessionWorktreeStatus::Active,
-            predecessor_session_id: None,
-            predecessor_path: None,
-        });
+        if !paths_refer_to_same_directory(&worktree_path, main_checkout) {
+            record.metadata.worktree = Some(SessionWorktreeAssignment {
+                path: worktree_path,
+                branch,
+                allocation_mode: SessionWorktreeAllocationMode::New,
+                status: SessionWorktreeStatus::Active,
+                predecessor_session_id: None,
+                predecessor_path: None,
+            });
+        }
         if let Some(ticket_id) = ticket_id {
             record.metadata.ticket_id = Some(ticket_id);
         }

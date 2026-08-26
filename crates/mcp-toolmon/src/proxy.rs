@@ -619,6 +619,13 @@ fn repository_root_target(
     Ok((normalized_path(target_root), store_root))
 }
 
+/// A worktree assignment whose own `path` is the repository's main checkout
+/// (e.g. left over from a stale hook-inference bug, or a failed provisioning
+/// attempt that fell back to main) is not worktree isolation. Treating it as
+/// "assigned" would then require a matching `.worktrees/<id>/...` checkout
+/// that never existed, permanently blocking a session that only ever worked
+/// in the main checkout. Such an assignment is treated the same as no
+/// assignment at all.
 fn session_is_unassigned(
     repository_root: &Path,
     session_id: &str,
@@ -628,9 +635,29 @@ fn session_is_unassigned(
         "default",
     );
     match config.read_session(session_id) {
-        Ok(record) => Ok(record.metadata.worktree.is_none()),
+        Ok(record) => Ok(match record.metadata.worktree {
+            None => true,
+            Some(assignment) => {
+                assignment_targets_repository_root(repository_root, &assignment.path)
+            },
+        }),
         Err(SessionError::NotFound { .. }) => Ok(true),
         Err(error) => Err(error.to_string()),
+    }
+}
+
+fn assignment_targets_repository_root(
+    repository_root: &Path,
+    assignment_path: &Path,
+) -> bool {
+    match (
+        std::fs::canonicalize(repository_root),
+        std::fs::canonicalize(assignment_path),
+    ) {
+        (Ok(repository_root), Ok(assignment_path)) => {
+            repository_root == assignment_path
+        },
+        _ => false,
     }
 }
 

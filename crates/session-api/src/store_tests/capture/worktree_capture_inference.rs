@@ -72,7 +72,11 @@ fn infer_worktree_from_environment_resolves_existing_ticket_from_branch() {
         .unwrap();
 
     config
-        .infer_worktree_from_environment("session-infer-existing", &repo_dir)
+        .infer_worktree_from_environment(
+            "session-infer-existing",
+            &repo_dir,
+            tempdir.path(),
+        )
         .unwrap();
 
     let record = config.read_session("session-infer-existing").unwrap();
@@ -108,6 +112,7 @@ fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable()
         .infer_worktree_from_environment(
             "session-infer-unresolvable",
             &repo_dir,
+            tempdir.path(),
         )
         .unwrap();
 
@@ -135,14 +140,20 @@ fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
         ))
         .unwrap();
 
+    // `repo_dir` is passed as its own `main_checkout` here: a plain branch
+    // checkout of the main checkout must never be recorded as a worktree
+    // assignment.
     config
-        .infer_worktree_from_environment("session-infer-main", &repo_dir)
+        .infer_worktree_from_environment(
+            "session-infer-main",
+            &repo_dir,
+            &repo_dir,
+        )
         .unwrap();
 
     let record = config.read_session("session-infer-main").unwrap();
     assert_eq!(record.metadata.ticket_id, None);
-    let worktree = record.metadata.worktree.expect("worktree assignment set");
-    assert_eq!(worktree.branch, "main");
+    assert_eq!(record.metadata.worktree, None);
 }
 
 #[test]
@@ -166,7 +177,11 @@ fn infer_worktree_from_environment_is_quiet_on_detached_head() {
         .unwrap();
 
     config
-        .infer_worktree_from_environment("session-infer-detached", &repo_dir)
+        .infer_worktree_from_environment(
+            "session-infer-detached",
+            &repo_dir,
+            tempdir.path(),
+        )
         .unwrap();
 
     let record = config.read_session("session-infer-detached").unwrap();
@@ -193,7 +208,11 @@ fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
         .unwrap();
 
     config
-        .infer_worktree_from_environment("session-infer-non-git", &non_git_dir)
+        .infer_worktree_from_environment(
+            "session-infer-non-git",
+            &non_git_dir,
+            tempdir.path(),
+        )
         .unwrap();
 
     let record = config.read_session("session-infer-non-git").unwrap();
@@ -240,7 +259,11 @@ fn infer_worktree_from_environment_never_overwrites_real_check_in() {
     init_git_repo_on_branch(&repo_dir, "agent/cccccccc-other-slug");
 
     config
-        .infer_worktree_from_environment(WORKTREE_SESSION_REAL, &repo_dir)
+        .infer_worktree_from_environment(
+            WORKTREE_SESSION_REAL,
+            &repo_dir,
+            tempdir.path(),
+        )
         .unwrap();
 
     let record = config.read_session(WORKTREE_SESSION_REAL).unwrap();

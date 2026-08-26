@@ -741,7 +741,14 @@ fn infer_capture_worktree(
     let Some(worktree_root) = store_root.parent() else {
         return Ok(());
     };
-    config.infer_worktree_from_environment(session_id, worktree_root)
+    let main_checkout = std::env::current_dir()
+        .map(|current_dir| anchor_checkout(&current_dir))
+        .unwrap_or_else(|_| worktree_root.to_path_buf());
+    config.infer_worktree_from_environment(
+        session_id,
+        worktree_root,
+        &main_checkout,
+    )
 }
 
 /// Mirrors the worktree's own resolved assignment into the main checkout's
