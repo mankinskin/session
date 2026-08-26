@@ -255,6 +255,120 @@ fn find_response(
         .find(|v| v.get("id").and_then(Value::as_i64) == Some(id))
 }
 
+/// Windows job object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`: any process
+/// assigned to it (and any descendant it spawns, since job membership is
+/// inherited by default) is terminated the moment the job handle closes —
+/// used so a panic or interrupted run can never leave the spawned
+/// `mcp-toolmon.exe` or its shadow-copied `canonical.exe` grandchild running
+/// and holding a file lock (see ticket 276446e8).
+#[cfg(windows)]
+struct WindowsJob(windows_sys::Win32::Foundation::HANDLE);
+
+#[cfg(windows)]
+impl WindowsJob {
+    fn new() -> Self {
+        use windows_sys::Win32::System::JobObjects::{
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JOBOBJECT_BASIC_LIMIT_INFORMATION,
+            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JobObjectExtendedLimitInformation,
+            CreateJobObjectW,
+            SetInformationJobObject,
+        };
+        unsafe {
+            let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            assert!(!job.is_null(), "CreateJobObjectW failed");
+            let info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+                BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION {
+                    LimitFlags: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                    ..std::mem::zeroed()
+                },
+                ..std::mem::zeroed()
+            };
+            let ok = SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &info as *const _ as *const _,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()
+                    as u32,
+            );
+            assert!(ok != 0, "SetInformationJobObject failed");
+            Self(job)
+        }
+    }
+
+    /// Best-effort: losing the race against the child exiting immediately
+    /// after spawn only forfeits the cleanup guarantee, never the test.
+    fn assign(&self, child: &std::process::Child) {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::System::JobObjects::AssignProcessToJobObject;
+        unsafe {
+            let handle = child.as_raw_handle()
+                as windows_sys::Win32::Foundation::HANDLE;
+            let _ = AssignProcessToJobObject(self.0, handle);
+        }
+    }
+}
+
+#[cfg(windows)]
+impl Drop for WindowsJob {
+    fn drop(&mut self) {
+        unsafe {
+            windows_sys::Win32::Foundation::CloseHandle(self.0);
+        }
+    }
+}
+
+/// RAII guard around the spawned `mcp-toolmon` subprocess: kills (and waits
+/// on) it on drop — including the unwind path from a test panic — so a
+/// failing assertion can never leak an orphaned process holding a file lock
+/// on the target binary (ticket 276446e8). On Windows this also tears down
+/// the shadow-copied `canonical.exe` grandchild via a job object, since
+/// killing the direct child alone does not kill its own children.
+struct ChildGuard {
+    child: std::process::Child,
+    // Held only for its Drop side effect (job-close kills the process tree).
+    #[cfg_attr(windows, allow(dead_code))]
+    #[cfg(windows)]
+    job: WindowsJob,
+}
+
+impl ChildGuard {
+    fn spawn(mut command: Command) -> std::io::Result<Self> {
+        #[cfg(windows)]
+        let job = WindowsJob::new();
+        let child = command.spawn()?;
+        #[cfg(windows)]
+        job.assign(&child);
+        Ok(Self {
+            child,
+            #[cfg(windows)]
+            job,
+        })
+    }
+}
+
+impl std::ops::Deref for ChildGuard {
+    type Target = std::process::Child;
+
+    fn deref(&self) -> &Self::Target {
+        &self.child
+    }
+}
+
+impl std::ops::DerefMut for ChildGuard {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.child
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+
 #[test]
 fn transparent_reload_end_to_end_subprocess() {
     let session_environment = active_session_environment();
@@ -262,7 +376,8 @@ fn transparent_reload_end_to_end_subprocess() {
     let canonical = canonical_dir.path().join(canonical_exe_name());
     write_exe(&canonical, &fake_v1_bytes());
 
-    let mut child = Command::new(get_binary_path())
+    let mut command = Command::new(get_binary_path());
+    command
         .arg("--")
         .arg(&canonical)
         .env("TOOLMON_POLL_MS", "25")
@@ -271,8 +386,8 @@ fn transparent_reload_end_to_end_subprocess() {
         .env_remove("COST_GATE_TABLE")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
+        .stderr(Stdio::null());
+    let mut child = ChildGuard::spawn(command)
         .expect("failed to spawn real mcp-toolmon binary");
 
     let mut stdin = child.stdin.take().unwrap();
