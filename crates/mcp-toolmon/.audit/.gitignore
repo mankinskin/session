@@ -1,0 +1,4 @@
+# Excluded local audit index artifacts created by audit-api.
+audit.sqlite3
+audit.sqlite3-shm
+audit.sqlite3-wal

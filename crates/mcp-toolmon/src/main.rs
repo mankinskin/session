@@ -28,6 +28,7 @@
 use std::sync::{
     Arc,
     Mutex,
+    MutexGuard,
 };
 
 use mcp_toolmon::{
@@ -50,6 +51,13 @@ use tokio::io::{
 
 fn log(msg: &str) {
     eprintln!("[mcp-toolmon] {msg}");
+}
+
+/// Locks `mutex`, recovering the guard from a poisoned lock instead of
+/// panicking: one panicking task must not cascade into every other task
+/// panicking on the same lock for the rest of the process's life.
+fn lock_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
 /// Split argv into the real server command (everything after `--`).
@@ -179,8 +187,8 @@ async fn run() {
                     let (rewritten, telemetry) = handle_server_message(
                         msg,
                         reader_policy.as_deref(),
-                        &mut reader_pending.lock().unwrap(),
-                        &mut reader_pending_calls.lock().unwrap(),
+                        &mut lock_recover(&reader_pending),
+                        &mut lock_recover(&reader_pending_calls),
                     );
                     if let Some(telemetry) = &telemetry {
                         toolmon_costgate::config::emit_telemetry_jsonl(
@@ -207,8 +215,8 @@ async fn run() {
                 let (action, telemetry) = handle_client_message(
                     msg,
                     policy.as_deref(),
-                    &mut pending.lock().unwrap(),
-                    &mut pending_calls.lock().unwrap(),
+                    &mut lock_recover(&pending),
+                    &mut lock_recover(&pending_calls),
                 );
                 if let Some(telemetry) = &telemetry {
                     toolmon_costgate::config::emit_telemetry_jsonl(

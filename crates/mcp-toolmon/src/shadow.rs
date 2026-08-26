@@ -72,10 +72,17 @@ pub fn shadow_root(override_dir: Option<&Path>) -> PathBuf {
 /// child name + this process's pid + a path hash, so concurrent proxy
 /// instances (and repeated runs against the same binary) never collide.
 /// Returns the path to the copied executable.
+///
+/// `root` (typically the shared system temp dir) may be world-writable, so
+/// the per-copy leaf directory is created with `create_dir` (exclusive —
+/// fails if anything, including a pre-planted symlink, already occupies that
+/// path) rather than `create_dir_all`, which would silently follow it.
 pub fn make_shadow_copy(
     canonical: &Path,
     root: &Path,
 ) -> io::Result<PathBuf> {
+    std::fs::create_dir_all(root)?;
+
     let pid = std::process::id();
     let name = canonical
         .file_stem()
@@ -86,7 +93,13 @@ pub fn make_shadow_copy(
     let hash = hasher.finish();
 
     let dir = root.join(format!("{name}-{pid}-{hash:x}"));
-    std::fs::create_dir_all(&dir)?;
+    std::fs::create_dir(&dir)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
+    }
 
     let file_name = canonical.file_name().ok_or_else(|| {
         io::Error::new(
