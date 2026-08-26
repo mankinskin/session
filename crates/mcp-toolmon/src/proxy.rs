@@ -625,7 +625,10 @@ fn repository_root_target(
 /// "assigned" would then require a matching `.worktrees/<id>/...` checkout
 /// that never existed, permanently blocking a session that only ever worked
 /// in the main checkout. Such an assignment is treated the same as no
-/// assignment at all.
+/// assignment at all. A failed provisioning attempt (the assignment points
+/// at a worktree path that was never created, or was since removed) is the
+/// same story: the path won't canonicalize, and that broken assignment must
+/// not permanently wall the session off from the main checkout either.
 fn session_is_unassigned(
     repository_root: &Path,
     session_id: &str,
@@ -639,6 +642,7 @@ fn session_is_unassigned(
             None => true,
             Some(assignment) => {
                 assignment_targets_repository_root(repository_root, &assignment.path)
+                    || !assignment.path.is_dir()
             },
         }),
         Err(SessionError::NotFound { .. }) => Ok(true),
@@ -1486,27 +1490,30 @@ mod tests {
     }
 
     #[test]
-    fn assigned_session_without_discoverable_worktree_remains_blocked_for_mutations()
+    fn assigned_session_with_vanished_worktree_falls_back_to_main_checkout()
      {
-        // Once a session has an assignment recorded in the session store, a
-        // resolution that still lands on the main checkout (assignment
-        // vanished from disk, or a stale legacy entry) stays blocked; the
-        // opt-in carve-out is only for sessions that never checked in.
+        // An assignment recorded in the session store whose worktree no
+        // longer exists on disk (removed, or a failed provisioning attempt
+        // that never created it) is a broken assignment, not real isolation.
+        // It must not permanently wall the session off from the main
+        // checkout; mutations fall back the same as an unassigned session.
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, worktree) =
             routing_fixture(SessionWorktreeStatus::Active, false);
         std::fs::remove_dir_all(&worktree).unwrap();
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
-        let text = response_text(
-            route_with_schema(
-                call("update_ticket", Some("gpt-5-mini")),
-                &test_gate(),
-                "update_ticket",
-                json!({"workspace": {"type": "string"}}),
-            )
-            .0,
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            call("update_ticket", Some("gpt-5-mini")),
+            &test_gate(),
+            "update_ticket",
+            json!({"workspace": {"type": "string"}}),
+        ) else {
+            panic!("update_ticket should forward when the assigned worktree vanished");
+        };
+        assert_eq!(
+            forwarded["params"]["arguments"]["workspace"],
+            json!(normalized(&main_checkout))
         );
-        assert!(text.contains("main checkout mutations are blocked"));
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
