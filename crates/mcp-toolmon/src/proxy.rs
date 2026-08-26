@@ -689,10 +689,16 @@ fn try_resolve_session_check_in_bootstrap_workspace(
         return Ok(None);
     }
     let canonical_worktrees = canonical_repository.join(".worktrees");
-    if canonical_workspace.parent() != Some(canonical_worktrees.as_path()) {
+    let canonical_nested_parent = canonical_worktrees.join(session_id);
+    let is_nested_child =
+        canonical_workspace.parent() == Some(canonical_nested_parent.as_path());
+    let is_legacy_flat_child =
+        canonical_workspace.parent() == Some(canonical_worktrees.as_path());
+    if !is_nested_child && !is_legacy_flat_child {
         return Err(format!(
-            "session_check_in bootstrap workspace '{}' must be a direct child of '{}'; received '{}'.",
+            "session_check_in bootstrap workspace '{}' must be a direct child of '{}' or '{}'; received '{}'.",
             workspace_path.display(),
+            normalized_path(&canonical_nested_parent),
             normalized_path(&canonical_worktrees),
             normalized_path(&canonical_workspace)
         ));
@@ -1490,6 +1496,47 @@ mod tests {
         std::fs::write(
             worktree.join(".git"),
             "gitdir: ../../.git/worktrees/bootstrap\n",
+        )
+        .unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+
+        let mut request = call("session_check_in", Some("gpt-5-mini"));
+        request["params"]["arguments"]["workspace"] =
+            json!(normalized(&worktree));
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            request,
+            &test_gate(),
+            "session_check_in",
+            json!({"workspace": {"type": "string"}}),
+        ) else {
+            panic!("expected forwarded request");
+        };
+        assert_eq!(
+            forwarded["params"]["arguments"]["workspace"],
+            json!(normalized(&worktree))
+        );
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn unassigned_session_check_in_with_nested_worktree_workspace_is_forwarded()
+    {
+        // The nested layout (`.worktrees/<session-uuid>/<slug>`) is the
+        // documented default; the bootstrap escape hatch must accept it, not
+        // just the legacy flat `.worktrees/<slug>` layout.
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let main_checkout = temp.path().join("repository");
+        let worktree = main_checkout
+            .join(".worktrees")
+            .join(TEST_SESSION_ID)
+            .join("topic-slug");
+        std::fs::create_dir_all(main_checkout.join(".git")).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".session")).unwrap();
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(
+            worktree.join(".git"),
+            "gitdir: ../../../.git/worktrees/topic-slug\n",
         )
         .unwrap();
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
