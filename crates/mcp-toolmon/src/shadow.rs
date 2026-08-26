@@ -76,7 +76,15 @@ pub fn shadow_root(override_dir: Option<&Path>) -> PathBuf {
 /// `root` (typically the shared system temp dir) may be world-writable, so
 /// the per-copy leaf directory is created with `create_dir` (exclusive —
 /// fails if anything, including a pre-planted symlink, already occupies that
-/// path) rather than `create_dir_all`, which would silently follow it.
+/// path) rather than `create_dir_all`, which would silently follow it. A
+/// repeat call for the SAME canonical path (and thus the same directory
+/// name — see below) is expected and must reuse that directory rather than
+/// erroring: [`Supervisor::swap_child_with_drain_ms`] calls this again on
+/// every respawn, after the previous child holding that shadow exe open has
+/// already been killed and waited on, to copy the fresh canonical bytes
+/// into the SAME destination on purpose. `AlreadyExists` is therefore only
+/// treated as a real error if the existing path isn't a plain directory we
+/// own (guards the symlink-planting case `create_dir` exists to prevent).
 pub fn make_shadow_copy(
     canonical: &Path,
     root: &Path,
@@ -93,7 +101,13 @@ pub fn make_shadow_copy(
     let hash = hasher.finish();
 
     let dir = root.join(format!("{name}-{pid}-{hash:x}"));
-    std::fs::create_dir(&dir)?;
+    match std::fs::create_dir(&dir) {
+        Ok(()) => {},
+        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+            verify_reusable_shadow_dir(&dir)?;
+        },
+        Err(e) => return Err(e),
+    }
 
     #[cfg(unix)]
     {
@@ -119,6 +133,24 @@ pub fn make_shadow_copy(
     }
 
     Ok(dest)
+}
+
+/// Guard for the `AlreadyExists` path in [`make_shadow_copy`]: confirm the
+/// pre-existing entry is a real directory (not a symlink or other file
+/// someone else planted at this predictable, pid+hash-keyed path) before
+/// reusing it.
+fn verify_reusable_shadow_dir(dir: &Path) -> io::Result<()> {
+    let meta = std::fs::symlink_metadata(dir)?;
+    if !meta.is_dir() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "shadow path {} exists but is not a plain directory",
+                dir.display()
+            ),
+        ));
+    }
+    Ok(())
 }
 
 /// Startup sweep: delete any shadow artifact directory under `root` whose
