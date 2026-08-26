@@ -502,67 +502,39 @@ fn resolve_workspace(
         .filter(|value| !value.is_empty() && *value != "default")
         .filter(|value| !Path::new(value).is_absolute())
         .map(Path::new);
-    let resolved = match resolver.resolve(ResolveRequest {
+
+    // Resolve the checkout scope first, independent of how `workspace` was
+    // expressed (unset, "default", empty, relative, or absolute): the
+    // argument only ever selects a sub-path within whichever checkout the
+    // session resolves to, never which checkout that is. Gating below runs
+    // against that resolved scope, not the literal input string.
+    let (canonical_target_root, store_root) = match resolver.resolve(ResolveRequest {
         session_id,
         relative_workspace,
         store_dir: &store_dir,
     }) {
-        Ok(resolved) => resolved,
-        Err(ResolutionError::MissingSessionWorktree { .. })
-            if access == ToolAccess::Read
-                && workspace.is_none_or(|value| {
-                    value.is_empty() || value == "default"
-                }) =>
-            return repository_root_target(&resolver, &store_dir),
-        Err(error) => match error {
-            ResolutionError::MissingSessionWorktree { .. }
-                if workspace.is_none_or(|value| {
-                    value.is_empty() || value == "default"
-                }) =>
-            {
-                let candidates = resolver
-                    .refused_candidates(&store_dir)
-                    .unwrap_or_default();
-                let looks_like_repository_root = candidates.len() == 1
-                    && candidates[0].parent().is_some_and(|root| {
-                        root.join(".worktrees").is_dir()
-                    });
-                if !looks_like_repository_root {
-                    return Err(ResolutionError::UnanchoredDefault {
-                        session_id: session_id.to_string(),
-                        candidates,
-                    }
-                    .to_string());
-                }
-                // Worktree assignment is opt-in: a session that never
-                // called session_check_in is not "blocked", it simply
-                // hasn't chosen isolation. The block applies only once an
-                // assignment exists and still resolves back to main.
-                let repository_root = candidates[0]
-                    .parent()
-                    .expect("looks_like_repository_root guarantees a parent");
-                if session_is_unassigned(repository_root, session_id)? {
-                    return repository_root_target(&resolver, &store_dir);
-                }
-                return Err(ResolutionError::MainCheckoutMutationBlocked.to_string());
-            },
-            other => return Err(other.to_string()),
+        Ok(resolved) => {
+            if access == ToolAccess::Mutation {
+                resolved
+                    .require_mutation_target()
+                    .map_err(|error| error.to_string())?;
+            }
+            let store_root = resolved
+                .store_root(&store_dir)
+                .map_err(|error| error.to_string())?;
+            let canonical_target_root =
+                std::fs::canonicalize(resolved.target_root()).map_err(|error| {
+                    format!(
+                        "resolved session worktree '{}' could not be canonicalized: {error}",
+                        resolved.target_root().display()
+                    )
+                })?;
+            (canonical_target_root, store_root)
         },
+        Err(ResolutionError::MissingSessionWorktree { .. }) =>
+            resolve_unassigned_session_target(&resolver, session_id, &store_dir, access)?,
+        Err(other) => return Err(other.to_string()),
     };
-    if access == ToolAccess::Mutation {
-        resolved
-            .require_mutation_target()
-            .map_err(|error| error.to_string())?;
-    }
-    let store_root = resolved
-        .store_root(&store_dir)
-        .map_err(|error| error.to_string())?;
-    let canonical_target_root = std::fs::canonicalize(resolved.target_root()).map_err(|error| {
-        format!(
-            "resolved session worktree '{}' could not be canonicalized: {error}",
-            resolved.target_root().display()
-        )
-    })?;
     let target_root = absolute_workspace
         .map(|workspace| {
             let canonical_workspace = std::fs::canonicalize(&workspace).map_err(|error| {
@@ -588,6 +560,43 @@ fn resolve_workspace(
     Ok((target_root, store_root))
 }
 
+/// Resolves the checkout scope for a session with no discoverable worktree
+/// (never checked in, or an assignment that no longer resolves on disk).
+///
+/// Reads always fall back to the repository's main-checkout store: a stale
+/// read has no destructive effect, so there is nothing to gate. Mutations
+/// only fall back when the session genuinely never opted into worktree
+/// isolation (`session_is_unassigned`); a session that did opt in but whose
+/// assignment is now broken stays blocked from mutating the main checkout.
+fn resolve_unassigned_session_target(
+    resolver: &SessionWorkspaceResolver,
+    session_id: &str,
+    store_dir: &str,
+    access: ToolAccess,
+) -> Result<(PathBuf, PathBuf), String> {
+    let candidates = resolver.refused_candidates(store_dir).unwrap_or_default();
+    let looks_like_repository_root = candidates.len() == 1
+        && candidates[0]
+            .parent()
+            .is_some_and(|root| root.join(".worktrees").is_dir());
+    if !looks_like_repository_root {
+        return Err(ResolutionError::UnanchoredDefault {
+            session_id: session_id.to_string(),
+            candidates,
+        }
+        .to_string());
+    }
+    if access == ToolAccess::Mutation {
+        let repository_root = candidates[0]
+            .parent()
+            .expect("looks_like_repository_root guarantees a parent");
+        if !session_is_unassigned(repository_root, session_id)? {
+            return Err(ResolutionError::MainCheckoutMutationBlocked.to_string());
+        }
+    }
+    repository_root_target(resolver, store_dir)
+}
+
 fn normalized_path(path: &Path) -> String {
     path.to_string_lossy()
         .replace('\\', "/")
@@ -598,10 +607,13 @@ fn normalized_path(path: &Path) -> String {
 /// Targets the repository's main-checkout store directly, bypassing worktree
 /// resolution. Used for reads always, and for mutations from a session that
 /// has never opted into worktree isolation via `session_check_in`.
+///
+/// Returns a canonicalized target root so callers can apply the same
+/// absolute-workspace containment check used for a resolved session worktree.
 fn repository_root_target(
     resolver: &SessionWorkspaceResolver,
     store_dir: &str,
-) -> Result<(String, PathBuf), String> {
+) -> Result<(PathBuf, PathBuf), String> {
     let store_root = resolver
         .refused_candidates(store_dir)
         .map_err(|error| error.to_string())?
@@ -616,7 +628,13 @@ fn repository_root_target(
             normalized_path(&store_root)
         )
     })?;
-    Ok((normalized_path(target_root), store_root))
+    let canonical_target_root = std::fs::canonicalize(target_root).map_err(|error| {
+        format!(
+            "repository checkout '{}' could not be canonicalized: {error}",
+            normalized_path(target_root)
+        )
+    })?;
+    Ok((canonical_target_root, store_root))
 }
 
 /// A worktree assignment whose own `path` is the repository's main checkout
@@ -752,19 +770,19 @@ fn resolve_workspace_for_tool(
     session_id: &str,
     workspace: Option<&str>,
 ) -> Result<(String, PathBuf), String> {
-    let access = tool_access(tool);
-    match resolve_workspace(session_id, workspace, access) {
-        Ok(resolved) => Ok(resolved),
-        Err(error) => {
-            match try_resolve_session_check_in_bootstrap_workspace(
-                tool, session_id, workspace,
-            ) {
-                Ok(Some(resolved)) => Ok(resolved),
-                Ok(None) => Err(error),
-                Err(bootstrap_error) => Err(bootstrap_error),
-            }
-        },
+    // `session_check_in` bootstrap enforces a stricter shape (a direct
+    // `.worktrees/<session>/<slug>` child with a `.git` entry) than the
+    // general containment check in `resolve_workspace`, and only applies to
+    // an unassigned session naming an absolute workspace. Run it first so a
+    // nested path that would otherwise pass the looser "anywhere under the
+    // main checkout" containment check still gets rejected.
+    if let Some(resolved) =
+        try_resolve_session_check_in_bootstrap_workspace(tool, session_id, workspace)?
+    {
+        return Ok(resolved);
     }
+    let access = tool_access(tool);
+    resolve_workspace(session_id, workspace, access)
 }
 
 /// Handle a client→server message.
@@ -1480,6 +1498,46 @@ mod tests {
                 json!({"workspace": {"type": "string"}}),
             ) else {
                 panic!("{tool} should forward from an unassigned session");
+            };
+            assert_eq!(
+                forwarded["params"]["arguments"]["workspace"],
+                json!(normalized(&main_checkout))
+            );
+        }
+        unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
+    }
+
+    #[test]
+    fn unassigned_session_mutation_is_forwarded_regardless_of_workspace_representation()
+     {
+        // Gating must key off the *resolved* checkout scope, not how the
+        // caller happened to spell `workspace`: "default", empty, unset, and
+        // an explicit absolute path to the same main checkout must all reach
+        // the same outcome for an unassigned session's mutation.
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout) = main_checkout_fixture();
+        unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
+        let main_checkout_workspace = normalized(&main_checkout);
+        for workspace in [
+            None,
+            Some("default"),
+            Some(""),
+            Some(main_checkout_workspace.as_str()),
+        ] {
+            let mut request = call("update_ticket", Some("gpt-5-mini"));
+            if let Some(workspace) = workspace {
+                request["params"]["arguments"]["workspace"] = json!(workspace);
+            }
+            let (ClientAction::Forward(forwarded), _) = route_with_schema(
+                request,
+                &test_gate(),
+                "update_ticket",
+                json!({"workspace": {"type": "string"}}),
+            ) else {
+                panic!(
+                    "update_ticket should forward from an unassigned session \
+                     regardless of workspace representation ({workspace:?})"
+                );
             };
             assert_eq!(
                 forwarded["params"]["arguments"]["workspace"],
