@@ -399,36 +399,14 @@ impl WorktreeGit {
         worktree: &Path,
         submodule_path: &str,
     ) -> Result<String, WorktreeGitError> {
-        let repository = Repository::open(worktree)?;
-        let tree = repository.head()?.peel_to_commit()?.tree()?;
-        Ok(tree.get_path(Path::new(submodule_path))?.id().to_string())
+        gitlink_sha_at(worktree, submodule_path)
     }
 
+    /// Direct submodule paths declared by this checkout's `.gitmodules`.
+    /// Does not recurse into a submodule's own nested submodules; use
+    /// `WorktreeGit::open` on that submodule path and call this again.
     pub fn submodule_paths(&self) -> Result<Vec<String>, WorktreeGitError> {
-        let path = self.main_checkout.join(".gitmodules");
-        if !path.exists() {
-            return Ok(Vec::new());
-        }
-        let config = Config::open(&path)?;
-        let mut entries = config.entries(None)?;
-        let mut paths = Vec::new();
-        while let Some(entry) = entries.next() {
-            let entry = entry?;
-            let Some(name) = entry.name() else {
-                continue;
-            };
-            if name
-                .strip_prefix("submodule.")
-                .and_then(|name| name.strip_suffix(".path"))
-                .is_some()
-                && let Some(value) = entry.value()
-            {
-                paths.push(value.to_string());
-            }
-        }
-        paths.sort();
-        paths.dedup();
-        Ok(paths)
+        submodule_paths_at(&self.main_checkout)
     }
 
     pub fn worktree_add_new_branch(
@@ -450,31 +428,10 @@ impl WorktreeGit {
         worktree: &Path,
         sha: &str,
     ) -> Result<(), WorktreeGitError> {
-        let submodule = self.main_checkout.join(submodule_path);
-        if let Some(parent) = worktree.parent() {
-            fs::create_dir_all(parent).map_err(|source| {
-                WorktreeGitError::Io {
-                    path: parent.to_path_buf(),
-                    source,
-                }
-            })?;
-        }
-        subprocess::run(
-            &submodule,
-            ["worktree", "add", "--detach"],
-            [worktree, Path::new(sha)],
-        )
-    }
-
-    fn submodule_worktree_remove_force(
-        &self,
-        submodule_path: &str,
-        worktree: &Path,
-    ) -> Result<(), WorktreeGitError> {
-        subprocess::run(
+        submodule_worktree_add_detached_at(
             &self.main_checkout.join(submodule_path),
-            ["worktree", "remove", "--force"],
-            [worktree],
+            worktree,
+            sha,
         )
     }
 
@@ -700,26 +657,7 @@ impl WorktreeGit {
         &self,
         worktree: &Path,
     ) -> Result<(), WorktreeGitError> {
-        // `submodule update` in a linked worktree repoints the shared
-        // `.git/modules/<name>/core.worktree` and empties the main checkout.
-        // Each nested linked worktree instead gets a private worktree git dir,
-        // uses the already-present object store, and needs no network access.
-        for submodule in self.submodule_paths()? {
-            let source = self.main_checkout.join(&submodule);
-            if !source.join(".git").exists() {
-                eprintln!(
-                    "warning: submodule {submodule} is not initialized in main checkout; skipping"
-                );
-                continue;
-            }
-            let sha = self.gitlink_sha(worktree, &submodule)?;
-            self.submodule_worktree_add_detached(
-                &submodule,
-                &worktree.join(&submodule),
-                &sha,
-            )?;
-        }
-        Ok(())
+        populate_submodules_offline_at(&self.main_checkout, worktree)
     }
 
     fn rollback_create(
@@ -729,16 +667,11 @@ impl WorktreeGit {
         original: WorktreeGitError,
     ) -> WorktreeGitError {
         let mut failures = Vec::new();
-        for submodule in self.submodule_paths().unwrap_or_default() {
-            let nested = path.join(&submodule);
-            if nested.exists()
-                && self
-                    .submodule_worktree_remove_force(&submodule, &nested)
-                    .is_err()
-            {
-                failures.push(format!("remove nested {}", nested.display()));
-            }
-        }
+        remove_nested_submodule_worktrees_at(
+            &self.main_checkout,
+            path,
+            &mut failures,
+        );
         if path.exists() && self.worktree_remove_force(path).is_err() {
             failures.push(format!("remove {}", path.display()));
         }
@@ -757,6 +690,121 @@ impl WorktreeGit {
                 original: Box::new(original),
                 rollback: failures.join(", "),
             }
+        }
+    }
+}
+
+/// Direct submodule paths declared by `.gitmodules` in an arbitrary checkout.
+fn submodule_paths_at(checkout: &Path) -> Result<Vec<String>, WorktreeGitError> {
+    let path = checkout.join(".gitmodules");
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let config = Config::open(&path)?;
+    let mut entries = config.entries(None)?;
+    let mut paths = Vec::new();
+    while let Some(entry) = entries.next() {
+        let entry = entry?;
+        let Some(name) = entry.name() else {
+            continue;
+        };
+        if name
+            .strip_prefix("submodule.")
+            .and_then(|name| name.strip_suffix(".path"))
+            .is_some()
+            && let Some(value) = entry.value()
+        {
+            paths.push(value.to_string());
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn gitlink_sha_at(
+    worktree: &Path,
+    submodule_path: &str,
+) -> Result<String, WorktreeGitError> {
+    let repository = Repository::open(worktree)?;
+    let tree = repository.head()?.peel_to_commit()?.tree()?;
+    Ok(tree.get_path(Path::new(submodule_path))?.id().to_string())
+}
+
+fn submodule_worktree_add_detached_at(
+    source_checkout: &Path,
+    worktree: &Path,
+    sha: &str,
+) -> Result<(), WorktreeGitError> {
+    if let Some(parent) = worktree.parent() {
+        fs::create_dir_all(parent).map_err(|source| WorktreeGitError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    subprocess::run(
+        source_checkout,
+        ["worktree", "add", "--detach"],
+        [worktree, Path::new(sha)],
+    )
+}
+
+fn submodule_worktree_remove_force_at(
+    source_checkout: &Path,
+    worktree: &Path,
+) -> Result<(), WorktreeGitError> {
+    subprocess::run(
+        source_checkout,
+        ["worktree", "remove", "--force"],
+        [worktree],
+    )
+}
+
+/// Recursively populate each submodule, and every submodule nested inside it,
+/// as detached linked worktrees built entirely from locally available
+/// objects. `source_checkout` is the already-initialized checkout whose
+/// `.gitmodules` and gitlinks are read; `worktree` is the sibling linked
+/// worktree being populated to match it.
+fn populate_submodules_offline_at(
+    source_checkout: &Path,
+    worktree: &Path,
+) -> Result<(), WorktreeGitError> {
+    for submodule in submodule_paths_at(source_checkout)? {
+        let source = source_checkout.join(&submodule);
+        if !source.join(".git").exists() {
+            eprintln!(
+                "warning: submodule {submodule} is not initialized in {}; skipping",
+                source_checkout.display()
+            );
+            continue;
+        }
+        let target = worktree.join(&submodule);
+        let sha = gitlink_sha_at(worktree, &submodule)?;
+        submodule_worktree_add_detached_at(&source, &target, &sha)?;
+        populate_submodules_offline_at(&source, &target)?;
+    }
+    Ok(())
+}
+
+/// Remove nested submodule worktrees depth-first (innermost first) so each
+/// `git worktree remove` still finds its path intact when it runs.
+fn remove_nested_submodule_worktrees_at(
+    source_checkout: &Path,
+    worktree: &Path,
+    failures: &mut Vec<String>,
+) {
+    let Ok(submodules) = submodule_paths_at(source_checkout) else {
+        return;
+    };
+    for submodule in submodules {
+        let source = source_checkout.join(&submodule);
+        let nested = worktree.join(&submodule);
+        if !nested.exists() {
+            continue;
+        }
+        remove_nested_submodule_worktrees_at(&source, &nested, failures);
+        if submodule_worktree_remove_force_at(&source, &nested).is_err() {
+            failures.push(format!("remove nested {}", nested.display()));
         }
     }
 }

@@ -78,6 +78,69 @@ fn fixture_repo(tool: &Path) -> Fixture {
         tool: tool.to_path_buf(),
     }
 }
+/// Like `fixture_repo`, but `modules/example` itself has its own submodule
+/// (`modules/example/nested`), reproducing a submodule-of-a-submodule chain.
+fn fixture_repo_with_nested_submodule(tool: &Path) -> Fixture {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let inner_source = temp.path().join("nested-submodule-source");
+    let source = temp.path().join("submodule-source");
+    let main = temp.path().join("main");
+    init_repo(&inner_source);
+    fs::write(inner_source.join("nested.txt"), "nested-initial\n").unwrap();
+    git(&inner_source, &["add", "nested.txt"]);
+    git(&inner_source, &["commit", "-m", "initial"]);
+    init_repo(&source);
+    fs::write(source.join("file.txt"), "initial\n").unwrap();
+    git(&source, &["add", "file.txt"]);
+    git(&source, &["commit", "-m", "initial"]);
+    git(
+        &source,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            inner_source.to_str().unwrap(),
+            "nested",
+        ],
+    );
+    git(&source, &["commit", "-m", "add nested submodule"]);
+    init_repo(&main);
+    fs::write(main.join("README"), "fixture\n").unwrap();
+    git(&main, &["add", "README"]);
+    git(&main, &["commit", "-m", "initial"]);
+    git(
+        &main,
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "add",
+            source.to_str().unwrap(),
+            "modules/example",
+        ],
+    );
+    git(&main, &["commit", "-m", "add submodule"]);
+    // Simulate a main checkout where `doctor` has already recursively
+    // initialized submodules-of-submodules; offline population only ever
+    // copies from what the main checkout already has materialized.
+    git(
+        &main.join("modules/example"),
+        &[
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "update",
+            "--init",
+            "nested",
+        ],
+    );
+    Fixture {
+        _temp: temp,
+        main,
+        tool: tool.to_path_buf(),
+    }
+}
 fn init_repo(path: &Path) {
     git_in(
         path.parent().unwrap(),
@@ -240,6 +303,23 @@ fn bootstrap_populates_submodule_offline() {
     let sub = f.worktree("bootstrap").join("modules/example");
     assert!(sub.join("file.txt").is_file());
     git(&sub, &["cat-file", "-e", &sha]);
+}
+#[test]
+fn bootstrap_populates_submodule_of_a_submodule_offline() {
+    let f = fixture_repo_with_nested_submodule(&tool());
+    let sha = recorded_sha(&f.main, "modules/example");
+    create(&f, "bootstrap");
+    let sub = f.worktree("bootstrap").join("modules/example");
+    assert!(sub.join("file.txt").is_file());
+    git(&sub, &["cat-file", "-e", &sha]);
+    let nested = sub.join("nested");
+    assert!(
+        nested.join("nested.txt").is_file(),
+        "submodule-of-a-submodule must be populated without a manual \
+         follow-up `git submodule update --init`"
+    );
+    let nested_sha = recorded_sha(&sub, "nested");
+    git(&nested, &["cat-file", "-e", &nested_sha]);
 }
 #[test]
 fn bootstrap_resolves_main_only_commit() {

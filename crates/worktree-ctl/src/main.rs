@@ -1347,6 +1347,26 @@ fn handle_doctor(dry_run: bool) -> Result<(), String> {
         WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
     let mut plan = LifecyclePlan::default();
 
+    scan_submodules_for_repairs(&git, &mut plan)?;
+    plan.add("prune stale superproject worktree registrations");
+    if dry_run {
+        plan.emit();
+        return Ok(());
+    }
+
+    repair_submodules(&git)?;
+    git.worktree_prune().map_err(|error| error.to_string())?;
+    println!("doctor: repairs complete");
+    Ok(())
+}
+
+/// Recurse into each already-initialized submodule so a deinitialized
+/// submodule-of-a-submodule (e.g. `workflow-tools`'s own `spec`/`session`)
+/// is reported too, not just direct submodules of the invoked checkout.
+fn scan_submodules_for_repairs(
+    git: &WorktreeGit,
+    plan: &mut LifecyclePlan,
+) -> Result<(), String> {
     for submodule in git.submodule_paths().map_err(|error| error.to_string())? {
         let path = git.main_checkout().join(&submodule);
         if let Some(config) =
@@ -1368,14 +1388,19 @@ fn handle_doctor(dry_run: bool) -> Result<(), String> {
             plan.add(format!(
                 "initialize and update deinitialized submodule {submodule}"
             ));
+            continue;
+        }
+        if let Ok(nested_git) = WorktreeGit::open(&path) {
+            scan_submodules_for_repairs(&nested_git, plan)?;
         }
     }
-    plan.add("prune stale superproject worktree registrations");
-    if dry_run {
-        plan.emit();
-        return Ok(());
-    }
+    Ok(())
+}
 
+/// Repair pass matching `scan_submodules_for_repairs`: recurses into each
+/// submodule only after it is confirmed initialized, since a deinitialized
+/// submodule has no `.gitmodules` of its own to discover yet.
+fn repair_submodules(git: &WorktreeGit) -> Result<(), String> {
     for submodule in git.submodule_paths().map_err(|error| error.to_string())? {
         let path = git.main_checkout().join(&submodule);
         if stale_worktree_config(git.main_checkout(), &submodule)?.is_some() {
@@ -1385,9 +1410,10 @@ fn handle_doctor(dry_run: bool) -> Result<(), String> {
         if Repository::open(&path).is_err() {
             initialize_submodule(git.main_checkout(), &submodule)?;
         }
+        if let Ok(nested_git) = WorktreeGit::open(&path) {
+            repair_submodules(&nested_git)?;
+        }
     }
-    git.worktree_prune().map_err(|error| error.to_string())?;
-    println!("doctor: repairs complete");
     Ok(())
 }
 
