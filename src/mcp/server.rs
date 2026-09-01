@@ -114,7 +114,7 @@ enum RelationStrengthSchema {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct CheckInInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Session id to check in.
     pub session_id: String,
@@ -233,7 +233,7 @@ pub struct SessionMoveJournalInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimeInitInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Copilot session UUID. Required; the MCP tool does not resolve one implicitly.
     pub session_id: String,
@@ -245,7 +245,7 @@ pub struct RuntimeInitInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimeResumeInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub predecessor_run_id: String,
@@ -253,7 +253,7 @@ pub struct RuntimeResumeInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimePinInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub entity_urn: String,
@@ -265,7 +265,7 @@ pub struct RuntimePinInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimeUnpinInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub entity_urn: String,
@@ -273,7 +273,7 @@ pub struct RuntimeUnpinInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct ToolMetricsInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Maximum age in days for included sessions.
     #[serde(default)]
@@ -285,7 +285,7 @@ pub struct ToolMetricsInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct SubagentRollupsInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Copilot session UUID to get rollups for.
     pub session_id: String,
@@ -293,7 +293,7 @@ pub struct SubagentRollupsInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GrantCreateInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Grant scope: session or subagent.
     pub scope: String,
@@ -309,13 +309,13 @@ pub struct GrantCreateInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GrantListInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct GrantRevokeInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Grant ID to revoke.
     pub grant_id: String,
@@ -323,7 +323,7 @@ pub struct GrantRevokeInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct EscalationCreateInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// The blocking decision or problem statement.
     pub blocking_decision: String,
@@ -345,7 +345,7 @@ pub struct EscalationCreateInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct EscalationListInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Optional status filter: open or resolved.
     #[serde(default)]
@@ -354,7 +354,7 @@ pub struct EscalationListInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct EscalationGetInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Escalation ID to retrieve.
     pub escalation_id: String,
@@ -362,7 +362,7 @@ pub struct EscalationGetInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct EscalationResolveInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     /// Escalation ID to resolve.
     pub escalation_id: String,
@@ -381,7 +381,7 @@ pub struct EscalationResolveInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimeViewInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
 }
@@ -392,7 +392,7 @@ pub struct CapabilitiesInput {}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowAddNodeInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     #[serde(default)]
@@ -429,7 +429,7 @@ pub struct WorkflowAddNodeInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowAddEdgeInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub from: String,
@@ -469,7 +469,7 @@ pub struct WorkflowNodeDraftInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowAddNodesInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub nodes: Vec<WorkflowNodeDraftInput>,
@@ -485,7 +485,7 @@ pub struct WorkflowEdgeDraftInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowAddEdgesInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub edges: Vec<WorkflowEdgeDraftInput>,
@@ -493,7 +493,7 @@ pub struct WorkflowAddEdgesInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowSetStatusInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub node_id: String,
@@ -507,7 +507,7 @@ pub struct WorkflowSetStatusInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowPromoteInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub node_id: String,
@@ -518,7 +518,7 @@ pub struct WorkflowPromoteInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowUpdateNodeInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub node_id: String,
@@ -549,7 +549,7 @@ pub struct WorkflowUpdateNodeInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowRemoveNodeInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     pub node_id: String,
@@ -557,14 +557,14 @@ pub struct WorkflowRemoveNodeInput {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct WorkflowRenderInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimeHandoffInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     #[serde(default)]
@@ -683,7 +683,7 @@ impl From<HandoffUpwardContextInput> for SessionHandoffUpwardContextEntry {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 pub struct RuntimeFinishInput {
-    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', '.', or '..' for entity creation.
+    /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
     #[serde(default)]
@@ -2913,7 +2913,7 @@ mod tests {
 
     #[test]
     fn workspace_validation_rejects_ambient_aliases() {
-        for value in [None, Some(""), Some("default"), Some("."), Some("..")] {
+        for value in [None, Some(""), Some("default"), Some("..")] {
             let err = workspace::validate_explicit_workspace_selector(value)
                 .expect_err("should reject ambient selector");
             let err_msg = err.to_string();
@@ -2928,5 +2928,11 @@ mod tests {
                 "error should state the requirement: {err_msg}"
             );
         }
+    }
+
+    #[test]
+    fn workspace_validation_accepts_current_directory() {
+        workspace::validate_explicit_workspace_selector(Some("."))
+            .expect("'.' should resolve to the MCP server's cwd");
     }
 }
