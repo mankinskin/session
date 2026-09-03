@@ -98,6 +98,20 @@ impl MoveDomain for SessionMoveDomain<'_> {
         Ok(paths.session_dir.exists().then_some(paths.session_dir))
     }
 
+    fn source_entity_paths_for_set(
+        &self,
+        entity_ids: &[Uuid],
+    ) -> MoveResult<std::collections::BTreeMap<Uuid, PathBuf>> {
+        let sessions_root = self.store.root.join("sessions");
+        Ok(entity_ids
+            .iter()
+            .filter_map(|entity_id| {
+                let path = sessions_root.join(entity_id.to_string());
+                path.is_dir().then_some((*entity_id, path))
+            })
+            .collect())
+    }
+
     fn related_entities(
         &self,
         _entity_id: &Uuid,
