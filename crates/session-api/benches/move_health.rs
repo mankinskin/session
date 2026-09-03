@@ -22,43 +22,18 @@
 //! a no-op, so apply cost has no reconciliation component that scales with
 //! total store size the way `SpecMoveDomain`'s does.
 
-use std::{
-    fs,
-    path::{
-        Path,
-        PathBuf,
-    },
-    process::Command,
-};
+use std::{fs, path::PathBuf};
 
 use chrono::Utc;
-use criterion::{
-    BatchSize,
-    Criterion,
-    criterion_group,
-    criterion_main,
-};
+use criterion::{Criterion, criterion_group, criterion_main};
+use memory_kernel::testing::{MoveBenchmarkWorkspace, iter_move_benchmark, move_bench_criterion};
 use session_api::{
-    CopilotHookMessage,
-    CopilotHookPayload,
-    SessionCaptureRequest,
-    SessionRole,
-    SessionStoreConfig,
+    CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest, SessionRole, SessionStoreConfig,
 };
-use tempfile::TempDir;
 use uuid::Uuid;
 
 const SESSION_INDEX_DIR: &str = ".session";
 const WORKSPACE_SLUG: &str = "bench-workspace";
-
-fn git_init(repo_root: &Path) {
-    let status = Command::new("git")
-        .current_dir(repo_root)
-        .arg("init")
-        .status()
-        .expect("run git init");
-    assert!(status.success(), "git init failed");
-}
 
 fn sample_request(session_id: &Uuid) -> SessionCaptureRequest {
     SessionCaptureRequest::copilot(CopilotHookPayload {
@@ -85,24 +60,18 @@ fn sample_request(session_id: &Uuid) -> SessionCaptureRequest {
 /// One isolated source+target workspace pair with `entity_count` persisted
 /// sessions in the source store.
 fn build_session_fixture(
-    entity_count: usize
-) -> (TempDir, SessionStoreConfig, PathBuf, Vec<Uuid>) {
-    let workspace_dir = tempfile::tempdir().expect("tempdir");
-    let repo = workspace_dir.path().join("repo");
-    fs::create_dir_all(&repo).expect("create repo dir");
-    git_init(&repo);
-
-    let source_workspace = repo.join("source");
-    let target_workspace = repo.join("target");
+    workspace: &MoveBenchmarkWorkspace,
+    entity_count: usize,
+) -> (SessionStoreConfig, PathBuf, Vec<Uuid>) {
+    workspace.reset();
+    let source_workspace = workspace.source_root().to_path_buf();
+    let target_workspace = workspace.target_root().to_path_buf();
     fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR))
         .expect("create source .session dir");
     fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR))
         .expect("create target .session dir");
 
-    let store = SessionStoreConfig::new(
-        source_workspace.join(SESSION_INDEX_DIR),
-        WORKSPACE_SLUG,
-    );
+    let store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR), WORKSPACE_SLUG);
 
     let ids: Vec<Uuid> = (0..entity_count)
         .map(|_| {
@@ -114,15 +83,15 @@ fn build_session_fixture(
         })
         .collect();
 
-    (workspace_dir, store, target_workspace, ids)
+    (store, target_workspace, ids)
 }
 
 // --- Entity count ---
 
 fn bench_session_move_preflight_by_entity_count(c: &mut Criterion) {
     for &entity_count in &[10usize, 50, 200] {
-        let (_workspace_dir, store, target_workspace, ids) =
-            build_session_fixture(entity_count);
+        let workspace = MoveBenchmarkWorkspace::new();
+        let (store, target_workspace, ids) = build_session_fixture(&workspace, entity_count);
         let id = ids[0];
         c.bench_function(
             &format!("session_move_preflight_{entity_count}entities"),
@@ -141,26 +110,26 @@ fn bench_session_move_preflight_by_entity_count(c: &mut Criterion) {
 // --- Phase separation ---
 
 fn bench_session_move_preflight_only(c: &mut Criterion) {
+    let workspace = MoveBenchmarkWorkspace::new();
+    let (store, target_workspace, ids) = build_session_fixture(&workspace, 1);
+    let id = ids[0];
     c.bench_function("session_move_phase_preflight_only", |b| {
-        b.iter_batched(
-            || build_session_fixture(1),
-            |(_workspace_dir, store, target_workspace, ids)| {
-                let plan = store
-                    .plan_move_preflight(&ids[0], &target_workspace)
-                    .expect("plan preflight");
-                criterion::black_box(plan);
-            },
-            BatchSize::SmallInput,
-        );
+        b.iter(|| {
+            let plan = store
+                .plan_move_preflight(&id, &target_workspace)
+                .expect("plan preflight");
+            criterion::black_box(plan);
+        });
     });
 }
 
 fn bench_session_move_apply_only(c: &mut Criterion) {
+    let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_apply_only", |b| {
-        b.iter_batched(
+        iter_move_benchmark(
+            b,
             || {
-                let (workspace_dir, store, target_workspace, ids) =
-                    build_session_fixture(1);
+                let (store, target_workspace, ids) = build_session_fixture(&workspace, 1);
                 let plan = store
                     .plan_move_preflight(&ids[0], &target_workspace)
                     .expect("plan preflight");
@@ -169,24 +138,25 @@ fn bench_session_move_apply_only(c: &mut Criterion) {
                     "unexpected move blockers: {:?}",
                     plan.blockers
                 );
-                (workspace_dir, store, plan)
+                (store, plan)
             },
-            |(_workspace_dir, store, plan)| {
+            |(store, plan)| {
                 let outcome = store
                     .execute_move_with_journal(&plan)
                     .expect("execute move");
                 criterion::black_box(outcome);
             },
-            BatchSize::SmallInput,
         );
     });
 }
 
 fn bench_session_move_preflight_plus_apply(c: &mut Criterion) {
+    let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_preflight_plus_apply", |b| {
-        b.iter_batched(
-            || build_session_fixture(1),
-            |(_workspace_dir, store, target_workspace, ids)| {
+        iter_move_benchmark(
+            b,
+            || build_session_fixture(&workspace, 1),
+            |(store, target_workspace, ids)| {
                 let plan = store
                     .plan_move_preflight(&ids[0], &target_workspace)
                     .expect("plan preflight");
@@ -200,17 +170,17 @@ fn bench_session_move_preflight_plus_apply(c: &mut Criterion) {
                     .expect("execute move");
                 criterion::black_box(outcome);
             },
-            BatchSize::SmallInput,
         );
     });
 }
 
 fn bench_session_move_rollback(c: &mut Criterion) {
+    let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_rollback", |b| {
-        b.iter_batched(
+        iter_move_benchmark(
+            b,
             || {
-                let (workspace_dir, store, target_workspace, ids) =
-                    build_session_fixture(1);
+                let (store, target_workspace, ids) = build_session_fixture(&workspace, 1);
                 let plan = store
                     .plan_move_preflight(&ids[0], &target_workspace)
                     .expect("plan preflight");
@@ -222,16 +192,15 @@ fn bench_session_move_rollback(c: &mut Criterion) {
                 let outcome = store
                     .execute_move_with_journal(&plan)
                     .expect("execute move");
-                (workspace_dir, store, outcome.journal.id)
+                (store, outcome.journal.id)
             },
-            |(_workspace_dir, store, journal_id)| {
+            |(store, journal_id)| {
                 let outcome = store
                     .rollback_move_with_journal(journal_id)
                     .expect("rollback move");
                 assert!(outcome.rolled_back);
                 criterion::black_box(outcome);
             },
-            BatchSize::SmallInput,
         );
     });
 }
@@ -241,11 +210,12 @@ fn bench_session_move_rollback(c: &mut Criterion) {
 /// public move API cannot synthesize a genuinely-interrupted move. See the
 /// module doc comment.
 fn bench_session_move_resume_idempotent_proxy(c: &mut Criterion) {
+    let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_resume_idempotent_proxy", |b| {
-        b.iter_batched(
+        iter_move_benchmark(
+            b,
             || {
-                let (workspace_dir, store, target_workspace, ids) =
-                    build_session_fixture(1);
+                let (store, target_workspace, ids) = build_session_fixture(&workspace, 1);
                 let plan = store
                     .plan_move_preflight(&ids[0], &target_workspace)
                     .expect("plan preflight");
@@ -257,26 +227,31 @@ fn bench_session_move_resume_idempotent_proxy(c: &mut Criterion) {
                 let outcome = store
                     .execute_move_with_journal(&plan)
                     .expect("execute move");
-                (workspace_dir, store, outcome.journal.id)
+                (store, outcome.journal.id)
             },
-            |(_workspace_dir, store, journal_id)| {
+            |(store, journal_id)| {
                 let outcome = store
                     .resume_move_with_journal(journal_id)
                     .expect("resume move");
                 criterion::black_box(outcome);
             },
-            BatchSize::SmallInput,
         );
     });
 }
 
+fn criterion_config() -> Criterion {
+    move_bench_criterion()
+}
+
 criterion_group!(
-    move_health,
+    name = move_health;
+    config = criterion_config();
+    targets =
     bench_session_move_preflight_by_entity_count,
     bench_session_move_preflight_only,
     bench_session_move_apply_only,
     bench_session_move_preflight_plus_apply,
     bench_session_move_rollback,
-    bench_session_move_resume_idempotent_proxy,
+    bench_session_move_resume_idempotent_proxy
 );
 criterion_main!(move_health);
