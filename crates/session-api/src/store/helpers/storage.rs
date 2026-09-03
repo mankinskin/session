@@ -376,28 +376,6 @@ pub(super) fn can_reuse_assignment(
         && existing.path.exists()
 }
 
-pub(super) fn receipt_from_record(
-    record: &SessionRecord
-) -> Result<SessionWorktreeCheckInReceipt, SessionError> {
-    let worktree = record.metadata.worktree.clone().ok_or_else(|| {
-        SessionError::MissingWorktreeAssignment {
-            session_id: record.session_id.clone(),
-        }
-    })?;
-
-    Ok(SessionWorktreeCheckInReceipt {
-        session_id: record.session_id.clone(),
-        owner_id: record.metadata.agent_id.clone().unwrap_or_default(),
-        ticket_id: record.metadata.ticket_id.clone().unwrap_or_default(),
-        worktree_path: worktree.path,
-        branch: worktree.branch,
-        allocation_mode: worktree.allocation_mode,
-        status: worktree.status,
-        predecessor_session_id: worktree.predecessor_session_id,
-        predecessor_path: worktree.predecessor_path,
-    })
-}
-
 pub(super) fn merge_links(
     existing: SessionLinks,
     incoming: SessionLinks,

@@ -86,13 +86,20 @@ impl ResolvedWorkspace {
         Ok(())
     }
 
-    /// Returns `<target_root>/<store_dir>` after validating `store_dir`.
+    /// Returns the store's resolved location under `target_root`, preferring
+    /// an existing canonical `.workflow-tools/<domain>` layout over a legacy
+    /// bare `<store_dir>` layout (delegated to
+    /// [`memory_kernel::workspace::resolve_store_root_at_fixed_workspace`],
+    /// bounded to this fixed target so resolution never escapes it).
     pub fn store_root(
         &self,
         store_dir: &str,
     ) -> Result<PathBuf, ResolutionError> {
         validate_store_dir(store_dir)?;
-        let store_root = self.target_root.join(store_dir);
+        let store_root = memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+            &self.target_root,
+            store_dir,
+        );
         let canonical_target = canonicalize(&self.target_root)?;
         let canonical_ancestor = canonicalize_existing_ancestor(&store_root)?;
         if !canonical_ancestor.starts_with(&canonical_target) {
@@ -763,6 +770,24 @@ mod tests {
             resolved.store_root("escape/.ticket"),
             Err(ResolutionError::StoreDirectoryEscapesTarget { store_dir }) if store_dir == "escape/.ticket"
         ));
+    }
+
+    #[test]
+    fn store_root_prefers_existing_canonical_layout_over_legacy() {
+        let (_temp, repository, worktree, _resolver) = fixture();
+        let resolved = ResolvedWorkspace {
+            repository: RepositoryRoot::new(&repository).unwrap(),
+            checkout: CheckoutScope::Worktree {
+                worktree_root: worktree.clone(),
+                branch: "agent/session".to_string(),
+            },
+            target_root: worktree.clone(),
+            relative_path: PathBuf::new(),
+        };
+        let canonical = worktree.join(".workflow-tools").join("session");
+        fs::create_dir_all(&canonical).unwrap();
+
+        assert_eq!(resolved.store_root(".session").unwrap(), canonical);
     }
 
     #[test]

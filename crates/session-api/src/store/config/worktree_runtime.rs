@@ -131,17 +131,6 @@ impl SessionStoreConfig {
             .unwrap_or_else(|| checkout.to_path_buf()))
     }
 
-    fn main_checkout_for(&self, worktree_path: &Path) -> Result<PathBuf, SessionError> {
-        if let Some(main_checkout) = worktree_path
-            .ancestors()
-            .find(|path| path.file_name().is_some_and(|name| name == ".worktrees"))
-            .and_then(Path::parent)
-        {
-            return Ok(main_checkout.to_path_buf());
-        }
-        self.main_checkout_for_store()
-    }
-
     fn validate_managed_worktree(
         &self,
         request: &SessionWorktreeCheckInRequest,
