@@ -1,3 +1,29 @@
+use std::str::FromStr;
+
+fn migrate_local_urn(
+    urn: &mut String,
+    legacy_workspace: &str,
+    workspace_path: &str,
+) -> bool {
+    let Ok(parsed) = feedback_api::EntityUrn::from_str(urn) else {
+        return false;
+    };
+    if std::path::Path::new(parsed.workspace()).is_absolute()
+        || (parsed.workspace() != legacy_workspace && parsed.workspace() != "default")
+    {
+        return false;
+    }
+    let Ok(rewritten) = feedback_api::EntityUrn::new(
+        workspace_path,
+        parsed.store(),
+        parsed.entity(),
+    ) else {
+        return false;
+    };
+    *urn = rewritten.as_str();
+    true
+}
+
 impl SessionStoreConfig {
     /// Persist a hook event without requiring a transcript snapshot. This is
     /// used for UserPromptSubmit, which can arrive before VS Code flushes the
@@ -34,13 +60,16 @@ impl SessionStoreConfig {
 
 
 
-    pub fn new(
-        root: impl Into<PathBuf>,
-        workspace_slug: impl Into<String>,
-    ) -> Self {
+    pub fn new(root: impl Into<PathBuf>) -> Self {
+        let root = root.into();
         Self {
-            root: root.into(),
-            workspace_slug: workspace_slug.into(),
+            workspace_path: memory_kernel::workspace::resolve_workspace_root_from_store_root(
+                &root,
+                ".session",
+            )
+            .to_string_lossy()
+            .into_owned(),
+            root,
         }
     }
 
@@ -65,7 +94,7 @@ impl SessionStoreConfig {
     ) -> Result<SessionStorePlan, SessionError> {
         let payload = copilot_payload_from_transcript_path(
             transcript_path,
-            self.workspace_slug.clone(),
+            self.workspace_path.clone(),
             Some(trigger.into()),
         )?;
 
@@ -105,7 +134,7 @@ impl SessionStoreConfig {
         let payload =
             copilot_payload_from_transcript_path_with_tool_response_override(
                 transcript_path,
-                self.workspace_slug.clone(),
+                self.workspace_path.clone(),
                 Some(trigger.clone()),
                 tool_response_override.clone(),
             )?;
@@ -134,12 +163,49 @@ impl SessionStoreConfig {
         session_id: &str,
     ) -> Result<SessionRecord, SessionError> {
         let paths = self.paths_for_session_id(session_id)?;
-        let manifest: PersistedSessionManifest =
+        let mut manifest: PersistedSessionManifest =
             read_json(&paths.manifest_path)?;
         ensure_supported_schema_version(
             &paths.manifest_path,
             manifest.schema_version,
         )?;
+
+        // Schema v1 stored a workspace slug in metadata. A session store has
+        // one unambiguous owning workspace, so rewrite that legacy selector
+        // to the canonical owning path on first read.
+        let workspace_path = self.workspace_path.clone();
+        let legacy_workspace = manifest.metadata.workspace_path.clone();
+        let mut migrated = false;
+        if manifest.metadata.workspace_path != workspace_path {
+            manifest.metadata.workspace_path = workspace_path;
+            migrated = true;
+        }
+        for pin in &mut manifest.pinned_entities {
+            migrated |= migrate_local_urn(
+                &mut pin.urn,
+                &legacy_workspace,
+                &self.workspace_path,
+            );
+        }
+        for node in &mut manifest.workflow.nodes {
+            for urn in [
+                &mut node.ticket_urn,
+                &mut node.spec_urn,
+                &mut node.anchor_urn,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                migrated |= migrate_local_urn(
+                    urn,
+                    &legacy_workspace,
+                    &self.workspace_path,
+                );
+            }
+        }
+        if migrated {
+            write_json(&paths.manifest_path, &manifest)?;
+        }
 
         Ok(SessionRecord {
             schema_version: manifest.schema_version,

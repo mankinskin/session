@@ -2,7 +2,7 @@
 fn persist_capture_keeps_distinct_id_less_events_by_data_json() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let mut first = sample_payload(
         "session-events",
@@ -96,7 +96,7 @@ fn persist_capture_keeps_distinct_id_less_events_by_data_json() {
 fn query_sessions_filters_by_text_and_metadata() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     config
         .capture_copilot_hook(sample_payload(
@@ -138,7 +138,7 @@ fn query_sessions_filters_by_text_and_metadata() {
 fn capture_copilot_transcript_persists_visible_transcript_messages() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let transcript_path = tempdir.path().join("copilot.jsonl");
 
     std::fs::write(
@@ -169,7 +169,7 @@ fn capture_copilot_transcript_persists_visible_transcript_messages() {
 fn capture_copilot_transcript_allows_divergent_newer_snapshot() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let transcript_path = tempdir.path().join("copilot.jsonl");
 
     std::fs::write(
@@ -218,7 +218,7 @@ fn capture_copilot_transcript_with_tool_response_never_blocks_on_missing_overrid
  {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let transcript_path = tempdir.path().join("copilot.jsonl");
 
     std::fs::write(
@@ -261,7 +261,7 @@ fn capture_copilot_transcript_with_tool_response_never_blocks_on_missing_overrid
 fn check_in_worktree_creates_and_returns_new_assignment() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -293,7 +293,7 @@ fn check_in_worktree_creates_and_returns_new_assignment() {
 fn check_in_worktree_reuses_existing_assignment_for_same_session() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -339,7 +339,7 @@ fn check_in_worktree_reuses_existing_assignment_for_same_session() {
 fn check_in_worktree_claims_unclaimed_hook_record() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -396,7 +396,7 @@ fn check_in_worktree_claims_unclaimed_hook_record() {
 fn check_in_worktree_rejects_mismatched_claimed_owner() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -434,7 +434,7 @@ fn check_in_worktree_rejects_mismatched_claimed_owner() {
 fn check_in_worktree_rotates_for_handoff_and_supersedes_predecessor() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let first_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -486,7 +486,7 @@ fn check_in_worktree_rotates_for_handoff_and_supersedes_predecessor() {
 fn new_events_file_omits_raw_event_json() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let mut payload = sample_payload(
         "session-size-check",
@@ -541,7 +541,6 @@ fn lookup_reads_branch_manifest_without_a_transcript() {
     );
     let config = SessionStoreConfig::new(
         main_checkout.join(".session"),
-        "context-engine",
     );
 
     config
@@ -584,10 +583,9 @@ fn check_in_writes_untracked_main_registry_and_branch_only_manifests() {
         "agent/session-a",
     );
     let worktree_config =
-        SessionStoreConfig::new(worktree.join(".session"), "context-engine");
+        SessionStoreConfig::new(worktree.join(".session"));
     let main_config = SessionStoreConfig::new(
         main_checkout.join(".session"),
-        "context-engine",
     );
 
     worktree_config
@@ -639,7 +637,6 @@ fn lookup_rejects_registry_entry_for_missing_worktree() {
     );
     let config = SessionStoreConfig::new(
         main_checkout.join(".session"),
-        "context-engine",
     );
     config
         .check_in_worktree(sample_worktree_request(

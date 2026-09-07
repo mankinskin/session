@@ -210,7 +210,7 @@ impl SessionStoreConfig {
             started_at: chrono::Utc::now(),
             captured_at: chrono::Utc::now(),
             metadata: SessionMetadata {
-                workspace_slug: self.workspace_slug.clone(),
+                workspace_path: self.workspace_path.clone(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -246,7 +246,7 @@ impl SessionStoreConfig {
         self.persist_branch_only_manifest(&record)?;
         let main_store = main_checkout.join(".session");
         if main_store != self.root {
-            SessionStoreConfig::new(main_store, self.workspace_slug.clone())
+            SessionStoreConfig::new(main_store)
                 .persist_branch_only_manifest(&record)?;
         }
         Ok(())
@@ -286,7 +286,7 @@ impl SessionStoreConfig {
         let main_store = main_checkout.join(".session");
         if main_store != self.root {
             paths.push(
-                SessionStoreConfig::new(main_store, self.workspace_slug.clone())
+                SessionStoreConfig::new(main_store)
                     .paths_for_session_id(session_id)?
                     .manifest_path,
             );
@@ -634,7 +634,7 @@ impl SessionStoreConfig {
                 started_at: chrono::Utc::now(),
                 captured_at: chrono::Utc::now(),
                 metadata: SessionMetadata {
-                    workspace_slug: self.workspace_slug.clone(),
+                    workspace_path: self.workspace_path.clone(),
                     conversation_id: None,
                     agent_id: None,
                     ticket_id: None,

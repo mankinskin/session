@@ -318,7 +318,7 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let config = SessionStoreConfig {
             root: tmp.path().to_path_buf(),
-            workspace_slug: "test".to_string(),
+            workspace_path: "test".to_string(),
         };
         (tmp, config)
     }

@@ -186,7 +186,7 @@ impl SessionStoreConfig {
                 started_at: context.created_at,
                 captured_at: context.updated_at,
                 metadata: SessionMetadata {
-                    workspace_slug: self.workspace_slug.clone(),
+                    workspace_path: self.workspace_path.clone(),
                     conversation_id: None,
                     agent_id: None,
                     ticket_id: None,
@@ -228,16 +228,12 @@ impl SessionStoreConfig {
     }
 
     fn test_store_config(&self) -> TestStoreConfig {
-        TestStoreConfig::new(
-            self.test_store_root(),
-            self.workspace_slug.clone(),
-        )
+        TestStoreConfig::new(self.test_store_root())
     }
 
     fn default_ticket_state_resolver(&self) -> DefaultTicketStateResolver {
         DefaultTicketStateResolver {
-            session_store_root: self.root.clone(),
-            workspace_slug: self.workspace_slug.clone(),
+            workspace_path: self.workspace_path.clone(),
             ticket_stores: std::sync::Mutex::new(BTreeMap::new()),
             spec_stores: std::sync::Mutex::new(BTreeMap::new()),
         }

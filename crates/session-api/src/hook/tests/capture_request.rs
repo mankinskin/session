@@ -23,7 +23,7 @@ fn sample_time() -> chrono::DateTime<chrono::Utc> {
 fn capture_request_maps_hook_payload_into_session_record() {
     let payload = CopilotHookPayload {
         session_id: "session-123".to_string(),
-        workspace_slug: "context-engine".to_string(),
+        workspace_path: "context-engine".to_string(),
         captured_at: sample_time(),
         conversation_id: Some("conversation-42".to_string()),
         agent_id: Some("github-copilot-gpt-5.4".to_string()),
@@ -57,7 +57,7 @@ fn capture_request_maps_hook_payload_into_session_record() {
     assert_eq!(record.session_id, "session-123");
     assert!(events.is_empty());
     assert_eq!(record.source, "copilot-hook");
-    assert_eq!(record.metadata.workspace_slug, "context-engine");
+    assert_eq!(record.metadata.workspace_path, "context-engine");
     assert_eq!(record.metadata.ticket_id, None);
     assert_eq!(record.metadata.worktree, None);
     assert_eq!(record.turns.len(), 2);
@@ -71,7 +71,7 @@ fn capture_request_maps_hook_payload_into_session_record() {
 fn capture_request_rejects_missing_session_id() {
     let payload = CopilotHookPayload {
         session_id: "   ".to_string(),
-        workspace_slug: "context-engine".to_string(),
+        workspace_path: "context-engine".to_string(),
         captured_at: sample_time(),
         conversation_id: None,
         agent_id: None,

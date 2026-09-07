@@ -27,7 +27,7 @@ fn seed_session(
 ) {
     let payload = CopilotHookPayload {
         session_id: session_id.to_string(),
-        workspace_slug: "default".to_string(),
+        workspace_path: "default".to_string(),
         captured_at: Utc::now(),
         conversation_id: Some("conv-1".to_string()),
         agent_id: Some(agent.to_string()),
@@ -65,7 +65,7 @@ fn seed_compaction_session(
 ) {
     let payload = CopilotHookPayload {
         session_id: session_id.to_string(),
-        workspace_slug: "default".to_string(),
+        workspace_path: "default".to_string(),
         captured_at: Utc::now(),
         conversation_id: Some("conv-compact".to_string()),
         agent_id: Some(agent.to_string()),
@@ -247,7 +247,7 @@ fn query_returns_seeded_session() {
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
     let config =
-        SessionStoreConfig::new(store_root.clone(), "default".to_string());
+        SessionStoreConfig::new(store_root.clone());
     seed_session(&config, "22222222-2222-4222-8222-222222222222", "agent-q");
 
     let result = run_machine(&[
@@ -334,7 +334,7 @@ fn peek_range_and_skeleton() {
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
     let config =
-        SessionStoreConfig::new(store_root.clone(), "default".to_string());
+        SessionStoreConfig::new(store_root.clone());
     seed_session(&config, "44444444-4444-4444-8444-444444444444", "agent-p");
 
     let range = run_machine(&[
@@ -372,7 +372,7 @@ fn terminal_observer_cli_round_trip() {
     let store_root_str = store_root.to_string_lossy().to_string();
     let session_id = "77777777-7777-4777-8777-777777777777";
     let config =
-        SessionStoreConfig::new(store_root.clone(), "default".to_string());
+        SessionStoreConfig::new(store_root.clone());
     config
         .init_runtime_context(session_api::SessionRuntimeInitRequest {
             session_id: Some(session_id.to_string()),
@@ -441,7 +441,7 @@ fn peek_prompt_pack_reports_guarded_entries() {
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
     let config =
-        SessionStoreConfig::new(store_root.clone(), "default".to_string());
+        SessionStoreConfig::new(store_root.clone());
     seed_compaction_session(
         &config,
         "55555555-5555-4555-8555-555555555555",
@@ -485,7 +485,7 @@ fn peek_prompt_pack_meets_quantitative_compactness_gate() {
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
     let config =
-        SessionStoreConfig::new(store_root.clone(), "default".to_string());
+        SessionStoreConfig::new(store_root.clone());
     seed_compaction_session(
         &config,
         "66666666-6666-4666-8666-666666666666",

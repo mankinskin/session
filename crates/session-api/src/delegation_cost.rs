@@ -997,7 +997,7 @@ pub fn compute_delegation_cost_report_from_events(
         started_at: events.captured_at,
         captured_at: events.captured_at,
         metadata: crate::SessionMetadata {
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
             conversation_id: None,
             agent_id: None,
             ticket_id: None,
@@ -1046,7 +1046,7 @@ mod tests {
             started_at: Utc::now(),
             captured_at: Utc::now(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,

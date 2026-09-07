@@ -306,7 +306,7 @@ mod tests {
             started_at,
             captured_at: stopped_at,
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -378,7 +378,7 @@ mod tests {
             started_at: Utc::now(),
             captured_at: Utc::now(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -495,7 +495,6 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let config = SessionStoreConfig::new(
             temp_dir.path().join(".session"),
-            "test-workspace",
         );
 
         // Create a simple session using the capture API
@@ -507,7 +506,7 @@ mod tests {
 
         let payload = CopilotHookPayload {
             session_id: session_id.to_string(),
-            workspace_slug: "test-workspace".to_string(),
+            workspace_path: "test-workspace".to_string(),
             captured_at: Utc::now(),
             conversation_id: None,
             agent_id: None,
@@ -589,7 +588,7 @@ mod tests {
             started_at: Utc::now(),
             captured_at: Utc::now(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -755,7 +754,7 @@ mod tests {
             started_at: Utc::now(),
             captured_at: Utc::now(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,

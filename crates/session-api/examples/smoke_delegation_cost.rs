@@ -7,7 +7,7 @@ fn main() {
     let tmp = std::env::temp_dir()
         .join(format!("session-smoke-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
-    let store = SessionStoreConfig::new(tmp.clone(), "smoke-workspace");
+    let store = SessionStoreConfig::new(tmp.clone());
 
     let transcript_path = std::path::Path::new(
         "c:/Users/linus/git/graph_app/context-engine/.session/sessions/41966513-a8fa-4b44-98fa-9c57f0437cc0/events.json",

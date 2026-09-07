@@ -296,7 +296,8 @@ pub struct SessionProvisioningDiagnostic {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionMetadata {
-    pub workspace_slug: String,
+    #[serde(alias = "workspace_slug")]
+    pub workspace_path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -434,7 +435,7 @@ mod tests {
             started_at: sample_time(),
             captured_at: sample_time(),
             metadata: SessionMetadata {
-                workspace_slug: "context-engine".to_string(),
+                workspace_path: "context-engine".to_string(),
                 conversation_id: Some("conversation-1".to_string()),
                 agent_id: Some("github-copilot-gpt-5.4".to_string()),
                 ticket_id: Some("ticket-1".to_string()),
@@ -535,7 +536,7 @@ mod tests {
             "started_at": "2026-07-25T18:57:59.736Z",
             "captured_at": "2026-07-26T01:23:11.736Z",
             "metadata": {
-                "workspace_slug": "default",
+                "workspace_path": "default",
                 "agent_id": "copilot-agent",
                 "trigger": "Stop",
                 "producer": "copilot-agent",
@@ -588,7 +589,7 @@ mod tests {
 
     #[test]
     fn existing_sessions_deserialize_without_provisioning_metadata() {
-        let legacy_json = r#"{"schema_version":1,"session_id":"93d9261e-93e8-4ae3-9f4c-02c17e7c8568","source":"copilot-hook","started_at":"2026-08-10T17:57:22.617Z","captured_at":"2026-08-10T18:53:14.528Z","metadata":{"workspace_slug":"default","agent_id":"copilot-agent","trigger":"Stop","producer":"copilot-agent","copilot_version":"0.60.0","vscode_version":"1.132.0","protocol_version":1,"worktree":{"path":"C:/Users/linus/git/context-engine","branch":"main","allocation_mode":"new","status":"active"}},"links":{}}"#;
+        let legacy_json = r#"{"schema_version":1,"session_id":"93d9261e-93e8-4ae3-9f4c-02c17e7c8568","source":"copilot-hook","started_at":"2026-08-10T17:57:22.617Z","captured_at":"2026-08-10T18:53:14.528Z","metadata":{"workspace_path":"default","agent_id":"copilot-agent","trigger":"Stop","producer":"copilot-agent","copilot_version":"0.60.0","vscode_version":"1.132.0","protocol_version":1,"worktree":{"path":"C:/Users/linus/git/context-engine","branch":"main","allocation_mode":"new","status":"active"}},"links":{}}"#;
 
         let record: SessionRecord = serde_json::from_str(legacy_json).unwrap();
 

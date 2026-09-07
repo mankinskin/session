@@ -634,13 +634,13 @@ mod tests {
         );
         let _resolver = SessionWorkspaceResolver::new(ResolverConfig {
             main_checkout: main_checkout.clone(),
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
         })
         .unwrap();
         // The anchor store is the worktree registry: assignments always live
         // beneath the checkout the servers were launched in.
         let store =
-            SessionStoreConfig::new(main_checkout.join(".session"), "default");
+            SessionStoreConfig::new(main_checkout.join(".session"));
         store
             .check_in_worktree(SessionWorktreeCheckInRequest {
                 session_id: TEST_SESSION_ID.to_string(),

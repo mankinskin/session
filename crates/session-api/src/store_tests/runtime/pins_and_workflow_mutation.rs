@@ -2,7 +2,7 @@
 fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -70,7 +70,7 @@ fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
 fn pinned_rule_render_skips_missing_rule() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -94,7 +94,7 @@ fn pinned_rule_render_skips_missing_rule() {
 fn pinned_rule_render_succeeds_when_rule_store_is_absent() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -118,7 +118,7 @@ fn pinned_rule_render_succeeds_when_rule_store_is_absent() {
 fn context_capture_persistence_isolation_is_byte_stable() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let capture = config
         .persist_capture(sample_request(
@@ -191,7 +191,7 @@ impl SessionTicketStateResolver for MockTicketResolver {
 fn workflow_persists_mutation_and_reload() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -295,7 +295,7 @@ fn workflow_persists_mutation_and_reload() {
 fn workflow_promotion_preserves_node_identity() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -345,7 +345,7 @@ fn workflow_promotion_preserves_node_identity() {
 fn workflow_ticket_node_rejects_non_ticket_urn() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -378,7 +378,7 @@ fn workflow_ticket_node_rejects_non_ticket_urn() {
 fn workflow_batches_are_atomic_and_preserve_duplicate_no_ops() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -458,7 +458,7 @@ fn workflow_batches_are_atomic_and_preserve_duplicate_no_ops() {
 fn session_run_lineage_round_trip() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     // Create the initial runtime context (first run).
     let init = config
@@ -528,7 +528,7 @@ fn session_run_lineage_round_trip() {
 fn read_runtime_context_missing_surfaces_not_found() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let err = config
         .read_runtime_context("11111111-1111-4111-8111-111111111111")
@@ -544,7 +544,7 @@ fn read_runtime_context_missing_surfaces_not_found() {
 fn writes_never_target_legacy_runtime_tree() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })

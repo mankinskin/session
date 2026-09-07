@@ -30,7 +30,7 @@ fn transcript_reader_maps_visible_messages_into_payload() {
     .unwrap();
 
     assert_eq!(payload.session_id, "session-123");
-    assert_eq!(payload.workspace_slug, "context-engine");
+    assert_eq!(payload.workspace_path, "context-engine");
     assert_eq!(payload.agent_id.as_deref(), Some("copilot-agent"));
     assert_eq!(payload.trigger.as_deref(), Some("stop"));
     assert_eq!(payload.messages.len(), 2);

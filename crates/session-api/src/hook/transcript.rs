@@ -42,12 +42,12 @@ pub struct ToolResponseOverride {
 
 pub fn copilot_payload_from_transcript_path(
     transcript_path: impl AsRef<Path>,
-    workspace_slug: impl Into<String>,
+    workspace_path: impl Into<String>,
     trigger: Option<String>,
 ) -> Result<CopilotHookPayload, SessionError> {
     copilot_payload_from_transcript_path_with_tool_response_override(
         transcript_path,
-        workspace_slug,
+        workspace_path,
         trigger,
         None,
     )
@@ -55,7 +55,7 @@ pub fn copilot_payload_from_transcript_path(
 
 pub fn copilot_payload_from_transcript_path_with_tool_response_override(
     transcript_path: impl AsRef<Path>,
-    workspace_slug: impl Into<String>,
+    workspace_path: impl Into<String>,
     trigger: Option<String>,
     tool_response_override: Option<ToolResponseOverride>,
 ) -> Result<CopilotHookPayload, SessionError> {
@@ -70,7 +70,7 @@ pub fn copilot_payload_from_transcript_path_with_tool_response_override(
     copilot_payload_from_transcript_reader_with_path(
         reader,
         transcript_path,
-        workspace_slug.into(),
+        workspace_path.into(),
         trigger,
         tool_response_override,
     )
@@ -78,13 +78,13 @@ pub fn copilot_payload_from_transcript_path_with_tool_response_override(
 
 pub fn copilot_payload_from_transcript_reader<R: BufRead>(
     reader: R,
-    workspace_slug: impl Into<String>,
+    workspace_path: impl Into<String>,
     trigger: Option<String>,
 ) -> Result<CopilotHookPayload, SessionError> {
     copilot_payload_from_transcript_reader_with_path(
         reader,
         Path::new("<copilot-transcript>"),
-        workspace_slug.into(),
+        workspace_path.into(),
         trigger,
         None,
     )
@@ -93,7 +93,7 @@ pub fn copilot_payload_from_transcript_reader<R: BufRead>(
 fn copilot_payload_from_transcript_reader_with_path<R: BufRead>(
     reader: R,
     transcript_path: &Path,
-    workspace_slug: String,
+    workspace_path: String,
     trigger: Option<String>,
     tool_response_override: Option<ToolResponseOverride>,
 ) -> Result<CopilotHookPayload, SessionError> {
@@ -227,7 +227,7 @@ fn copilot_payload_from_transcript_reader_with_path<R: BufRead>(
 
     Ok(CopilotHookPayload {
         session_id,
-        workspace_slug,
+        workspace_path,
         captured_at: captured_at.or(started_at).unwrap_or_else(Utc::now),
         conversation_id: None,
         agent_id,

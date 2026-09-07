@@ -100,7 +100,7 @@ fn test_manifest_roundtrip_with_track_fields()
         started_at: now,
         captured_at: now,
         metadata: SessionMetadata {
-            workspace_slug: "test".to_string(),
+            workspace_path: "test".to_string(),
             conversation_id: None,
             agent_id: None,
             ticket_id: None,
@@ -168,7 +168,7 @@ fn test_legacy_manifest_deserialization()
         "started_at": "2026-07-26T23:40:14.755Z",
         "captured_at": "2026-07-26T23:51:30.249Z",
         "metadata": {
-            "workspace_slug": "default",
+            "workspace_path": "default",
             "agent_id": "copilot-agent",
             "trigger": "PostToolUse",
             "producer": "copilot-agent",
@@ -209,7 +209,7 @@ fn test_session_record_track_field_conversion() {
         started_at: now,
         captured_at: now,
         metadata: SessionMetadata {
-            workspace_slug: "test".to_string(),
+            workspace_path: "test".to_string(),
             conversation_id: None,
             agent_id: None,
             ticket_id: None,

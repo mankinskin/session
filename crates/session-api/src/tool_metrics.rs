@@ -827,7 +827,7 @@ pub fn aggregate_multi_store(
     let mut all_summaries = Vec::new();
 
     for store_root in store_roots {
-        let config = SessionStoreConfig::new(store_root, "default");
+        let config = SessionStoreConfig::new(store_root);
 
         // Get summaries from this store using the same logic as tool_metrics()
         // but don't aggregate yet - just collect
@@ -952,7 +952,7 @@ mod tests {
             started_at: sample_time(),
             captured_at: sample_time(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -1122,7 +1122,7 @@ mod tests {
             started_at: sample_time(),
             captured_at: sample_time(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -1272,7 +1272,7 @@ mod tests {
             started_at: sample_time(),
             captured_at: sample_time(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,
@@ -1591,7 +1591,7 @@ mod tests {
             started_at: sample_time(),
             captured_at: sample_time(),
             metadata: SessionMetadata {
-                workspace_slug: "test".to_string(),
+                workspace_path: "test".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,

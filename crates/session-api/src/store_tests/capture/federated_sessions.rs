@@ -3,7 +3,6 @@ fn federated_fixture(
 ) -> (SessionStoreConfig, SessionStoreConfig, SessionStoreConfig) {
     let main = SessionStoreConfig::new(
         tempdir.path().join(".session"),
-        "context-engine",
     );
     let nested = SessionStoreConfig::new(
         tempdir
@@ -12,7 +11,6 @@ fn federated_fixture(
             .join("session-nested")
             .join("nested-slug")
             .join(".session"),
-        "context-engine",
     );
     let legacy = SessionStoreConfig::new(
         tempdir
@@ -20,7 +18,6 @@ fn federated_fixture(
             .join(".worktrees")
             .join("12345678-legacy-slug")
             .join(".session"),
-        "context-engine",
     );
     (main, nested, legacy)
 }

@@ -135,7 +135,7 @@ pub struct ResolveRequest<'a> {
 #[derive(Debug, Clone)]
 pub struct ResolverConfig {
     pub main_checkout: PathBuf,
-    pub workspace_slug: String,
+    pub workspace_path: String,
 }
 
 impl ResolverConfig {
@@ -148,7 +148,7 @@ impl ResolverConfig {
     /// environment variable would only restate what the working directory
     /// already says.
     pub fn from_working_dir(
-        workspace_slug: impl Into<String>
+        workspace_path: impl Into<String>
     ) -> Result<Self, ResolutionError> {
         let main_checkout = working_dir().ok_or_else(|| {
             ResolutionError::InvalidConfiguration(
@@ -157,7 +157,7 @@ impl ResolverConfig {
         })?;
         Ok(Self {
             main_checkout,
-            workspace_slug: workspace_slug.into(),
+            workspace_path: workspace_path.into(),
         })
     }
 }
@@ -181,9 +181,9 @@ struct DiscoveredWorktree {
 
 impl SessionWorkspaceResolver {
     pub fn new(config: ResolverConfig) -> Result<Self, ResolutionError> {
-        if config.workspace_slug.trim().is_empty() {
+        if config.workspace_path.trim().is_empty() {
             return Err(ResolutionError::InvalidConfiguration(
-                "workspace_slug must not be empty".to_string(),
+                "workspace_path must not be empty".to_string(),
             ));
         }
         let main_checkout = RepositoryRoot::new(&config.main_checkout)?;
@@ -642,7 +642,7 @@ mod tests {
         fs::create_dir_all(worktree.join(".git")).unwrap();
         let resolver = SessionWorkspaceResolver::new(ResolverConfig {
             main_checkout: repository.clone(),
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
         })
         .unwrap();
         (temp, repository, worktree, resolver)
@@ -896,7 +896,7 @@ mod tests {
         fs::create_dir_all(worktree.join(".ticket")).unwrap();
         let resolver = SessionWorkspaceResolver::new(ResolverConfig {
             main_checkout: worktree.clone(),
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
         })
         .unwrap();
 

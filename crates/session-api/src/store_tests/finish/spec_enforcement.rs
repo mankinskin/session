@@ -33,7 +33,7 @@ impl SessionTicketStateResolver for FixedSpecStateResolver {
 fn spec_workspace() -> (SessionStoreConfig, String, TempDir) {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();

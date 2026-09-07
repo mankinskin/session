@@ -62,7 +62,7 @@ fn sample_payload(
 ) -> CopilotHookPayload {
     CopilotHookPayload {
         session_id: session_id.to_string(),
-        workspace_slug: "context-engine".to_string(),
+        workspace_path: "context-engine".to_string(),
         captured_at,
         conversation_id: conversation_id.map(str::to_string),
         agent_id: Some("github-copilot-gpt-5.4".to_string()),
@@ -170,7 +170,7 @@ fn managed_worktree(
 
 #[test]
 fn store_plan_uses_session_id_in_paths() {
-    let config = SessionStoreConfig::new(".session", "context-engine");
+    let config = SessionStoreConfig::new(".session");
     let plan = config
         .plan_capture(sample_request(
             "session-abc",
@@ -194,7 +194,7 @@ fn store_plan_uses_session_id_in_paths() {
 
 #[test]
 fn store_plan_rejects_invalid_path_segments() {
-    let config = SessionStoreConfig::new(".session", "context-engine");
+    let config = SessionStoreConfig::new(".session");
     let mut request = sample_request(
         "session-abc",
         Some("conversation-abc"),
@@ -215,7 +215,7 @@ fn store_plan_rejects_invalid_path_segments() {
 fn persist_capture_writes_manifest_and_transcript_files() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let plan = config
         .persist_capture(sample_request(
@@ -236,7 +236,7 @@ fn persist_capture_writes_manifest_and_transcript_files() {
         serde_json::from_str(&transcript_text).unwrap();
 
     assert_eq!(manifest.session_id, "session-abc");
-    assert_eq!(manifest.metadata.workspace_slug, "context-engine");
+    assert_eq!(manifest.metadata.workspace_path, "context-engine");
     assert_eq!(transcript.session_id, "session-abc");
     assert_eq!(transcript.turns.len(), 1);
     assert_eq!(transcript.turns[0].content, "Persist this chat");
@@ -246,7 +246,7 @@ fn persist_capture_writes_manifest_and_transcript_files() {
 fn persist_capture_appends_only_new_turns_from_later_capture() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     config
         .persist_capture(sample_request(
@@ -289,7 +289,7 @@ fn persist_capture_appends_only_new_turns_from_later_capture() {
 fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
     let tempdir = TempDir::new().unwrap();
     let store_path = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(&store_path, "context-engine");
+    let config = SessionStoreConfig::new(&store_path);
 
     let post_tool_use = SessionProvisioningDiagnostic {
         outcome: "skipped".to_string(),
@@ -320,7 +320,7 @@ fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
         ))
         .unwrap();
 
-    let fresh_config = SessionStoreConfig::new(&store_path, "context-engine");
+    let fresh_config = SessionStoreConfig::new(&store_path);
     assert_eq!(
         fresh_config
             .read_session("session-non-user-then-user")
@@ -392,7 +392,7 @@ fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
 fn read_session_reconstructs_persisted_record() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     config
         .persist_capture(sample_request(
@@ -425,7 +425,7 @@ fn read_session_reconstructs_persisted_record() {
 fn capture_copilot_hook_persists_payload() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let plan = config
         .capture_copilot_hook(sample_payload(

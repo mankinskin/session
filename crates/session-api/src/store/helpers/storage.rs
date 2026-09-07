@@ -288,10 +288,10 @@ pub(super) fn merge_metadata(
     incoming: SessionMetadata,
 ) -> SessionMetadata {
     SessionMetadata {
-        workspace_slug: if incoming.workspace_slug.trim().is_empty() {
-            existing.workspace_slug
+        workspace_path: if incoming.workspace_path.trim().is_empty() {
+            existing.workspace_path
         } else {
-            incoming.workspace_slug
+            incoming.workspace_path
         },
         conversation_id: incoming.conversation_id.or(existing.conversation_id),
         agent_id: incoming.agent_id.or(existing.agent_id),
@@ -533,19 +533,19 @@ pub(super) fn session_matches_query(
 
 pub(super) fn validate_segment(
     value: &str,
-    is_workspace_slug: bool,
+    is_workspace_path: bool,
 ) -> Result<(), SessionError> {
     let trimmed = value.trim();
     let invalid = ['/', '\\', ':'];
     // "." and ".." are only rejected for workspace slugs: they would otherwise
     // resolve to a path-traversal segment when joined onto a store base.
     let is_dot_segment =
-        is_workspace_slug && (trimmed == "." || trimmed == "..");
+        is_workspace_path && (trimmed == "." || trimmed == "..");
     if trimmed.is_empty()
         || value.chars().any(|ch| invalid.contains(&ch))
         || is_dot_segment
     {
-        return if is_workspace_slug {
+        return if is_workspace_path {
             Err(SessionError::InvalidWorkspaceSlug(value.to_string()))
         } else {
             Err(SessionError::InvalidSessionId(value.to_string()))

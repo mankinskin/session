@@ -66,10 +66,7 @@ impl<'a> SessionMoveDomain<'a> {
         &self,
         root: &Path,
     ) -> SessionStoreConfig {
-        SessionStoreConfig::new(
-            root.to_path_buf(),
-            self.store.workspace_slug.clone(),
-        )
+        SessionStoreConfig::new(root.to_path_buf())
     }
 }
 
@@ -217,7 +214,7 @@ mod tests {
     fn sample_request(session_id: &Uuid) -> SessionCaptureRequest {
         SessionCaptureRequest::copilot(CopilotHookPayload {
             session_id: session_id.to_string(),
-            workspace_slug: "context-engine".to_string(),
+            workspace_path: "context-engine".to_string(),
             captured_at: chrono::Utc::now(),
             conversation_id: Some("conversation-1".to_string()),
             agent_id: Some("github-copilot".to_string()),
@@ -253,7 +250,6 @@ mod tests {
         let session_id = Uuid::new_v4();
         let source_store = SessionStoreConfig::new(
             source_workspace.join(SESSION_INDEX_DIR),
-            "context-engine",
         );
         source_store
             .persist_capture(sample_request(&session_id))
@@ -269,7 +265,6 @@ mod tests {
 
         let target_store = SessionStoreConfig::new(
             target_workspace.join(SESSION_INDEX_DIR),
-            "context-engine",
         );
         assert!(matches!(
             source_store.read_session(&session_id.to_string()),

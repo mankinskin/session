@@ -45,7 +45,7 @@ pub(crate) fn anchored_resolver() -> Result<SessionWorkspaceResolver, String> {
     {
         Some(override_path) => ResolverConfig {
             main_checkout: PathBuf::from(override_path),
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
         },
         None => ResolverConfig::from_working_dir("default")
             .map_err(|error| error.to_string())?,

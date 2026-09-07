@@ -29,7 +29,7 @@ fn feedback_ingest_result_event(
 fn ingest_arguments() -> Value {
     serde_json::json!({
         "workspace": "c:/repo/memory-api",
-        "workspace_slug": "memory-api",
+        "workspace_path": "memory-api",
         "source": "agent",
         "target": "ce://memory-api/rule/some-rule",
         "rating": "not-helpful",

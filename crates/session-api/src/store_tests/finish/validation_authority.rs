@@ -3,7 +3,7 @@
 fn workflow_finish_enforces_gates_and_is_idempotent() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -130,7 +130,7 @@ fn workflow_finish_blocks_when_required_validation_guard_is_missing() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config =
-        SessionStoreConfig::new(store_root.clone(), "context-engine");
+        SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -222,7 +222,7 @@ impl SessionTicketStateResolver for BlockingTerminalResolver {
 }
 
 fn test_store_for(store_root: &std::path::Path) -> test_api::TestStoreConfig {
-    test_api::TestStoreConfig::new(store_root.join(".test"), "context-engine")
+    test_api::TestStoreConfig::new(store_root.join(".test"))
 }
 
 fn seed_validation_spec(
@@ -291,7 +291,7 @@ fn add_required_validation_node(
 fn workflow_finish_rejects_caller_passed_when_authoritative_failed() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -333,7 +333,7 @@ fn workflow_finish_rejects_caller_passed_when_authoritative_failed() {
 fn workflow_add_node_rejects_validation_kind_with_absent_spec_id() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -370,7 +370,7 @@ fn workflow_add_node_rejects_validation_kind_with_absent_spec_id() {
 fn workflow_add_nodes_rejects_unresolvable_validation_spec_id_with_index() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -427,7 +427,7 @@ fn workflow_add_nodes_rejects_unresolvable_validation_spec_id_with_index() {
 fn workflow_add_node_rejects_ticket_and_spec_kinds_without_urn() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -483,7 +483,7 @@ fn wedged_validation_node_is_repaired_via_update_node_and_finish_then_succeeds()
 {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -589,7 +589,7 @@ fn wedged_validation_node_is_repaired_via_update_node_and_finish_then_succeeds()
 fn wedged_validation_node_is_repaired_via_remove_node() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();

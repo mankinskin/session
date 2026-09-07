@@ -5,7 +5,7 @@
 fn workflow_finish_rejects_caller_passed_when_no_execution_exists() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -40,7 +40,7 @@ fn workflow_finish_rejects_caller_passed_when_no_execution_exists() {
 fn workflow_finish_accepts_authoritative_passed_execution() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -75,7 +75,7 @@ fn workflow_finish_accepts_authoritative_passed_execution() {
 fn workflow_finish_rejects_local_done_when_live_ticket_non_terminal() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root, "context-engine");
+    let config = SessionStoreConfig::new(store_root);
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -136,7 +136,7 @@ fn workflow_finish_rejects_local_done_when_live_ticket_non_terminal() {
 fn workflow_finish_production_path_blocks_non_terminal_ticket() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -200,7 +200,7 @@ fn workflow_finish_production_path_blocks_non_terminal_ticket() {
 fn workflow_finish_production_path_blocks_missing_ticket() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -257,7 +257,7 @@ fn workflow_finish_production_path_blocks_missing_ticket() {
 fn workflow_finish_rejects_cross_workspace_ticket_routing() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -314,7 +314,7 @@ fn workflow_finish_rejects_cross_workspace_ticket_routing() {
 fn workflow_finish_resolves_ticket_from_nested_workspace_store() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -374,10 +374,10 @@ fn workflow_finish_resolves_ticket_from_nested_workspace_store() {
 /// High: an unknown workspace slug fails closed with a descriptive diagnostic
 /// and never creates a store directory as a side effect.
 #[test]
-fn workflow_finish_rejects_unknown_workspace_slug_without_creating_store() {
+fn workflow_finish_rejects_unknown_workspace_path_without_creating_store() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -430,10 +430,10 @@ fn workflow_finish_rejects_unknown_workspace_slug_without_creating_store() {
 /// High: a path-traversal workspace slug is rejected by validation before any
 /// path is built, and creates no directory.
 #[test]
-fn workflow_finish_rejects_path_traversal_workspace_slug() {
+fn workflow_finish_rejects_path_traversal_workspace_path() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();

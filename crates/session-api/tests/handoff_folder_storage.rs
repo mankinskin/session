@@ -27,7 +27,7 @@ use std::{
 fn setup_test_store() -> (SessionStoreConfig, PathBuf) {
     let temp_dir = tempfile::tempdir().expect("create temp dir");
     let store_root = temp_dir.path().to_path_buf();
-    let config = SessionStoreConfig::new(&store_root, "test-workspace");
+    let config = SessionStoreConfig::new(&store_root);
     (config, store_root)
 }
 

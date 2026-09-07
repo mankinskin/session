@@ -56,7 +56,7 @@ pub struct SessionAuditReport {
     pub schema_version: u32,
     pub source: String,
     pub captured_at: chrono::DateTime<chrono::Utc>,
-    pub workspace_slug: String,
+    pub workspace_path: String,
     pub metrics: SessionAuditMetrics,
     pub top_tools: Vec<SessionAuditToolCount>,
     pub findings: Vec<SessionAuditFinding>,
@@ -168,7 +168,7 @@ pub fn build_session_audit_report(
         schema_version: record.schema_version,
         source: record.source.clone(),
         captured_at: record.captured_at,
-        workspace_slug: record.metadata.workspace_slug.clone(),
+        workspace_path: record.metadata.workspace_path.clone(),
         metrics: SessionAuditMetrics {
             turn_count: record.turns.len(),
             assistant_turn_count,

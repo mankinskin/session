@@ -181,7 +181,7 @@ impl SessionStoreConfig {
             started_at: now,
             captured_at: now,
             metadata: SessionMetadata {
-                workspace_slug: self.workspace_slug.clone(),
+                workspace_path: self.workspace_path.clone(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,

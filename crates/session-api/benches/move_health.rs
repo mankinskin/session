@@ -33,12 +33,12 @@ use session_api::{
 use uuid::Uuid;
 
 const SESSION_INDEX_DIR: &str = ".session";
-const WORKSPACE_SLUG: &str = "bench-workspace";
+const WORKSPACE_PATH: &str = "bench-workspace";
 
 fn sample_request(session_id: &Uuid) -> SessionCaptureRequest {
     SessionCaptureRequest::copilot(CopilotHookPayload {
         session_id: session_id.to_string(),
-        workspace_slug: WORKSPACE_SLUG.to_string(),
+        workspace_path: WORKSPACE_PATH.to_string(),
         captured_at: Utc::now(),
         conversation_id: Some("bench-conversation".to_string()),
         agent_id: Some("github-copilot".to_string()),
@@ -71,7 +71,7 @@ fn build_session_fixture(
     fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR))
         .expect("create target .session dir");
 
-    let store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR), WORKSPACE_SLUG);
+    let store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR), WORKSPACE_PATH);
 
     let ids: Vec<Uuid> = (0..entity_count)
         .map(|_| {

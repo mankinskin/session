@@ -74,7 +74,7 @@ mod tests {
             started_at: Utc::now(),
             captured_at: Utc::now(),
             metadata: crate::SessionMetadata {
-                workspace_slug: "default".to_string(),
+                workspace_path: "default".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,

@@ -51,7 +51,7 @@ fn seed_ticket_worktree_inference(
 fn infer_worktree_from_environment_resolves_existing_ticket_from_branch() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_id =
         uuid::Uuid::parse_str("bbbbbbbb-2222-4222-8222-222222222222")
@@ -93,7 +93,7 @@ fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable()
 {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let repo_dir = tempdir.path().join("repo");
     std::fs::create_dir_all(&repo_dir).unwrap();
@@ -125,7 +125,7 @@ fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable()
 fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let repo_dir = tempdir.path().join("repo");
     std::fs::create_dir_all(&repo_dir).unwrap();
@@ -160,7 +160,7 @@ fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
 fn infer_worktree_from_environment_is_quiet_on_detached_head() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let repo_dir = tempdir.path().join("repo");
     std::fs::create_dir_all(&repo_dir).unwrap();
@@ -193,7 +193,7 @@ fn infer_worktree_from_environment_is_quiet_on_detached_head() {
 fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let non_git_dir = tempdir.path().join("not-a-repo");
     std::fs::create_dir_all(&non_git_dir).unwrap();
@@ -224,7 +224,7 @@ fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
 fn infer_worktree_from_environment_never_overwrites_real_check_in() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let checked_in_ticket = "ticket-checked-in-by-hand";
     config

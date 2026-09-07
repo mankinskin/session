@@ -107,7 +107,7 @@ fn seed_unrelated_session(config: &SessionStoreConfig) {
 
 fn seeded_config(tempdir: &TempDir) -> SessionStoreConfig {
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     seed_strict_session(&config, tempdir);
     seed_linked_session(&config);
     seed_mentioned_session(&config);
@@ -224,7 +224,7 @@ fn sessions_for_ticket_mentioned_includes_all_structured_tiers_only() {
 fn check_in_worktree_forward_captures_ticket_linkage_for_immediate_discovery() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         "f1111111-1111-4111-8111-111111111111",
@@ -261,7 +261,7 @@ fn check_in_worktree_forward_captures_ticket_linkage_for_immediate_discovery() {
 fn sessions_for_ticket_skips_unreadable_session_and_returns_the_rest() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         "f2222222-2222-4222-8222-222222222222",

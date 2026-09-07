@@ -66,7 +66,7 @@ fn write_raw_session_with_turns(
         started_at: sample_time(),
         captured_at: sample_time(),
         metadata: SessionMetadata {
-            workspace_slug: "context-engine".to_string(),
+            workspace_path: "context-engine".to_string(),
             conversation_id: None,
             agent_id: None,
             ticket_id: ticket_id.map(str::to_string),
@@ -160,7 +160,7 @@ fn seed_ticket(ticket_store_root: &std::path::Path, ticket_id: uuid::Uuid) {
 fn backfill_links_via_agent_branch_shape() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_id =
         uuid::Uuid::parse_str("aaaaaaaa-1111-4111-8111-111111111111")
@@ -201,7 +201,7 @@ fn backfill_links_via_agent_branch_shape() {
 fn backfill_falls_back_to_worktree_path_when_branch_absent() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_id =
         uuid::Uuid::parse_str("bbbbbbbb-2222-4222-8222-222222222222")
@@ -232,7 +232,7 @@ fn backfill_falls_back_to_worktree_path_when_branch_absent() {
 fn backfill_branch_present_and_unmatched_does_not_fall_back() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_id =
         uuid::Uuid::parse_str("cccccccc-3333-4333-8333-333333333333")
@@ -265,7 +265,7 @@ fn backfill_branch_present_and_unmatched_does_not_fall_back() {
 fn backfill_handoff_links_multiple_target_tickets() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_one =
         uuid::Uuid::parse_str("dddddddd-4444-4444-8444-444444444444")
@@ -348,7 +348,7 @@ fn backfill_handoff_links_multiple_target_tickets() {
 fn backfill_skips_unresolvable_short_id_without_writing() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     // No ticket store at all: every short id is unresolvable.
     write_raw_session(
@@ -373,7 +373,7 @@ fn backfill_skips_unresolvable_short_id_without_writing() {
 fn backfill_skips_corrupt_entry_and_continues() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_id =
         uuid::Uuid::parse_str("11111111-6666-4666-8666-666666666666")
@@ -404,7 +404,7 @@ fn backfill_skips_corrupt_entry_and_continues() {
 fn backfill_is_idempotent_and_never_overwrites_real_check_in() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
 
     let ticket_id =
         uuid::Uuid::parse_str("22222222-7777-4777-8777-777777777777")
@@ -474,7 +474,7 @@ fn backfill_is_idempotent_and_never_overwrites_real_check_in() {
 fn backfill_matches_ticket_tool_suffixes_across_server_prefixes() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let ticket_id = uuid::Uuid::parse_str("33333333-8888-4888-8888-888888888888").unwrap();
     seed_ticket(&store_root.join(".ticket"), ticket_id);
 
@@ -504,7 +504,7 @@ fn backfill_matches_ticket_tool_suffixes_across_server_prefixes() {
 fn backfill_keeps_ambiguous_claims_linked_without_a_primary_ticket() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let first = uuid::Uuid::parse_str("44444444-9999-4999-8999-999999999999").unwrap();
     let second = uuid::Uuid::parse_str("55555555-aaaa-4aaa-8aaa-aaaaaaaaaaaa").unwrap();
     seed_ticket(&store_root.join(".ticket"), first);
@@ -531,7 +531,7 @@ fn backfill_keeps_ambiguous_claims_linked_without_a_primary_ticket() {
 fn backfill_ticket_tool_call_never_sets_strict_ticket_id() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let ticket_id = uuid::Uuid::parse_str("66666666-bbbb-4bbb-8bbb-bbbbbbbbbbbb").unwrap();
     seed_ticket(&store_root.join(".ticket"), ticket_id);
     write_raw_session_with_turns(
@@ -553,7 +553,7 @@ fn backfill_ticket_tool_call_never_sets_strict_ticket_id() {
 fn backfill_discards_unresolvable_transcript_short_id() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let missing = "77777777";
     write_raw_session_with_turns(
         &store_root,
@@ -574,7 +574,7 @@ fn backfill_discards_unresolvable_transcript_short_id() {
 fn backfill_resolves_ticket_tool_short_ids_without_mining_content() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let ticket_id = uuid::Uuid::parse_str("88888888-dddd-4ddd-8ddd-dddddddddddd").unwrap();
     seed_ticket(&store_root.join(".ticket"), ticket_id);
     write_raw_session_with_turns(
@@ -595,7 +595,7 @@ fn backfill_resolves_ticket_tool_short_ids_without_mining_content() {
 fn backfill_transcript_dry_run_preserves_session_artifacts() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let ticket_id = uuid::Uuid::parse_str("99999999-eeee-4eee-8eee-eeeeeeeeeeee").unwrap();
     seed_ticket(&store_root.join(".ticket"), ticket_id);
     write_raw_session_with_turns(
@@ -621,7 +621,7 @@ fn backfill_transcript_dry_run_preserves_session_artifacts() {
 fn backfill_transcript_ticket_links_are_idempotent() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     let ticket_id = uuid::Uuid::parse_str("aaaaaaaa-ffff-4fff-8fff-ffffffffffff").unwrap();
     seed_ticket(&store_root.join(".ticket"), ticket_id);
     write_raw_session_with_turns(
@@ -644,7 +644,7 @@ fn backfill_transcript_ticket_links_are_idempotent() {
 fn backfill_skips_malformed_or_missing_tool_request_payloads() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root.clone(), "context-engine");
+    let config = SessionStoreConfig::new(store_root.clone());
     write_raw_session_with_turns(
         &store_root,
         "session-malformed-payload",

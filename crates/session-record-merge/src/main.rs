@@ -267,10 +267,10 @@ fn merge_metadata(
     secondary: &SessionMetadata,
 ) -> SessionMetadata {
     SessionMetadata {
-        workspace_slug: if !primary.workspace_slug.is_empty() {
-            primary.workspace_slug.clone()
+        workspace_path: if !primary.workspace_path.is_empty() {
+            primary.workspace_path.clone()
         } else {
-            secondary.workspace_slug.clone()
+            secondary.workspace_path.clone()
         },
         conversation_id: primary
             .conversation_id
@@ -450,7 +450,7 @@ mod tests {
             started_at: captured_at,
             captured_at,
             metadata: SessionMetadata {
-                workspace_slug: "default".to_string(),
+                workspace_path: "default".to_string(),
                 conversation_id: None,
                 agent_id: None,
                 ticket_id: None,

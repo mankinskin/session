@@ -721,27 +721,19 @@ impl From<ValidationGateInput> for SessionValidationGate {
 #[derive(Clone)]
 pub struct SessionServer {
     store_root: PathBuf,
-    workspace_slug: String,
     tool_router: ToolRouter<Self>,
 }
 
 impl SessionServer {
-    pub fn new(
-        store_root: PathBuf,
-        workspace_slug: String,
-    ) -> Self {
+    pub fn new(store_root: PathBuf) -> Self {
         Self {
             store_root,
-            workspace_slug,
             tool_router: Self::tool_router(),
         }
     }
 
     fn config(&self) -> SessionStoreConfig {
-        SessionStoreConfig::new(
-            self.store_root.clone(),
-            self.workspace_slug.clone(),
-        )
+        SessionStoreConfig::new(self.store_root.clone())
     }
 
     fn config_for_workspace(
@@ -753,13 +745,11 @@ impl SessionServer {
                 workspace_selector,
             ))
             .map_err(|err| McpError::invalid_params(err.to_string(), None))?;
-        let store_root = workspace::resolve_store_root_from(
-            std::path::Path::new(workspace_selector),
-            ".session",
-        );
         Ok(SessionStoreConfig::new(
-            store_root,
-            self.workspace_slug.clone(),
+            workspace::resolve_store_root_for_initialization_from(
+                std::path::Path::new(workspace_selector),
+                ".session",
+            ),
         ))
     }
 
@@ -2165,9 +2155,8 @@ impl ServerHandler for SessionServer {
 
 pub async fn run_mcp_server(
     store_root: PathBuf,
-    workspace_slug: String,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let server = SessionServer::new(store_root, workspace_slug);
+    let server = SessionServer::new(store_root);
 
     tracing::info!(
         "Starting session-mcp server on stdio (direct store access)"
@@ -2205,7 +2194,7 @@ mod tests {
     ) {
         let payload = CopilotHookPayload {
             session_id: session_id.to_string(),
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
             captured_at: Utc::now(),
             conversation_id: None,
             agent_id: Some(agent.to_string()),
@@ -2280,7 +2269,7 @@ mod tests {
         let workspace = session_root.display().to_string();
         let session_id = "88888888-8888-4888-8888-888888888888";
         let server = SessionServer::new(session_root.clone(), "default".to_string());
-        let config = SessionStoreConfig::new(session_root, "default");
+        let config = SessionStoreConfig::new(session_root);
         config
             .init_runtime_context(SessionRuntimeInitRequest {
                 session_id: Some(session_id.to_string()),
@@ -2446,7 +2435,7 @@ mod tests {
     async fn runtime_render_instructions_returns_only_pinned_rules() {
         let dir = tempdir().unwrap();
         let session_root = dir.path().join(".session");
-        let config = SessionStoreConfig::new(&session_root, "default");
+        let config = SessionStoreConfig::new(&session_root);
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
                 session_id: Some(
@@ -2499,7 +2488,7 @@ mod tests {
         let store_root = dir.path().join(".session");
         let server =
             SessionServer::new(store_root.clone(), "default".to_string());
-        let config = SessionStoreConfig::new(store_root, "default".to_string());
+        let config = SessionStoreConfig::new(store_root);
         seed(&config, "22222222-2222-4222-8222-222222222222", "agent-2");
 
         let query = server

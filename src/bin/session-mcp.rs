@@ -13,14 +13,10 @@ async fn main() {
         .init();
 
     let store_root = resolve_store_root();
-    let workspace_slug = resolve_workspace_slug();
 
-    eprintln!(
-        "session-mcp starting (store: {}, workspace: {workspace_slug})",
-        store_root.display()
-    );
+    eprintln!("session-mcp starting (store: {})", store_root.display());
 
-    if let Err(err) = run_mcp_server(store_root, workspace_slug).await {
+    if let Err(err) = run_mcp_server(store_root).await {
         eprintln!("Fatal error: {err}");
         std::process::exit(1);
     }
@@ -41,7 +37,3 @@ fn resolve_store_root() -> PathBuf {
     }
 }
 
-fn resolve_workspace_slug() -> String {
-    std::env::var("SESSION_WORKSPACE_SLUG")
-        .unwrap_or_else(|_| "default".to_string())
-}

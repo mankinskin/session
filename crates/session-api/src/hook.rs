@@ -106,7 +106,8 @@ pub struct CopilotHookMessage {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CopilotHookPayload {
     pub session_id: String,
-    pub workspace_slug: String,
+    #[serde(alias = "workspace_slug")]
+    pub workspace_path: String,
     pub captured_at: DateTime<Utc>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation_id: Option<String>,
@@ -203,7 +204,7 @@ impl SessionCaptureRequest {
                 started_at,
                 captured_at,
                 metadata: SessionMetadata {
-                    workspace_slug: payload.workspace_slug,
+                    workspace_path: payload.workspace_path,
                     conversation_id: payload.conversation_id,
                     agent_id: payload.agent_id,
                     ticket_id: None,

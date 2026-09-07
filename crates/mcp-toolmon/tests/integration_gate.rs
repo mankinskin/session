@@ -122,11 +122,11 @@ fn active_session_fixture() -> (TempDir, PathBuf) {
     );
     SessionWorkspaceResolver::new(ResolverConfig {
         main_checkout: main_checkout.clone(),
-        workspace_slug: "default".to_string(),
+        workspace_path: "default".to_string(),
     })
     .unwrap();
     // The anchor store beneath the main checkout is the worktree registry.
-    SessionStoreConfig::new(main_checkout.join(".session"), "default")
+    SessionStoreConfig::new(main_checkout.join(".session"))
         .check_in_worktree(SessionWorktreeCheckInRequest {
             session_id: TEST_SESSION_ID.to_string(),
             owner_id: "agent".to_string(),

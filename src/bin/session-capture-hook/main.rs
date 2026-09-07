@@ -118,7 +118,7 @@ fn run() -> Result<(), SessionError> {
         return Ok(());
     };
     tracing::debug!(store_root = %store_root.display(), "resolved capture store root");
-    let config = SessionStoreConfig::new(store_root.clone(), "default");
+    let config = SessionStoreConfig::new(store_root.clone());
     let hook_event_name = hook_event_name(&args);
     let captured_hook_event = hook_event(&args, &hook_event_name);
     if !transcript_path.is_file() {
@@ -264,7 +264,7 @@ fn mirror_user_prompt_to_main(
     if main_store == store_root {
         return Ok(());
     }
-    SessionStoreConfig::new(main_store, "default")
+    SessionStoreConfig::new(main_store)
         .persist_hook_event(session_id, event)
 }
 #[derive(Debug)]
@@ -366,7 +366,7 @@ fn initialize_session_routing(
     }
     let resolver = match SessionWorkspaceResolver::new(ResolverConfig {
         main_checkout: anchor,
-        workspace_slug: "default".to_string(),
+        workspace_path: "default".to_string(),
     }) {
         Ok(resolver) => resolver,
         Err(error) => {
@@ -506,12 +506,12 @@ fn report_structured_feedback_signals(plan: &SessionStorePlan) {
     } else {
         mine_structured_feedback_signals(&plan.record.turns)
     };
-    let workspace_slug = plan.record.metadata.workspace_slug.as_str();
+    let workspace_path = plan.record.metadata.workspace_path.as_str();
     let event_failed_tool_calls = plan
         .events
         .as_ref()
         .map(|events| {
-            mine_failed_tool_call_signals(&events.events, workspace_slug)
+            mine_failed_tool_call_signals(&events.events, workspace_path)
         })
         .unwrap_or_default();
     let event_ingestions = plan
@@ -679,7 +679,7 @@ fn resolve_capture_store_root(
     };
     let resolver = match SessionWorkspaceResolver::new(ResolverConfig {
         main_checkout: anchor,
-        workspace_slug: "default".to_string(),
+        workspace_path: "default".to_string(),
     }) {
         Ok(resolver) => resolver,
         Err(error) => {
@@ -814,7 +814,7 @@ fn mirror_worktree_assignment_to_main(
     let Some(assignment) = record.metadata.worktree else {
         return;
     };
-    let main_config = SessionStoreConfig::new(main_store_root, "default");
+    let main_config = SessionStoreConfig::new(main_store_root);
     if let Err(error) = main_config.register_provisioned_worktree(
         session_id,
         &assignment.path,
@@ -939,7 +939,7 @@ mod tests {
             include_str!("../../../tests/fixtures/local_parse_fixture_a.jsonl"),
         )
         .unwrap();
-        let config = SessionStoreConfig::new(&store_root, "default");
+        let config = SessionStoreConfig::new(&store_root);
         let plan = config
             .capture_copilot_transcript_with_tool_response(
                 &transcript_path,
@@ -1081,7 +1081,7 @@ mod tests {
         let worktree = main_checkout.join("worktree");
         create_git_worktree(&main_checkout, &worktree, "feature");
         let store_root = worktree.join(".session");
-        let config = SessionStoreConfig::new(&store_root, "default");
+        let config = SessionStoreConfig::new(&store_root);
         let original_cwd = env::current_dir().unwrap();
         env::set_current_dir(&main_checkout).unwrap();
 

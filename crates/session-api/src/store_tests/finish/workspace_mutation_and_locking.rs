@@ -5,7 +5,7 @@
 fn finished_workspace_rejects_all_mutations() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root, "context-engine");
+    let config = SessionStoreConfig::new(store_root);
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -92,7 +92,7 @@ fn finished_workspace_rejects_all_mutations() {
 fn aged_live_lock_blocks_second_owner_and_releases_safely() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root, "context-engine");
+    let config = SessionStoreConfig::new(store_root);
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -156,7 +156,7 @@ fn failed_windows_replacement_preserves_previous_bytes() {
 fn finish_excludes_mutation_init_and_resume_until_terminal_commit() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -265,7 +265,7 @@ fn finish_excludes_mutation_init_and_resume_until_terminal_commit() {
 fn finished_workspace() -> (SessionStoreConfig, String, TempDir) {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
-    let config = SessionStoreConfig::new(store_root, "context-engine");
+    let config = SessionStoreConfig::new(store_root);
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();

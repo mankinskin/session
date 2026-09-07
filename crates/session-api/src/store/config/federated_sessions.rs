@@ -133,7 +133,7 @@ impl SessionStoreConfig {
         }
 
         stores.extend(roots.into_iter().map(|root| {
-            (SessionStoreConfig::new(root, self.workspace_slug.clone()), true)
+            (SessionStoreConfig::new(root), true)
         }));
         Ok(stores)
     }

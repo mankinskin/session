@@ -88,14 +88,14 @@ fn e2e_hook_binary_persists_fixture_transcript() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let config = SessionStoreConfig::new(&store_root, "default");
+    let config = SessionStoreConfig::new(&store_root);
     let record = config
         .read_session(FIXTURE_SESSION_ID)
         .expect("persisted session should be readable from temp store");
 
     assert!(!record.turns.is_empty());
     assert_eq!(record.session_id, FIXTURE_SESSION_ID);
-    assert_eq!(record.metadata.workspace_slug, "default");
+    assert_eq!(record.metadata.workspace_path, "default");
     assert_eq!(record.metadata.trigger.as_deref(), Some("SessionStart"));
 }
 
@@ -242,13 +242,13 @@ fn e2e_stop_hook_script_persists_fixture_from_nested_workspace_cwd() {
         leaked_root_manifest.display()
     );
 
-    let config = SessionStoreConfig::new(&fixture_store_root, "default");
+    let config = SessionStoreConfig::new(&fixture_store_root);
     let record = config.read_session(&session_id).expect(
         "stop hook should persist fixture transcript into the temp store",
     );
 
     assert_eq!(record.session_id, session_id);
-    assert_eq!(record.metadata.workspace_slug, "default");
+    assert_eq!(record.metadata.workspace_path, "default");
     assert_eq!(record.metadata.trigger.as_deref(), Some("SessionStart"));
     assert_eq!(record.turns.len(), 2);
     assert_eq!(

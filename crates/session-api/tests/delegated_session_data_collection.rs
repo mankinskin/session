@@ -66,7 +66,7 @@ fn subagent_rollup_links_delegated_session_to_parent() {
         started_at: Utc::now(),
         captured_at: Utc::now(),
         metadata: SessionMetadata {
-            workspace_slug: "test".to_string(),
+            workspace_path: "test".to_string(),
             conversation_id: None,
             agent_id: None,
             ticket_id: None,
@@ -130,7 +130,7 @@ fn subagent_rollup_aggregates_token_cost_model_per_delegated_session() {
         started_at: Utc::now(),
         captured_at: Utc::now(),
         metadata: SessionMetadata {
-            workspace_slug: "test".to_string(),
+            workspace_path: "test".to_string(),
             conversation_id: None,
             agent_id: None,
             ticket_id: None,

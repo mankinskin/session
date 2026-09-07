@@ -6,7 +6,7 @@ use crate::{
 #[test]
 fn terminal_observer_persists_bounded_output_and_rejects_append_after_close() {
     let tempdir = TempDir::new().unwrap();
-    let config = SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let session_id = uuid::Uuid::new_v4().to_string();
     config
         .init_runtime_context(SessionRuntimeInitRequest {

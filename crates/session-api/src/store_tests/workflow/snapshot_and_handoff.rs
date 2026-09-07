@@ -3,7 +3,7 @@
 fn workflow_snapshot_resolves_live_state_and_emits_missing_diagnostics() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -78,7 +78,7 @@ fn workflow_snapshot_resolves_live_state_and_emits_missing_diagnostics() {
 fn workflow_render_outputs_are_deterministic_and_escaped() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -163,7 +163,7 @@ fn workflow_render_outputs_are_deterministic_and_escaped() {
 fn workflow_render_is_read_only_for_runtime_persistence() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -206,7 +206,7 @@ fn workflow_render_is_read_only_for_runtime_persistence() {
 fn handoff_persists_before_render_and_resume_links_new_run() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -260,7 +260,7 @@ fn handoff_persists_before_render_and_resume_links_new_run() {
 fn handoff_package_missing_objective_is_rejected() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -292,7 +292,7 @@ fn handoff_package_missing_objective_is_rejected() {
 fn handoff_package_round_trip_persists_schema_fields() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -365,7 +365,7 @@ fn handoff_package_round_trip_persists_schema_fields() {
 fn handoff_package_with_nonexistent_target_file_fails_at_creation_time() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -423,7 +423,7 @@ fn handoff_package_with_nonexistent_target_file_fails_at_creation_time() {
 fn handoff_package_validates_target_files_in_assigned_worktree() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let session_id = uuid::Uuid::new_v4().to_string();
     let worktree = managed_worktree(
         &tempdir,
@@ -480,7 +480,7 @@ fn handoff_package_validates_target_files_in_assigned_worktree() {
 fn handoff_package_normalizes_backslash_target_files_to_forward_slash() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
@@ -580,7 +580,7 @@ fn legacy_inline_handoff_package_still_deserializes() {
 fn handoff_package_with_open_escalations_persists_but_not_ready() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();

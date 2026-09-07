@@ -58,18 +58,10 @@ pub struct SessionCli {
     #[arg(long, global = true, conflicts_with = "json")]
     pub toon: bool,
 
-    /// Explicit session store root (the `.session` directory).
-    #[arg(long, global = true)]
-    pub store_root: Option<PathBuf>,
-
-    /// Workspace/repo root to normalize to the canonical `.session` store.
+    /// Workspace/repo root that owns the canonical `.session` store.
     /// Lets a tool run from an ancestor checkout target a nested workspace.
     #[arg(long = "workspace", alias = "workspace-root", global = true)]
     pub workspace_root: Option<PathBuf>,
-
-    /// Workspace slug that scopes session storage.
-    #[arg(long, global = true, default_value = "default")]
-    pub workspace_slug: String,
 
     #[command(subcommand)]
     pub command: SessionCommand,
@@ -716,22 +708,24 @@ pub enum CliRunError {
 
 pub fn run(cli: SessionCli) -> Result<CliOutput, CliRunError> {
     if matches!(cli.command, SessionCommand::CheckIn(_))
-        && cli.store_root.is_none()
         && cli.workspace_root.is_none()
     {
         return Err(CliRunError::BadRequest(
-            "entity creation requires explicit --workspace <path> or --store-root <path>".to_string(),
+            "entity creation requires explicit --workspace <path>".to_string(),
         ));
     }
 
-    let store_root = workspace::resolve_requested_store_root(
-        cli.store_root.as_deref(),
-        cli.workspace_root.as_deref(),
-        None,
-        SESSION_STORE_DIR,
-    );
-    let config =
-        SessionStoreConfig::new(store_root, cli.workspace_slug.clone());
+    let store_root = match cli.workspace_root.as_deref() {
+        Some(workspace_root) => workspace::resolve_store_root_for_initialization_from(
+            workspace_root,
+            SESSION_STORE_DIR,
+        ),
+        None => workspace::resolve_session_store_root_from(
+            workspace::working_dir().as_deref(),
+            SESSION_STORE_DIR,
+        ),
+    };
+    let config = SessionStoreConfig::new(store_root);
 
     let payload = dispatch(&config, cli.command)?;
 
@@ -1713,7 +1707,7 @@ mod tests {
         ])
         .expect("parse check-in");
 
-        assert_eq!(cli.workspace_slug, "default");
+        assert_eq!(cli.workspace_path, "default");
         match cli.command {
             SessionCommand::CheckIn(args) => {
                 assert_eq!(
@@ -1764,7 +1758,7 @@ mod tests {
     fn workflow_batch_commands_dispatch_atomically() {
         let dir = tempfile::tempdir().unwrap();
         let config =
-            SessionStoreConfig::new(dir.path().join(".session"), "default");
+            SessionStoreConfig::new(dir.path().join(".session"));
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
                 session_id: Some(
@@ -1852,7 +1846,7 @@ mod tests {
     fn render_instructions_dispatches_focused_rule_set() {
         let dir = tempfile::tempdir().unwrap();
         let session_root = dir.path().join(".session");
-        let config = SessionStoreConfig::new(&session_root, "default");
+        let config = SessionStoreConfig::new(&session_root);
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
                 session_id: Some(
@@ -2049,7 +2043,7 @@ mod tests {
         );
         let payload = CopilotHookPayload {
             session_id: session_id.to_string(),
-            workspace_slug: "default".to_string(),
+            workspace_path: "default".to_string(),
             captured_at: Utc::now(),
             conversation_id: Some("conv-1".to_string()),
             agent_id: Some("agent-1".to_string()),

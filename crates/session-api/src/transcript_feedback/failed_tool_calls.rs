@@ -66,7 +66,7 @@ const NO_SUPPORTED_STORE_METHODS: &[&str] = &[
 pub fn map_failed_tool_call_to_entity(
     tool_name: Option<&str>,
     tool_arguments_json: Option<&Value>,
-    workspace_slug: &str,
+    workspace_path: &str,
 ) -> FailedToolCallMapping {
     let Some(tool_name) = tool_name else {
         return unmapped(UnmappedReason::UnknownTool);
@@ -97,7 +97,7 @@ pub fn map_failed_tool_call_to_entity(
     };
 
     match json_str(tool_arguments_json, id_key)
-        .and_then(|id| EntityUrn::ticket(workspace_slug, id).ok())
+        .and_then(|id| EntityUrn::ticket(workspace_path, id).ok())
     {
         Some(urn) => FailedToolCallMapping::Entity { urn },
         None => unmapped(UnmappedReason::NoEntityIdArgument),
@@ -107,17 +107,17 @@ pub fn map_failed_tool_call_to_entity(
 /// Extract failed-tool-call signals from canonical captured outcome events.
 pub fn mine_failed_tool_call_signals(
     events: &[CopilotHookEvent],
-    workspace_slug: &str,
+    workspace_path: &str,
 ) -> Vec<StructuredFeedbackSignal> {
     canonicalize_outcome_events(events)
         .iter()
-        .filter_map(|event| detect_failed_tool_call(event, workspace_slug))
+        .filter_map(|event| detect_failed_tool_call(event, workspace_path))
         .collect()
 }
 
 fn detect_failed_tool_call(
     event: &CopilotHookEvent,
-    workspace_slug: &str,
+    workspace_path: &str,
 ) -> Option<StructuredFeedbackSignal> {
     if !is_tool_execution_outcome(event.event_type.as_deref())
         || event.tool_success != Some(false)
@@ -136,7 +136,7 @@ fn detect_failed_tool_call(
         mapping: Some(map_failed_tool_call_to_entity(
             event.tool_name.as_deref(),
             event.tool_arguments_json.as_ref(),
-            workspace_slug,
+            workspace_path,
         )),
     })
 }

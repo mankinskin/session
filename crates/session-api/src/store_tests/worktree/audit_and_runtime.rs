@@ -2,7 +2,7 @@
 fn check_in_worktree_rotates_when_existing_path_is_missing() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let first_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -51,7 +51,7 @@ fn check_in_worktree_rotates_when_existing_path_is_missing() {
 fn cross_session_reuse_requires_adopt_flow() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let shared_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -90,7 +90,7 @@ fn cross_session_reuse_requires_adopt_flow() {
 fn check_in_rolls_back_successor_registry_failure() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let successor_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_B,
@@ -128,7 +128,7 @@ fn check_in_rolls_back_successor_registry_failure() {
 fn check_in_rolls_back_predecessor_update_failure() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let predecessor_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -185,7 +185,7 @@ fn check_in_rolls_back_predecessor_update_failure() {
 fn successful_rotation_supersedes_predecessor_once() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let predecessor_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -241,7 +241,7 @@ fn successful_rotation_supersedes_predecessor_once() {
 fn duplicate_active_canonical_path_without_predecessor_is_a_conflict() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let first_path = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -293,7 +293,7 @@ fn duplicate_active_canonical_path_without_predecessor_is_a_conflict() {
 fn check_in_rejects_external_missing_and_branch_mismatched_worktrees() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let external = tempdir.path().join("external");
     git2::Repository::init(&external).unwrap();
     let external_error = config
@@ -340,7 +340,7 @@ fn check_in_rejects_external_missing_and_branch_mismatched_worktrees() {
 fn check_in_rejects_symlink_path_escape() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let target = managed_worktree(
         &tempdir,
         WORKTREE_SESSION_A,
@@ -382,7 +382,7 @@ fn check_in_rejects_symlink_path_escape() {
 fn read_session_rejects_unknown_schema_version() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let plan = config
         .persist_capture(sample_request(
@@ -422,7 +422,6 @@ fn runtime_init_uses_the_provisioned_worktree_uuid() {
     std::fs::create_dir_all(&store_root).unwrap();
     let config = SessionStoreConfig::new(
         store_root.strip_prefix(&current_dir).unwrap(),
-        "context-engine",
     );
 
     let result = config
@@ -443,7 +442,7 @@ fn runtime_init_uses_the_provisioned_worktree_uuid() {
 fn worktree_identity_rejects_slug_values() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let session_id = "epic-kickoff-8fdfe135";
 
     let error = config
@@ -467,7 +466,7 @@ fn worktree_identity_rejects_slug_values() {
 fn legacy_slug_keyed_session_record_remains_readable() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let session_id = "structured-ticket-entities-iteration";
 
     config
@@ -489,7 +488,7 @@ fn legacy_slug_keyed_session_record_remains_readable() {
 fn session_audit_supports_latest_and_explicit_session_selectors() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let mut older = sample_payload(
         "session-old",
@@ -564,7 +563,7 @@ fn session_audit_supports_latest_and_explicit_session_selectors() {
 fn context_schema_init_is_idempotent_without_forcing_a_new_run() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let first = config
         .init_runtime_context(SessionRuntimeInitRequest {
@@ -593,7 +592,7 @@ fn context_schema_init_is_idempotent_without_forcing_a_new_run() {
 fn run_lineage_init_resume_creates_distinct_linked_run() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
 
     let first = config
         .init_runtime_context(SessionRuntimeInitRequest {
@@ -622,7 +621,7 @@ fn run_lineage_init_resume_creates_distinct_linked_run() {
 fn context_pin_unpin_is_idempotent_and_persistent() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest {
             session_id: Some(uuid::Uuid::new_v4().to_string()),
@@ -662,7 +661,7 @@ fn context_pin_unpin_is_idempotent_and_persistent() {
 fn context_pin_rejects_malformed_entity_urn_segments() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest {
             session_id: Some(uuid::Uuid::new_v4().to_string()),
@@ -686,7 +685,7 @@ fn context_pin_rejects_malformed_entity_urn_segments() {
 fn context_view_returns_headers_only() {
     let tempdir = TempDir::new().unwrap();
     let config =
-        SessionStoreConfig::new(tempdir.path().join("store"), "context-engine");
+        SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
         .init_runtime_context(SessionRuntimeInitRequest {
             session_id: Some(uuid::Uuid::new_v4().to_string()),

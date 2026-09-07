@@ -172,7 +172,7 @@ pub struct SessionTicketBackfillReport {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionStoreConfig {
     pub root: PathBuf,
-    pub workspace_slug: String,
+    pub workspace_path: String,
 }
 
 #[derive(Debug, Clone)]
@@ -272,19 +272,21 @@ fn sibling_store_root(
 /// any other slug resolves to `<base>/<slug>/<sibling_store_dir>` and is
 /// validated to reject empty, `.`, `..`, and path-separator segments before
 /// any path is built.
-fn resolve_slug_store_root(
-    session_store_root: &Path,
-    session_workspace_slug: &str,
-    slug: &str,
+fn resolve_workspace_store_root(
+    workspace_path: &str,
     sibling_store_dir: &str,
 ) -> Result<PathBuf, String> {
-    if slug == "default" || slug == session_workspace_slug {
-        return Ok(sibling_store_root(session_store_root, sibling_store_dir));
+    let workspace_path = Path::new(workspace_path);
+    if !workspace_path.is_absolute() {
+        return Err(format!(
+            "workspace path `{}` must be absolute; migrate legacy slug URNs before resolution",
+            workspace_path.display()
+        ));
     }
-    validate_segment(slug, true).map_err(|error| error.to_string())?;
-    Ok(sibling_store_base(session_store_root)
-        .join(slug)
-        .join(sibling_store_dir))
+    Ok(memory_kernel::workspace::resolve_store_root_from(
+        workspace_path,
+        sibling_store_dir,
+    ))
 }
 
 /// RAII guard that releases the runtime mutation lock on drop.
@@ -299,43 +301,36 @@ impl Drop for RuntimeMutationLock {
 }
 
 struct DefaultTicketStateResolver {
-    session_store_root: PathBuf,
-    workspace_slug: String,
-    // Keyed by resolved store root path (not by raw URN slug) so that the
-    // literal `default` alias and the session's own workspace slug share one
-    // cache entry and open the store at most once.
+    workspace_path: String,
+    // Keyed by resolved store root path so path-equivalent URNs open each
+    // store at most once.
     ticket_stores: std::sync::Mutex<BTreeMap<PathBuf, TicketStore>>,
     spec_stores: std::sync::Mutex<BTreeMap<PathBuf, SpecStore>>,
 }
 
 impl DefaultTicketStateResolver {
     /// Runs `f` against the cached (or freshly opened) ticket store for
-    /// `slug`, opening and caching it at most once per resolved store root.
+    /// `workspace_path`, opening and caching it at most once per resolved store root.
     /// Never creates a store as a side effect: every resolved store must
     /// already exist.
     fn with_ticket_store<T>(
         &self,
-        slug: &str,
+        workspace_path: &str,
         f: impl FnOnce(&TicketStore) -> Result<T, String>,
     ) -> Result<T, String> {
-        let root = resolve_slug_store_root(
-            &self.session_store_root,
-            &self.workspace_slug,
-            slug,
-            ".ticket",
-        )?;
+        let root = resolve_workspace_store_root(workspace_path, ".ticket")?;
         let mut stores = self.ticket_stores.lock().unwrap();
         if !stores.contains_key(&root) {
             if !root.exists() {
                 return Err(format!(
-                    "ticket store for workspace `{slug}` is unavailable at {}: \
+                    "ticket store for workspace `{workspace_path}` is unavailable at {}: \
                      not initialized",
                     root.display()
                 ));
             }
             let store = TicketStore::open(&root).map_err(|error| {
                 format!(
-                    "ticket store for workspace `{slug}` is unavailable at {}: {error}",
+                    "ticket store for workspace `{workspace_path}` is unavailable at {}: {error}",
                     root.display()
                 )
             })?;
@@ -347,22 +342,16 @@ impl DefaultTicketStateResolver {
     /// Symmetric to [`Self::with_ticket_store`] for spec stores.
     fn with_spec_store<T>(
         &self,
-        slug: &str,
+        workspace_path: &str,
         f: impl FnOnce(&SpecStore) -> Result<T, String>,
     ) -> Result<T, String> {
-        let root = resolve_slug_store_root(
-            &self.session_store_root,
-            &self.workspace_slug,
-            slug,
-            ".spec",
-        )?;
+        let root = resolve_workspace_store_root(workspace_path, ".spec")?;
         let mut stores = self.spec_stores.lock().unwrap();
         if !stores.contains_key(&root) {
-            let is_own_workspace =
-                slug == "default" || slug == self.workspace_slug;
+            let is_own_workspace = workspace_path == self.workspace_path;
             if !is_own_workspace && !root.exists() {
                 return Err(format!(
-                    "spec store for workspace `{slug}` is unavailable at {}: \
+                    "spec store for workspace `{workspace_path}` is unavailable at {}: \
                      not initialized",
                     root.display()
                 ));
@@ -393,7 +382,7 @@ impl SessionTicketStateResolver for DefaultTicketStateResolver {
             Uuid::parse_str(&parsed.entity_id).map_err(|error| {
                 format!("invalid ticket id in URN {ticket_urn}: {error}")
             })?;
-        self.with_ticket_store(&parsed.workspace_slug, |store| {
+        self.with_ticket_store(&parsed.workspace_path, |store| {
             match store
                 .get_indexed(&ticket_id)
                 .map_err(|error| error.to_string())?
@@ -416,7 +405,7 @@ impl SessionTicketStateResolver for DefaultTicketStateResolver {
         if parsed.kind != SessionPinnedEntityKind::Spec {
             return Err(format!("not a spec URN: {spec_urn}"));
         }
-        self.with_spec_store(&parsed.workspace_slug, |store| {
+        self.with_spec_store(&parsed.workspace_path, |store| {
             let manifest = store
                 .get(&parsed.entity_id)
                 .map_err(|error| format!("required spec not found: {error}"))?;

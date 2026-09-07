@@ -1,4 +1,6 @@
 use super::*;
+use feedback_api::EntityUrn;
+use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SessionStorePaths {
@@ -25,7 +27,7 @@ pub(super) fn validate_session_id(value: &str) -> Result<(), SessionError> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct ParsedEntityUrn {
-    pub(super) workspace_slug: String,
+    pub(super) workspace_path: String,
     pub(super) kind: SessionPinnedEntityKind,
     pub(super) entity_id: String,
 }
@@ -34,21 +36,11 @@ pub(super) fn parse_entity_urn(
     entity_urn: &str
 ) -> Result<ParsedEntityUrn, SessionError> {
     let trimmed = entity_urn.trim();
-    if !trimmed.starts_with("ce://") {
-        return Err(SessionError::InvalidEntityUrn(trimmed.to_string()));
-    }
-
-    let rest = trimmed.trim_start_matches("ce://");
-    let mut segments = rest.split('/');
-    let workspace_slug = segments.next().unwrap_or_default().to_string();
-    let store = segments.next().unwrap_or_default();
-    let entity_id = segments.next().unwrap_or_default().to_string();
-    if workspace_slug.trim().is_empty() || entity_id.trim().is_empty() {
-        return Err(SessionError::InvalidEntityUrn(trimmed.to_string()));
-    }
-    if segments.next().is_some() {
-        return Err(SessionError::InvalidEntityUrn(trimmed.to_string()));
-    }
+    let urn = EntityUrn::from_str(trimmed)
+        .map_err(|_| SessionError::InvalidEntityUrn(trimmed.to_string()))?;
+    let workspace_path = urn.workspace().to_string();
+    let store = urn.store();
+    let entity_id = urn.entity().to_string();
 
     let kind = match store {
         "ticket" | "tickets" => SessionPinnedEntityKind::Ticket,
@@ -58,7 +50,7 @@ pub(super) fn parse_entity_urn(
     };
 
     Ok(ParsedEntityUrn {
-        workspace_slug,
+        workspace_path,
         kind,
         entity_id,
     })

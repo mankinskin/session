@@ -287,7 +287,7 @@ fn e2e_session_start_captures_in_main_checkout_when_provisioning_fails() {
         !checkout.join(".worktrees").exists(),
         "unassigned sessions must not create a worktree"
     );
-    let record = SessionStoreConfig::new(checkout.join(".session"), "default")
+    let record = SessionStoreConfig::new(checkout.join(".session"))
         .read_session(session_id)
         .expect("capture should persist in the main checkout store");
     assert_eq!(
@@ -730,14 +730,14 @@ fn e2e_hook_binary_persists_fixture_transcript() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let config = SessionStoreConfig::new(&store_root, "default");
+    let config = SessionStoreConfig::new(&store_root);
     let record = config
         .read_session(FIXTURE_SESSION_ID)
         .expect("persisted session should be readable from temp store");
 
     assert!(!record.turns.is_empty());
     assert_eq!(record.session_id, FIXTURE_SESSION_ID);
-    assert_eq!(record.metadata.workspace_slug, "default");
+    assert_eq!(record.metadata.workspace_path, "default");
     assert_eq!(record.metadata.trigger.as_deref(), Some("SessionStart"));
 
     // A transcript with no tool execution must not leave an empty sidecar.
@@ -817,7 +817,7 @@ fn e2e_session_start_with_external_store_does_not_provision_cwd_checkout() {
         String::from_utf8_lossy(&output.stderr)
     );
     assert_eq!(output.stdout, b"{}\n");
-    let config = SessionStoreConfig::new(&store_root, "default");
+    let config = SessionStoreConfig::new(&store_root);
     let record = config.read_session(FIXTURE_SESSION_ID).expect(
         "provisioning diagnostic should remain readable after the hook exits",
     );
@@ -1397,13 +1397,13 @@ fn e2e_capture_hook_script_persists_fixture_from_nested_workspace_cwd() {
         leaked_root_manifest.display()
     );
 
-    let config = SessionStoreConfig::new(&fixture_store_root, "default");
+    let config = SessionStoreConfig::new(&fixture_store_root);
     let record = config.read_session(&session_id).expect(
         "capture hook should persist fixture transcript into the temp store",
     );
 
     assert_eq!(record.session_id, session_id);
-    assert_eq!(record.metadata.workspace_slug, "default");
+    assert_eq!(record.metadata.workspace_path, "default");
     assert_eq!(record.metadata.trigger.as_deref(), Some("SessionStart"));
     assert_eq!(record.turns.len(), 2);
     assert_eq!(
