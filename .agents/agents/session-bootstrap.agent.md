@@ -33,7 +33,7 @@ Follow [worktree-provisioning.instructions.md](../instructions/session/worktree-
 for provisioning, naming, diagnostics, and worktree control operations.
 Follow [session-bootstrap.instructions.md](../instructions/session/session-bootstrap.instructions.md)
 for relevant guidance discovery and pinning.
-Follow [board.instructions.md](../instructions/ticket/board.instructions.md) for board
+Follow [board.instructions.md](../../../ticket/.agents/instructions/ticket/board.instructions.md) for board
 ownership and heartbeat handling.
 
 ## Required Workflow
@@ -46,7 +46,7 @@ ownership and heartbeat handling.
 4. Claim the selected ticket and the expected file scope, recording the branch and
    worktree in the board intent.
 5. Discover, pin, and render only instructions relevant to the selected task.
-6. Follow [subagent-return-contract.instructions.md](../instructions/orchestration/subagent-return-contract.instructions.md) for the terminal ready result or blocker.
+6. Follow [subagent-return-contract.instructions.md](../../../.agents/instructions/workflow/subagent-return-contract.instructions.md) for the terminal ready result or blocker.
 
 ## Output Format
 

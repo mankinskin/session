@@ -31,7 +31,7 @@ Analyze ended sessions and their artifacts, extract learnings, errors, and impro
 
 ## Constraints
 
-Use bounded session inspection from [session-identity-and-handoff.instructions.md](../instructions/session/session-identity-and-handoff.instructions.md), durable-first evidence and normalized findings from [session-artifacts.instructions.md](../instructions/orchestration/session-artifacts.instructions.md), and diagnostic technique from [session-optimization.instructions.md](../instructions/session/session-optimization.instructions.md). Use the Feedback Workflow in [AGENTS.md](../../AGENTS.md) for feedback storage and entity identifiers.
+Use bounded session inspection from [session-identity-and-handoff.instructions.md](../instructions/session/session-identity-and-handoff.instructions.md), durable-first evidence and normalized findings from [session-artifacts.instructions.md](../../../.agents/instructions/workflow/session-artifacts.instructions.md), and diagnostic technique from [session-optimization.instructions.md](../instructions/session/session-optimization.instructions.md). Use the Feedback Workflow in [AGENTS.md](../../../../context-engine/AGENTS.md) for feedback storage and entity identifiers.
 
 Every finding must be normalized as `scope | finding | outcome | blocker | pointer`, carry a disposition and one-line reason, and name concrete repeated reads, re-dispatched units, or retried commands when wasted effort is observed.
 

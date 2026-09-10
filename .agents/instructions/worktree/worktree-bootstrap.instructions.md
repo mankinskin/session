@@ -55,7 +55,7 @@ Both commands must be empty; otherwise commit or stash the tracked changes first
 
 `git worktree move` is unusable in this repository because every worktree contains five submodule linked worktrees. `worktree-ctl rename` uses filesystem relocation, top-level repair, and branch rename instead.
 
-The ordering is mandatory: `session_check_in` records `worktree_path` and `branch`, with no update surface or topic/slug field in [memory-api/crates/session-api/src/store.rs](memory-api/crates/session-api/src/store.rs). Renaming after check-in strands the stored path and branch.
+The ordering is mandatory: `session_check_in` records `worktree_path` and `branch`, with no update surface or topic/slug field in [memory-api/crates/session-api/src/store.rs](../../../crates/session-api/src/store.rs). Renaming after check-in strands the stored path and branch.
 
 Verify that the top-level repair kept every submodule populated:
 

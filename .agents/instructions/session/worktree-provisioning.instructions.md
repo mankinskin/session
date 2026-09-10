@@ -13,13 +13,13 @@ repository from the location of this instruction file, prompt absolute paths, a
 pasted artifact path, or an inherited current directory. “Main checkout” in
 this file means the selected target repository main checkout.
 
-The capture hook can provision a session worktree before the session's first tool call. Provisioning makes an isolated checkout available; it does not select the execution mode for the session. An agent uses a worktree only when the task needs explicit isolation under [AGENTS.md](../../../AGENTS.md#task-routing). VS Code loads [.github/hooks/hooks.json](../../../.github/hooks/hooks.json) through the `.chat.hookFilesLocations` setting in [.vscode/settings.json](../../../.vscode/settings.json). The registered binary is `session-capture-hook`, installed on `PATH` at `~/.cargo/bin/session-capture-hook`.
+The capture hook can provision a session worktree before the session's first tool call. Provisioning makes an isolated checkout available; it does not select the execution mode for the session. An agent uses a worktree only when the task needs explicit isolation under [AGENTS.md](../../../../../context-engine/AGENTS.md#task-routing). VS Code loads [.github/hooks/hooks.json](../../../../../context-engine/.github/hooks/hooks.json) through the `.chat.hookFilesLocations` setting in [.vscode/settings.json](../../../../../context-engine/.vscode/settings.json). The registered binary is `session-capture-hook`, installed on `PATH` at `~/.cargo/bin/session-capture-hook`.
 
 `SessionStart` is the event eager provisioning is primarily attached to, so a provisioned worktree may exist before the first prompt. If `SessionStart` was missed for a session (e.g. hooks were reconfigured mid-session, or the event never fired), the hook lazily provisions instead on the first later event that carries a session id and isn't `Stop` (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `SubagentStart`, `SubagentStop`) — `Stop` intentionally never provisions, so a session that never began capturing does not spring a fresh worktree into existence only at its end. The `UserPromptSubmit` timeout is 300 seconds to allow a cold provision.
 
 ## When To Create A Worktree
 
-Create a worktree only for worktree-backed implementation work under [AGENTS.md](../../../AGENTS.md#task-routing): overlapping active file ownership, requester-required branch isolation, or a planned Git operation requiring an independent branch. A multi-file change, a submodule, risk, or work expected to span sessions alone does not require a worktree. Small, self-contained work stays in the selected main checkout and does not call `session_check_in` or `board_check_in`.
+Create a worktree only for worktree-backed implementation work under [AGENTS.md](../../../../../context-engine/AGENTS.md#task-routing): overlapping active file ownership, requester-required branch isolation, or a planned Git operation requiring an independent branch. A multi-file change, a submodule, risk, or work expected to span sessions alone does not require a worktree. Small, self-contained work stays in the selected main checkout and does not call `session_check_in` or `board_check_in`.
 
 The agent that will perform the isolated task creates the worktree from the selected main checkout:
 
@@ -48,7 +48,7 @@ Then claim the task's files on the board. The session record is authoritative fo
 
 ## Capture Hook
 
-VS Code loads [.github/hooks/hooks.json](../../../.github/hooks/hooks.json) through [.vscode/settings.json](../../../.vscode/settings.json). `session-capture-hook --from-hook-stdin` accepts the Copilot hook payload and emits `{}` on success or intentional skip. It records session events and transcript capture without changing Git worktrees.
+VS Code loads [.github/hooks/hooks.json](../../../../../context-engine/.github/hooks/hooks.json) through [.vscode/settings.json](../../../../../context-engine/.vscode/settings.json). `session-capture-hook --from-hook-stdin` accepts the Copilot hook payload and emits `{}` on success or intentional skip. It records session events and transcript capture without changing Git worktrees.
 
 The hook uses `MCP_MAIN_CHECKOUT` when set, otherwise its current directory, to locate the main checkout. An explicit `--store-root` is honored. Without one, the resolver selects the registered worktree store when available and otherwise the main checkout `.session` store.
 
@@ -56,4 +56,4 @@ For hook diagnostics, inspect the tracing log at `$TMPDIR/session-capture-hook/s
 
 ## Worktree Lifecycle
 
-[worktree-workflow.instructions.md](../commit/worktree-workflow.instructions.md) owns branch creation, check-in, rebase, merge, and teardown. `worktree-ctl` supports `new`, `bootstrap`, `list`, `rebase`, `merge`, `sync`, `rename`, `finish`, `remove`, and `doctor`; run lifecycle mutations from the main checkout.
+[worktree-workflow.instructions.md](../worktree/worktree-workflow.instructions.md) owns branch creation, check-in, rebase, merge, and teardown. `worktree-ctl` supports `new`, `bootstrap`, `list`, `rebase`, `merge`, `sync`, `rename`, `finish`, `remove`, and `doctor`; run lifecycle mutations from the main checkout.

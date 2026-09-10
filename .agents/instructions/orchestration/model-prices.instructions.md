@@ -119,12 +119,12 @@ Sync rules:
 - The script rewrites `model_prices.json` **only** when `source_sha256` changes, so a routine sync is a no-op and produces no diff.
 - Treat `model_prices.json` as generated: commit the regenerated file, never hand-edit it. Fix pricing problems upstream or in the script.
 - Sync is a network operation. If it fails (offline, upstream down), fall back to the committed table, note that prices may be stale, and continue — do not block work on a failed sync.
-- A sync can **change tier assignments**. After a sync that produces a diff, re-check the canonical ladder in [model-routing.instructions.md](model-routing.instructions.md) against the new numbers. [orchestrator-delegation.instructions.md](orchestrator-delegation.instructions.md) references that ladder rather than duplicating it — keep it that way.
-- The table is a **vendor catalogue**, not the roster of models the current surface offers. Many priced models will be refused by `runSubagent`. Confirm availability before routing to a model you found here; see "Roster is not the catalogue" in [model-routing.instructions.md](model-routing.instructions.md).
+- A sync can **change tier assignments**. After a sync that produces a diff, re-check the canonical ladder in [model-routing.instructions.md](../../../../.agents/instructions/workflow/model-routing.instructions.md) against the new numbers. [orchestrator-delegation.instructions.md](../../../../.agents/instructions/workflow/orchestrator-delegation.instructions.md) references that ladder rather than duplicating it — keep it that way.
+- The table is a **vendor catalogue**, not the roster of models the current surface offers. Many priced models will be refused by `runSubagent`. Confirm availability before routing to a model you found here; see "Roster is not the catalogue" in [model-routing.instructions.md](../../../../.agents/instructions/workflow/model-routing.instructions.md).
 
 ## The Cost Gate
 
-The gate is a Rust MCP middleware, [workflow-tools/session/crates/mcp-toolmon](../../../workflow-tools/session/crates/mcp-toolmon). There is **no** `cost_gate.py`; earlier revisions of this file documented one that never shipped.
+The gate is a Rust MCP middleware, [workflow-tools/session/crates/mcp-toolmon](../../../crates/mcp-toolmon). There is **no** `cost_gate.py`; earlier revisions of this file documented one that never shipped.
 
 ```bash
 mcp-toolmon -- <real-server-command> [server args...]
@@ -137,7 +137,7 @@ mcp-toolmon -- <real-server-command> [server args...]
 - `caller_model` must be a real `model_id` key from the table (e.g. `claude-sonnet-5`, `gpt-5.3-codex`), not a vendor or product label like `copilot` or `anthropic`. An unrecognized id is **rejected**, so price awareness is never silently bypassed. A delegated sub-agent passes **its own** id, not the orchestrator's.
 - Configure via `COST_GATE_TABLE` (required for enforcement), `COST_GATE_TOOL_METRICS`, `COST_GATE_GRANTS_DIR`, `COST_GATE_SCALE_MAX`, `COST_GATE_BUDGET_ZERO_PRICE`.
 - The gate **fails open** when the price table is missing or unreadable — it becomes a transparent passthrough. A silently permissive gate looks identical to a correctly permissive one; verify `COST_GATE_TABLE` resolves before concluding that routing is unrestricted.
-- **The gate does not see `runSubagent`.** It only intercepts MCP `tools/call` traffic, so it governs *which tools a model may call*, not *which model receives a delegated unit*. Dispatch-target selection is routing judgement — see the tier ladder in [model-routing.instructions.md](model-routing.instructions.md).
+- **The gate does not see `runSubagent`.** It only intercepts MCP `tools/call` traffic, so it governs *which tools a model may call*, not *which model receives a delegated unit*. Dispatch-target selection is routing judgement — see the tier ladder in [model-routing.instructions.md](../../../../.agents/instructions/workflow/model-routing.instructions.md).
 - After changing gate logic, run `cargo test -p mcp-toolmon` before relying on it.
 
 ## When Prices Move

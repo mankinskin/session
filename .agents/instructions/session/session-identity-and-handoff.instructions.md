@@ -76,7 +76,7 @@ further read, write, build, or validation command.
 
 ## Claim Order
 
-For a worktree-backed task, bootstrap the worktree, rename to the topic slug, run `session_check_in` and `board_check_in`, then make the first edit. The rename must precede `session_check_in`, or the stored path is stranded. [worktree-claim.instructions.md](../commit/worktree-claim.instructions.md) is the canonical owner of the claim commands, and [worktree-bootstrap.instructions.md](../commit/worktree-bootstrap.instructions.md) owns the rename sequence. [worktree-provisioning.instructions.md](worktree-provisioning.instructions.md) explains how the hook provisions the `<uuid>/session` placeholder. A main-checkout task skips those worktree-specific claims after checking that no active board entry owns the path.
+For a worktree-backed task, bootstrap the worktree, rename to the topic slug, run `session_check_in` and `board_check_in`, then make the first edit. The rename must precede `session_check_in`, or the stored path is stranded. [worktree-claim.instructions.md](../worktree/worktree-claim.instructions.md) is the canonical owner of the claim commands, and [worktree-bootstrap.instructions.md](../worktree/worktree-bootstrap.instructions.md) owns the rename sequence. [worktree-provisioning.instructions.md](worktree-provisioning.instructions.md) explains how the hook provisions the `<uuid>/session` placeholder. A main-checkout task skips those worktree-specific claims after checking that no active board entry owns the path.
 
 ### Check-in registers an explicit worktree
 
@@ -96,11 +96,11 @@ session: <uuid> | checkout: main | ticket: <short-id> <title>
 
 Resolve every placeholder from the current session and its claimed ticket; never copy values from a previous transcript or instruction example. Main-checkout tasks do not invent a worktree or branch in the footer.
 
-The footer applies to sub-agents too: a sub-agent's single returned message carries the footer, so a write-and-die Worker's one step remains attributable after the session is gone. See [write-and-die.instructions.md](../orchestration/write-and-die.instructions.md).
+The footer applies to sub-agents too: a sub-agent's single returned message carries the footer, so a write-and-die Worker's one step remains attributable after the session is gone. See [write-and-die.instructions.md](../../../../.agents/instructions/workflow/write-and-die.instructions.md).
 
 ## Inspecting a Prior Session
 
-[session-artifacts.instructions.md](../orchestration/session-artifacts.instructions.md) owns the precedence rule: read durable artifacts first (ticket, then spec, then handoff package); use a bounded transcript slice only when durable artifacts are insufficient; never dump a raw transcript.
+[session-artifacts.instructions.md](../../../../.agents/instructions/workflow/session-artifacts.instructions.md) owns the precedence rule: read durable artifacts first (ticket, then spec, then handoff package); use a bounded transcript slice only when durable artifacts are insufficient; never dump a raw transcript.
 
 Which sessions touched a ticket:
 
@@ -152,7 +152,7 @@ The structured form is `handoff.json` in the same directory. `session.exe handof
 
 ### Normalize what you find
 
-Convert every prior-session finding to `scope | finding | outcome | blocker | pointer` before carrying the finding forward, as required by [session-artifacts.instructions.md](../orchestration/session-artifacts.instructions.md).
+Convert every prior-session finding to `scope | finding | outcome | blocker | pointer` before carrying the finding forward, as required by [session-artifacts.instructions.md](../../../../.agents/instructions/workflow/session-artifacts.instructions.md).
 
 ## Known Defect
 
