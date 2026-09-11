@@ -9,7 +9,7 @@ agent: "agent"
 
 Help the user orient in the current checkout or bootstrap a fresh one without skipping the repository workflow.
 
-Reference [README](../../README.md), [AGENTS](../../../../context-engine/AGENTS.md), [session-optimization instructions](../instructions/session/session-optimization.instructions.md), [spec-cli](../../../../context-engine/memory-api/tools/cli/spec-cli/README.md), [ticket-cli](../../../../context-engine/memory-api/tools/cli/ticket-cli/README.md), [audit-cli](../../../audit/crates/audit-cli/README.md), and [viewer-ctl](../../../viewer-api/viewer-ctl/README.md).
+Reference [README](../../README.md), [AGENTS](../../../AGENTS.md), [session-optimization instructions](../instructions/session/session-optimization.instructions.md), [spec-cli](../../../../context-engine/memory-api/tools/cli/spec-cli/README.md), [ticket-cli](../../../../context-engine/memory-api/tools/cli/ticket-cli/README.md), [audit-cli](../../../audit/crates/audit-cli/README.md), and [viewer-ctl](../../../viewer-api/viewer-ctl/README.md).
 
 ## Workflow
 

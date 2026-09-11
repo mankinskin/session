@@ -10,7 +10,7 @@ Multiple agents editing the same checkout at the same time is the failure mode t
 
 ## When This Applies
 
-Use this protocol only after choosing a worktree for concrete isolation: overlapping active file ownership, requester-required branch isolation, or a planned Git operation that needs an independent branch. [AGENTS.md](../../../../../context-engine/AGENTS.md#task-routing) makes the main checkout the default after a board check. Ticket size, file count, submodules, and risk alone do not trigger this protocol.
+Use this protocol only after choosing a worktree for concrete isolation: overlapping active file ownership, requester-required branch isolation, or a planned Git operation that needs an independent branch. [AGENTS.md](../../../../AGENTS.md#task-routing) makes the main checkout the default after a board check. Ticket size, file count, submodules, and risk alone do not trigger this protocol.
 
 Before this protocol starts, resolve the target repository from the active VS
 Code workspace root and verify the candidate with `git -C <candidate> rev-parse
