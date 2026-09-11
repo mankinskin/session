@@ -35,11 +35,21 @@ if [[ -z "$auditor" ]]; then
 fi
 
 if [[ -z "$auditor" ]]; then
-    echo "pre-commit: audit links command unavailable; build audit-cli or set AUDIT_BIN" >&2
+    echo "pre-commit: audit hook command unavailable; build audit-cli or set AUDIT_BIN" >&2
     exit 1
 fi
 
-if ! "$auditor" links "$repo_root"; then
-    echo "pre-commit: Markdown link-coherence check failed; repair the reported guidance links" >&2
+audit_root="$repo_root"
+while superproject_root="$(git -C "$audit_root" rev-parse --show-superproject-working-tree 2>/dev/null)"; do
+    if [[ -n "$superproject_root" ]]; then
+        audit_root="$superproject_root"
+    else
+        break
+    fi
+done
+
+if ! "$auditor" hook "$audit_root"; then
+    echo "pre-commit: guidance audit hook failed; repair the reported findings" >&2
+    echo "pre-commit: try: install-ctl guidance autofix --repo-root $audit_root --apply --yes" >&2
     exit 1
 fi
