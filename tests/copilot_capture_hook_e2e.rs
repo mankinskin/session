@@ -49,7 +49,7 @@ fn create_fixture_checkout(path: &std::path::Path) {
             .expect("run git fixture command");
         assert!(status.success(), "git fixture command should succeed");
     }
-    fs::create_dir_all(path.join(".session"))
+        fs::create_dir_all(path.join(".workflow-tools/session"))
         .expect("create fixture session store");
 }
 
@@ -112,7 +112,7 @@ fn e2e_session_start_captures_a_fresh_session_in_main_checkout() {
     );
     assert!(
         checkout
-            .join(".session")
+            .join(".workflow-tools/session")
             .join("sessions")
             .join(&session_id)
             .is_dir(),
@@ -120,7 +120,7 @@ fn e2e_session_start_captures_a_fresh_session_in_main_checkout() {
     );
     assert!(
         checkout
-            .join(".session")
+            .join(".workflow-tools/session")
             .join("sessions")
             .join(session_id)
             .join("session.json")
@@ -147,7 +147,7 @@ fn e2e_session_start_captures_a_fresh_session_in_main_checkout() {
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
             checkout
-                .join(".session")
+                .join(".workflow-tools/session")
                 .join("sessions")
                 .join(session_id)
                 .join("events.json"),
@@ -167,7 +167,7 @@ fn e2e_session_start_captures_a_fresh_session_in_main_checkout() {
     let main_events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
             checkout
-                .join(".session")
+                .join(".workflow-tools/session")
                 .join("sessions")
                 .join(session_id)
                 .join("events.json"),
@@ -208,7 +208,7 @@ fn e2e_session_start_captures_a_fresh_session_in_main_checkout() {
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
             checkout
-                .join(".session")
+                .join(".workflow-tools/session")
                 .join("sessions")
                 .join(session_id)
                 .join("events.json"),
@@ -287,7 +287,7 @@ fn e2e_session_start_captures_in_main_checkout_when_provisioning_fails() {
         !checkout.join(".worktrees").exists(),
         "unassigned sessions must not create a worktree"
     );
-    let record = SessionStoreConfig::new(checkout.join(".session"))
+    let record = SessionStoreConfig::new(checkout.join(".workflow-tools/session"))
         .read_session(session_id)
         .expect("capture should persist in the main checkout store");
     assert_eq!(
@@ -303,7 +303,7 @@ fn e2e_session_start_registers_in_main_checkout_without_disturbing_other_session
     let checkout = fixture.path().join("checkout");
     create_fixture_checkout(&checkout);
     let decoy = checkout
-        .join(".session")
+        .join(".workflow-tools/session")
         .join("sessions")
         .join("different-session")
         .join("session.json");
@@ -342,7 +342,7 @@ fn e2e_session_start_registers_in_main_checkout_without_disturbing_other_session
     // existing record.
     assert!(
         checkout
-            .join(".session")
+            .join(".workflow-tools/session")
             .join("sessions")
             .join(session_id)
             .join("session.json")
@@ -424,7 +424,7 @@ fn e2e_empty_transcript_skips_capture_and_persists_session_events() {
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
             checkout
-                .join(".session")
+                .join(".workflow-tools/session")
                 .join("sessions")
                 .join(session_id)
                 .join("events.json"),
@@ -528,7 +528,7 @@ fn e2e_missing_transcript_session_start_and_stop_do_not_provision() {
     let events: PersistedSessionEvents = serde_json::from_str(
         &fs::read_to_string(
             prompt_checkout
-                .join(".session")
+                .join(".workflow-tools/session")
                 .join("sessions")
                 .join(prompt_session_id)
                 .join("events.json"),
@@ -605,7 +605,7 @@ fn e2e_user_prompt_submit_captures_in_main_checkout_without_session_start() {
     );
     assert!(
         checkout
-            .join(".session")
+            .join(".workflow-tools/session")
             .join("sessions")
             .join(&session_id)
             .join("session.json")
@@ -637,7 +637,7 @@ fn e2e_user_prompt_submit_self_heals_a_deleted_main_checkout_registration() {
     );
     assert!(output.status.success());
     let main_record = checkout
-        .join(".session")
+        .join(".workflow-tools/session")
         .join("sessions")
         .join(session_id)
         .join("session.json");
@@ -777,7 +777,7 @@ fn e2e_session_start_with_external_store_does_not_provision_cwd_checkout() {
             .expect("run git fixture command");
         assert!(status.success(), "git fixture command should succeed");
     }
-    fs::create_dir_all(cwd_checkout.path().join(".session"))
+    fs::create_dir_all(cwd_checkout.path().join(".workflow-tools/session"))
         .expect("create cwd session store");
 
     let hook_bin = std::env::var("CARGO_BIN_EXE_session-capture-hook")
@@ -1387,7 +1387,7 @@ fn e2e_capture_hook_script_persists_fixture_from_nested_workspace_cwd() {
     );
 
     let leaked_root_manifest = repo_root
-        .join(".session")
+        .join(".workflow-tools/session")
         .join("sessions")
         .join(&session_id)
         .join("session.json");

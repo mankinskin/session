@@ -25,7 +25,7 @@ use session_api::{
 };
 use memory_kernel::workspace::{
     CANONICAL_STORES_DIR,
-    resolve_store_root_at_fixed_workspace,
+    canonical_store_root,
 };
 use session_workspace_resolver::{
     ResolveRequest,
@@ -34,20 +34,13 @@ use session_workspace_resolver::{
 };
 use ticket_api::storage::TicketStore;
 
-/// Domain store directory name passed to the workspace resolvers, which map it
-/// onto the canonical `.workflow-tools/session` layout when that exists.
+/// Domain store directory name passed to the workspace resolvers.
 const SESSION_STORE_DIR: &str = ".session";
 
-/// Resolves the session store at a fixed checkout, preferring the canonical
-/// `.workflow-tools/session` layout over the legacy `.session` tree.
+/// Returns the canonical session store, creating new capture state beneath
+/// `.workflow-tools/session` rather than resurrecting a legacy `.session` tree.
 fn session_store_root_at(checkout: &Path) -> PathBuf {
-    resolve_store_root_at_fixed_workspace(checkout, SESSION_STORE_DIR)
-}
-
-/// Returns the session store at `checkout` only when it already exists.
-fn existing_session_store_root(checkout: &Path) -> Option<PathBuf> {
-    let store_root = session_store_root_at(checkout);
-    store_root.is_dir().then_some(store_root)
+    canonical_store_root(checkout, SESSION_STORE_DIR)
 }
 
 /// Returns the checkout that owns a resolved session store, stepping over the
@@ -670,13 +663,7 @@ fn resolve_capture_store_root(
         },
     };
     let anchor = anchor_checkout(&current_dir);
-    let Some(main_store_root) = existing_session_store_root(&anchor) else {
-        eprintln!(
-            "[session-capture-hook] capture skipped: no session store beneath '{}'; refusing to write a default session store",
-            anchor.display()
-        );
-        return None;
-    };
+    let main_store_root = session_store_root_at(&anchor);
     let resolver = match SessionWorkspaceResolver::new(ResolverConfig {
         main_checkout: anchor,
         workspace_path: "default".to_string(),
@@ -694,8 +681,8 @@ fn resolve_capture_store_root(
         relative_workspace: None,
         store_dir: SESSION_STORE_DIR,
     }) {
-        Ok(workspace) => match workspace.mutation_store_root(SESSION_STORE_DIR) {
-            Ok(store_root) => Some(store_root),
+        Ok(workspace) => match workspace.require_mutation_target() {
+            Ok(()) => Some(session_store_root_at(workspace.target_root())),
             Err(error) => {
                 eprintln!(
                     "[session-capture-hook] capture skipped: could not resolve worktree session store: {error}"
@@ -799,9 +786,7 @@ fn mirror_worktree_assignment_to_main(
     let Some(anchor) = anchor_checkout_for_worktree(worktree_root) else {
         return;
     };
-    let Some(main_store_root) = existing_session_store_root(&anchor) else {
-        return;
-    };
+    let main_store_root = session_store_root_at(&anchor);
     let record = match config.read_session(session_id) {
         Ok(record) => record,
         Err(error) => {
@@ -921,7 +906,7 @@ mod tests {
             &main_checkout,
             "44444444-4444-4444-8444-444444444444",
         );
-        std::fs::create_dir_all(main_checkout.join(".session")).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session")).unwrap();
         let original_cwd = std::env::current_dir().unwrap();
         let original_main_checkout = env::var_os("MCP_MAIN_CHECKOUT");
         unsafe { env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
@@ -955,14 +940,14 @@ mod tests {
                 None => env::remove_var("MCP_MAIN_CHECKOUT"),
             }
         }
-        assert_eq!(store_root, worktree.join(".session"));
+        assert_eq!(store_root, worktree.join(".workflow-tools/session"));
         let record = config.read_session(&plan.record.session_id).expect(
             "captured session should be readable from the worktree store",
         );
         assert_eq!(record.session_id, plan.record.session_id);
         assert!(
             !main_checkout
-                .join(".session")
+                .join(".workflow-tools/session")
                 .join("sessions")
                 .join(&plan.record.session_id)
                 .exists(),
@@ -971,7 +956,7 @@ mod tests {
     }
 
     #[test]
-    fn capture_without_assignment_uses_main_checkout() {
+    fn capture_without_assignment_uses_canonical_main_store_when_legacy_exists() {
         let _env_lock = ENV_LOCK.lock().unwrap();
         let fixture = tempdir().unwrap();
         let main_checkout = fixture.path().join("main");
@@ -986,7 +971,7 @@ mod tests {
 
         assert_eq!(
             resolve_capture_store_root(None, Some("missing")),
-            Some(main_checkout.join(".session"))
+            Some(main_checkout.join(".workflow-tools/session"))
         );
         unsafe {
             match original_main_checkout {
@@ -1036,11 +1021,6 @@ mod tests {
     }
 
     #[test]
-    fn capture_with_inactive_assignment_does_not_write_main_checkout() {
-        assert_eq!(resolve_capture_store_root(None, Some("inactive")), None);
-    }
-
-    #[test]
     fn capture_store_resolution_ignores_process_current_directory() {
         let _cwd_lock = CWD_LOCK.lock().unwrap();
         let _env_lock = ENV_LOCK.lock().unwrap();
@@ -1050,7 +1030,7 @@ mod tests {
             &main_checkout,
             "55555555-5555-4555-8555-555555555555",
         );
-        std::fs::create_dir_all(main_checkout.join(".session")).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session")).unwrap();
         let unrelated = fixture.path().join("unrelated");
         std::fs::create_dir_all(&unrelated).unwrap();
         let original_cwd = std::env::current_dir().unwrap();
@@ -1070,7 +1050,7 @@ mod tests {
                 None => env::remove_var("MCP_MAIN_CHECKOUT"),
             }
         }
-        assert_eq!(result, Some(worktree.join(".session")));
+        assert_eq!(result, Some(worktree.join(".workflow-tools/session")));
     }
 
     #[test]
