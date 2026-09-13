@@ -8,6 +8,7 @@ applyTo: "**"
 - The Copilot session UUID is the only session identifier. The UUID comes from the Copilot hook payload and keys the on-disk record directory `.session/sessions/<session-uuid>/`.
 - Session IDs must be UUIDs. A slug-shaped value is rejected; session identity must always be supplied explicitly, with no marker-file or other fallback.
 - Runtime state (`active_run_id`, `runs`, `pinned_entities`, and `workflow`) lives in `.session/sessions/<session-uuid>/session.json`.
+- Pinned entities use the canonical URN scheme `ce://<workspace>/<store>/<entity>` (e.g. `ce://default/ticket/<id>`, `ce://default/spec/<id>`, `ce://default/rule/<id>`, `ce://default/dossier/<folder-name>`). Raw filesystem paths (e.g. `path:...`) are rejected by `session_runtime_pin`.
 - When a task chooses worktree isolation, new worktrees are named `.worktrees/<session-uuid>/<slug>` and branches are named `agent/<session-uuid>/<slug>`. Existing flat `.worktrees/<session-short-id>-<slug>` worktrees remain supported during transition and are not migrated. Positional discovery selects nested first; more than one valid slug directory for one UUID is `AmbiguousSessionWorktree`.
 
 ## Resolve The Target Repository Before The Session Checkout

@@ -68,6 +68,7 @@ pub enum SessionPinnedEntityKind {
     Ticket,
     Spec,
     Rule,
+    Dossier,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

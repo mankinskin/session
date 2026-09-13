@@ -25,7 +25,6 @@ fn runtime_init_writes_an_idempotent_store_local_ignore_rule() {
 
     let config = session_api::SessionStoreConfig::new(
         repo_root.join(".session"),
-        "test-workspace",
     );
     for _ in 0..2 {
         config

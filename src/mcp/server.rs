@@ -256,6 +256,7 @@ pub struct RuntimePinInput {
     /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
+    /// Canonical entity URN in `ce://<workspace>/<store>/<entity>` format (e.g. `ce://default/ticket/<ticket-id>`, `ce://default/spec/<spec-id>`, `ce://default/rule/<rule-id>`, or `ce://default/dossier/<folder-or-slug>`).
     pub entity_urn: String,
     #[serde(default)]
     pub relation: Option<String>,
@@ -268,6 +269,7 @@ pub struct RuntimeUnpinInput {
     /// Concrete workspace path, repo root, .session store path, or path inside that store. Do not use omitted, empty, 'default', or '..' for entity creation; use '.' explicitly to target the MCP server process's current working directory.
     pub workspace: String,
     pub session_id: String,
+    /// Canonical entity URN in `ce://<workspace>/<store>/<entity>` format to unpin.
     pub entity_urn: String,
 }
 

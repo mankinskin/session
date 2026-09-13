@@ -487,6 +487,7 @@ pub struct ResumeArgs {
 pub struct PinArgs {
     #[arg(long)]
     pub session_id: String,
+    /// Canonical entity URN in `ce://<workspace>/<store>/<entity>` format (e.g. `ce://default/ticket/<id>`, `ce://default/dossier/<slug>`).
     #[arg(long)]
     pub entity_urn: String,
     #[arg(long)]
@@ -499,6 +500,7 @@ pub struct PinArgs {
 pub struct UnpinArgs {
     #[arg(long)]
     pub session_id: String,
+    /// Canonical entity URN in `ce://<workspace>/<store>/<entity>` format to unpin.
     #[arg(long)]
     pub entity_urn: String,
 }
