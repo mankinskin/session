@@ -71,7 +71,7 @@ fn build_session_fixture(
     fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR))
         .expect("create target .session dir");
 
-    let store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR), WORKSPACE_PATH);
+    let store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
 
     let ids: Vec<Uuid> = (0..entity_count)
         .map(|_| {

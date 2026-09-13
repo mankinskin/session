@@ -216,10 +216,8 @@ fn session_is_unassigned(
     repository_root: &Path,
     session_id: &str,
 ) -> Result<bool, String> {
-    let config = SessionStoreConfig::new(
-        repository_root.join(DEFAULT_STORE_DIR),
-        "default",
-    );
+    let config =
+        SessionStoreConfig::new(repository_root.join(DEFAULT_STORE_DIR));
     match config.read_session(session_id) {
         Ok(record) => Ok(match record.metadata.worktree {
             None => true,
