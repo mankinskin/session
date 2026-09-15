@@ -5,6 +5,7 @@ pub mod escalation;
 pub mod follow_up;
 pub mod grants;
 pub mod hook;
+pub mod kernel_adapter;
 pub mod model;
 pub mod move_domain;
 pub mod peek;
@@ -70,6 +71,13 @@ pub use hook::{
     copilot_payload_from_transcript_path,
     copilot_payload_from_transcript_path_with_tool_response_override,
     copilot_payload_from_transcript_reader,
+};
+pub use kernel_adapter::{
+    HookEventEnvelopeError,
+    envelope_from_hook_event,
+    session_domain_id,
+    session_domain_manifest,
+    session_entity_type_id,
 };
 pub use model::{
     HandoffBacklogFilter,
