@@ -32,7 +32,7 @@ fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
     config
         .pin_runtime_entity(
             &workspace_id,
-            &format!("ce://context-engine/rules/{later_id}"),
+            &format!("ce://default/rules/{later_id}"),
             None,
             None,
         )
@@ -40,7 +40,7 @@ fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
     config
         .pin_runtime_entity(
             &workspace_id,
-            "ce://context-engine/tickets/11111111-1111-4111-8111-111111111111",
+            "ce://default/tickets/11111111-1111-4111-8111-111111111111",
             None,
             None,
         )
@@ -48,7 +48,7 @@ fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
     config
         .pin_runtime_entity(
             &workspace_id,
-            &format!("ce://context-engine/rules/{earlier_id}"),
+            &format!("ce://default/rules/{earlier_id}"),
             None,
             None,
         )
@@ -78,7 +78,7 @@ fn pinned_rule_render_skips_missing_rule() {
     config
         .pin_runtime_entity(
             &init.context.session_id,
-            "ce://context-engine/rules/22222222-2222-4222-8222-222222222222",
+            "ce://default/rules/22222222-2222-4222-8222-222222222222",
             None,
             None,
         )
@@ -102,7 +102,7 @@ fn pinned_rule_render_succeeds_when_rule_store_is_absent() {
     config
         .pin_runtime_entity(
             &init.context.session_id,
-            "ce://context-engine/rules/22222222-2222-4222-8222-222222222222",
+            "ce://default/rules/22222222-2222-4222-8222-222222222222",
             None,
             None,
         )

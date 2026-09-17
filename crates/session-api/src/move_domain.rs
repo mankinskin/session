@@ -12,12 +12,16 @@ use std::path::{
 
 use memory_kernel::storage::move_kernel::{
     self,
+    load_move_set_journal,
     MoveDomain,
     MoveError,
     MoveOutcome,
     MovePlan,
     MoveReferences,
     MoveResult,
+    MoveSetExecutionPhase,
+    MoveSetOutcome,
+    MoveSetPlan,
 };
 use uuid::Uuid;
 
@@ -183,6 +187,65 @@ impl SessionStoreConfig {
         let domain = SessionMoveDomain::new(self);
         move_kernel::rollback_move(&domain, journal_id).map_err(from_move_error)
     }
+
+    /// Build one normalized read-only preflight plan for a set of UUID
+    /// session ids, reusing the domain-neutral kernel's set-level batching
+    /// (shared store root/git topology resolution instead of per-entity
+    /// recomputation). Rejects an empty selection; deterministically
+    /// dedupes/sorts the rest.
+    pub fn plan_move_set(
+        &self,
+        session_ids: &[Uuid],
+        target_workspace_root: &Path,
+    ) -> Result<MoveSetPlan, SessionError> {
+        let domain = SessionMoveDomain::new(self);
+        move_kernel::plan_move_set(&domain, session_ids, target_workspace_root)
+            .map_err(from_move_error)
+    }
+
+    /// Execute a supported normalized set move with one shared lock
+    /// lifecycle covering every session in the set.
+    pub fn execute_move_set(
+        &self,
+        plan: &MoveSetPlan,
+    ) -> Result<MoveSetOutcome, SessionError> {
+        let domain = SessionMoveDomain::new(self);
+        move_kernel::execute_move_set(&domain, plan).map_err(from_move_error)
+    }
+
+    /// Resume an interrupted set move from its journal id. A journal that
+    /// already reached `Validated`/`RolledBack` short-circuits to its
+    /// recorded outcome instead of re-entering the kernel's execution loop
+    /// with an empty (already-cleared) entity-plan list.
+    pub fn resume_move_set(
+        &self,
+        journal_id: Uuid,
+    ) -> Result<MoveSetOutcome, SessionError> {
+        let existing = load_move_set_journal(&self.root, journal_id).map_err(from_move_error)?;
+        if matches!(
+            existing.phase,
+            MoveSetExecutionPhase::Validated | MoveSetExecutionPhase::RolledBack
+        ) {
+            let session_ids = existing.entity_ids.clone();
+            return Ok(MoveSetOutcome {
+                journal: existing,
+                entity_ids: session_ids,
+                entity_outcomes: Vec::new(),
+            });
+        }
+        let domain = SessionMoveDomain::new(self);
+        move_kernel::resume_move_set(&domain, journal_id).map_err(from_move_error)
+    }
+
+    /// Roll back a completed or partially completed set move, identified by
+    /// the set journal id.
+    pub fn rollback_move_set(
+        &self,
+        journal_id: Uuid,
+    ) -> Result<MoveSetOutcome, SessionError> {
+        let domain = SessionMoveDomain::new(self);
+        move_kernel::rollback_move_set(&domain, journal_id).map_err(from_move_error)
+    }
 }
 
 #[cfg(test)]
@@ -277,5 +340,189 @@ mod tests {
                 .session_id,
             session_id.to_string()
         );
+    }
+
+    #[test]
+    fn plan_move_set_rejects_empty_selection() {
+        let temp = tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        run_git(&repo, &["init"]);
+
+        let source_workspace = repo.join("source");
+        let target_workspace = repo.join("target");
+        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+
+        let source_store =
+            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+
+        let error = source_store
+            .plan_move_set(&[], &target_workspace)
+            .unwrap_err();
+        assert!(error.to_string().contains("empty"));
+    }
+
+    #[test]
+    fn plan_move_set_normalizes_and_dedupes_selection() {
+        let temp = tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        run_git(&repo, &["init"]);
+
+        let source_workspace = repo.join("source");
+        let target_workspace = repo.join("target");
+        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+
+        let source_store =
+            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+
+        let first_id = Uuid::new_v4();
+        let second_id = Uuid::new_v4();
+        source_store
+            .persist_capture(sample_request(&first_id))
+            .unwrap();
+        source_store
+            .persist_capture(sample_request(&second_id))
+            .unwrap();
+
+        // Deliberately unsorted, with a duplicate entry.
+        let selection = [second_id, first_id, second_id];
+        let plan = source_store
+            .plan_move_set(&selection, &target_workspace)
+            .unwrap();
+
+        let mut expected = vec![first_id, second_id];
+        expected.sort();
+        assert_eq!(plan.entity_ids, expected);
+        assert_eq!(plan.entity_plans.len(), 2);
+    }
+
+    #[test]
+    fn execute_move_set_preserves_uuid_identity_and_transcript_files() {
+        let temp = tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        run_git(&repo, &["init"]);
+
+        let source_workspace = repo.join("source");
+        let target_workspace = repo.join("target");
+        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+
+        let source_store =
+            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+
+        let first_id = Uuid::new_v4();
+        let second_id = Uuid::new_v4();
+        source_store
+            .persist_capture(sample_request(&first_id))
+            .unwrap();
+        source_store
+            .persist_capture(sample_request(&second_id))
+            .unwrap();
+
+        let plan = source_store
+            .plan_move_set(&[first_id, second_id], &target_workspace)
+            .unwrap();
+        assert!(plan.supported(), "unexpected blockers: {:?}", plan.entity_plans);
+
+        let outcome = source_store.execute_move_set(&plan).unwrap();
+        assert_eq!(outcome.entity_ids, plan.entity_ids);
+        assert_eq!(outcome.entity_outcomes.len(), 2);
+        for entity_outcome in &outcome.entity_outcomes {
+            assert_eq!(entity_outcome.journal.phase, MoveExecutionPhase::Validated);
+        }
+
+        let target_store =
+            SessionStoreConfig::new(target_workspace.join(SESSION_INDEX_DIR));
+        for session_id in [first_id, second_id] {
+            assert!(matches!(
+                source_store.read_session(&session_id.to_string()),
+                Err(SessionError::NotFound { .. })
+            ));
+
+            let moved = target_store.read_session(&session_id.to_string()).unwrap();
+            assert_eq!(moved.session_id, session_id.to_string());
+
+            let paths = target_store
+                .paths_for_session_id(&session_id.to_string())
+                .unwrap();
+            assert!(paths.manifest_path.is_file());
+            assert!(paths.transcript_path.is_file());
+        }
+    }
+
+    #[test]
+    fn resume_move_set_short_circuits_after_validated() {
+        let temp = tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        run_git(&repo, &["init"]);
+
+        let source_workspace = repo.join("source");
+        let target_workspace = repo.join("target");
+        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+
+        let source_store =
+            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+
+        let session_id = Uuid::new_v4();
+        source_store
+            .persist_capture(sample_request(&session_id))
+            .unwrap();
+
+        let plan = source_store
+            .plan_move_set(&[session_id], &target_workspace)
+            .unwrap();
+        let outcome = source_store.execute_move_set(&plan).unwrap();
+        let journal_id = outcome.journal.id;
+
+        let resumed = source_store.resume_move_set(journal_id).unwrap();
+        assert_eq!(resumed.journal.id, journal_id);
+        assert_eq!(resumed.journal.phase, MoveSetExecutionPhase::Validated);
+        assert!(resumed.entity_outcomes.is_empty());
+    }
+
+    #[test]
+    fn rollback_move_set_restores_sessions_by_journal_id() {
+        let temp = tempdir().unwrap();
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).unwrap();
+        run_git(&repo, &["init"]);
+
+        let source_workspace = repo.join("source");
+        let target_workspace = repo.join("target");
+        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+
+        let source_store =
+            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+
+        let session_id = Uuid::new_v4();
+        source_store
+            .persist_capture(sample_request(&session_id))
+            .unwrap();
+
+        let plan = source_store
+            .plan_move_set(&[session_id], &target_workspace)
+            .unwrap();
+        let outcome = source_store.execute_move_set(&plan).unwrap();
+        let journal_id = outcome.journal.id;
+
+        let rolled_back = source_store.rollback_move_set(journal_id).unwrap();
+        assert_eq!(rolled_back.journal.id, journal_id);
+
+        let target_store =
+            SessionStoreConfig::new(target_workspace.join(SESSION_INDEX_DIR));
+        assert!(source_store
+            .read_session(&session_id.to_string())
+            .is_ok());
+        assert!(matches!(
+            target_store.read_session(&session_id.to_string()),
+            Err(SessionError::NotFound { .. })
+        ));
     }
 }

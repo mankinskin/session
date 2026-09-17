@@ -273,20 +273,34 @@ fn sibling_store_root(
 /// validated to reject empty, `.`, `..`, and path-separator segments before
 /// any path is built.
 fn resolve_workspace_store_root(
+    session_store_root: &Path,
+    own_workspace_path: &str,
     workspace_path: &str,
     sibling_store_dir: &str,
 ) -> Result<PathBuf, String> {
     let workspace_path = Path::new(workspace_path);
-    if !workspace_path.is_absolute() {
-        return Err(format!(
-            "workspace path `{}` must be absolute; migrate legacy slug URNs before resolution",
-            workspace_path.display()
+    if workspace_path.is_absolute() {
+        return Ok(memory_kernel::workspace::resolve_store_root_from(
+            workspace_path,
+            sibling_store_dir,
         ));
     }
-    Ok(memory_kernel::workspace::resolve_store_root_from(
-        workspace_path,
-        sibling_store_dir,
-    ))
+
+    let workspace = workspace_path.to_string_lossy();
+    if workspace == "default" || workspace == own_workspace_path {
+        return Ok(sibling_store_root(session_store_root, sibling_store_dir));
+    }
+    if workspace.is_empty()
+        || matches!(workspace.as_ref(), "." | "..")
+        || workspace.contains(['/', '\\'])
+    {
+        return Err(format!(
+            "workspace path `{workspace}` contains invalid path characters"
+        ));
+    }
+    Ok(sibling_store_base(session_store_root)
+        .join(workspace.as_ref())
+        .join(sibling_store_dir))
 }
 
 /// RAII guard that releases the runtime mutation lock on drop.
@@ -301,6 +315,7 @@ impl Drop for RuntimeMutationLock {
 }
 
 struct DefaultTicketStateResolver {
+    session_store_root: PathBuf,
     workspace_path: String,
     // Keyed by resolved store root path so path-equivalent URNs open each
     // store at most once.
@@ -318,7 +333,12 @@ impl DefaultTicketStateResolver {
         workspace_path: &str,
         f: impl FnOnce(&TicketStore) -> Result<T, String>,
     ) -> Result<T, String> {
-        let root = resolve_workspace_store_root(workspace_path, ".ticket")?;
+        let root = resolve_workspace_store_root(
+            &self.session_store_root,
+            &self.workspace_path,
+            workspace_path,
+            ".ticket",
+        )?;
         let mut stores = self.ticket_stores.lock().unwrap();
         if !stores.contains_key(&root) {
             if !root.exists() {
@@ -345,7 +365,12 @@ impl DefaultTicketStateResolver {
         workspace_path: &str,
         f: impl FnOnce(&SpecStore) -> Result<T, String>,
     ) -> Result<T, String> {
-        let root = resolve_workspace_store_root(workspace_path, ".spec")?;
+        let root = resolve_workspace_store_root(
+            &self.session_store_root,
+            &self.workspace_path,
+            workspace_path,
+            ".spec",
+        )?;
         let mut stores = self.spec_stores.lock().unwrap();
         if !stores.contains_key(&root) {
             let is_own_workspace = workspace_path == self.workspace_path;

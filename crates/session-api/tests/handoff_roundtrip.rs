@@ -67,7 +67,7 @@ fn open_escalations_field_persists_and_round_trips() {
         higher_level_objective: "Deliver the program objective".to_string(),
         upward_context: upward_context(),
         target_files: vec![
-            "workflow-tools/session/crates/session-api/src/lib.rs".to_string(),
+            "src/lib.rs".to_string(),
         ],
         decisions: vec!["Use async/await".to_string()],
         non_goals: vec!["No refactoring".to_string()],
@@ -130,7 +130,7 @@ fn empty_open_escalations_is_persisted_as_empty_list() {
         higher_level_objective: "Deliver the program objective".to_string(),
         upward_context: upward_context(),
         target_files: vec![
-            "workflow-tools/session/crates/session-api/src/error.rs".to_string(),
+            "crates/session-api/src/error.rs".to_string(),
         ],
         decisions: vec!["Use trait bounds".to_string()],
         non_goals: vec!["No optimization yet".to_string()],
@@ -168,7 +168,7 @@ fn validation_gate_command_field_persists_and_round_trips() {
         higher_level_objective: "Deliver the program objective".to_string(),
         upward_context: upward_context(),
         target_files: vec![
-            "workflow-tools/session/crates/session-api/src/store.rs".to_string(),
+            "crates/session-api/src/store.rs".to_string(),
         ],
         decisions: vec!["Use Criterion benchmarks".to_string()],
         non_goals: vec!["No UI tests".to_string()],
@@ -224,7 +224,7 @@ fn legacy_target_ticket_strings_and_absent_context_fields_deserialize() {
         higher_level_objective: "Deliver the program objective".to_string(),
         upward_context: upward_context(),
         target_files: vec![
-            "workflow-tools/session/crates/session-api/src/lib.rs".to_string(),
+            "src/lib.rs".to_string(),
         ],
         decisions: vec!["Use serde compatibility".to_string()],
         non_goals: vec!["No renderer changes".to_string()],
@@ -268,7 +268,7 @@ fn ready_handoff_missing_upward_context_fails_before_writing_files() {
         higher_level_objective: String::new(),
         upward_context: vec![],
         target_files: vec![
-            "workflow-tools/session/crates/session-api/src/lib.rs".to_string(),
+            "src/lib.rs".to_string(),
         ],
         decisions: vec!["Use serde".to_string()],
         non_goals: vec!["No renderer changes".to_string()],
@@ -306,7 +306,7 @@ fn non_ready_handoff_missing_upward_context_persists() {
         higher_level_objective: String::new(),
         upward_context: vec![],
         target_files: vec![
-            "workflow-tools/session/crates/session-api/src/lib.rs".to_string(),
+            "src/lib.rs".to_string(),
         ],
         decisions: vec!["Use serde".to_string()],
         non_goals: vec!["No renderer changes".to_string()],

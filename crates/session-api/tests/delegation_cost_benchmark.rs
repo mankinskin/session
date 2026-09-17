@@ -32,7 +32,7 @@ const BASELINE_SESSION_IDS: &[&str] = &[
 
 fn benchmark_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../../.benchmark/10d21210/baseline")
+    .join("../../.benchmark/10d21210/baseline")
 }
 
 fn checked_in_report_path() -> PathBuf {

@@ -87,9 +87,7 @@ fn handoff_persists_as_folder_with_json_and_markdown() {
         target_tickets: vec![target_ticket("ticket-123")],
         higher_level_objective: "Deliver the program objective".to_string(),
         upward_context: upward_context(),
-        target_files: vec![
-            "workflow-tools/session/crates/session-api/src/lib.rs".to_string(),
-        ],
+        target_files: vec!["src/lib.rs".to_string()],
         decisions: vec!["Use async/await".to_string()],
         non_goals: vec!["No refactoring".to_string()],
         context_anchors: vec!["Related PR #456".to_string()],
@@ -140,7 +138,7 @@ fn handoff_persists_as_folder_with_json_and_markdown() {
         "markdown should contain target ticket"
     );
     assert!(
-        md_content.contains("workflow-tools/session/crates/session-api/src/lib.rs"),
+        md_content.contains("src/lib.rs"),
         "markdown should contain target file"
     );
     assert!(
@@ -214,9 +212,7 @@ fn handoff_markdown_shows_open_escalations_warning() {
         target_tickets: vec![target_ticket("ticket-456")],
         higher_level_objective: String::new(),
         upward_context: vec![],
-        target_files: vec![
-            "workflow-tools/session/crates/session-api/src/error.rs".to_string(),
-        ],
+        target_files: vec!["crates/session-api/src/error.rs".to_string()],
         decisions: vec!["Decision made".to_string()],
         non_goals: vec!["Non-goal".to_string()],
         context_anchors: vec!["Anchor".to_string()],
@@ -270,9 +266,7 @@ fn legacy_flat_json_handoffs_still_load() {
         target_tickets: vec![target_ticket("ticket-789")],
         higher_level_objective: "Deliver the program objective".to_string(),
         upward_context: upward_context(),
-        target_files: vec![
-            "workflow-tools/session/crates/session-api/src/store.rs".to_string(),
-        ],
+        target_files: vec!["crates/session-api/src/store.rs".to_string()],
         decisions: vec!["Test decision".to_string()],
         non_goals: vec!["Test non-goal".to_string()],
         context_anchors: vec!["Test anchor".to_string()],

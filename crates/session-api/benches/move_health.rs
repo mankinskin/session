@@ -86,15 +86,26 @@ fn build_session_fixture(
     (store, target_workspace, ids)
 }
 
+fn benchmark_requested(name: &str) -> bool {
+    std::env::args()
+        .skip(1)
+        .find(|arg| !arg.starts_with('-'))
+        .is_none_or(|filter| name.contains(&filter))
+}
+
 // --- Entity count ---
 
 fn bench_session_move_preflight_by_entity_count(c: &mut Criterion) {
     for &entity_count in &[10usize, 50, 200] {
+        let name = format!("session_move_preflight_{entity_count}entities");
+        if !benchmark_requested(&name) {
+            continue;
+        }
         let workspace = MoveBenchmarkWorkspace::new();
         let (store, target_workspace, ids) = build_session_fixture(&workspace, entity_count);
         let id = ids[0];
         c.bench_function(
-            &format!("session_move_preflight_{entity_count}entities"),
+            &name,
             |b| {
                 b.iter(|| {
                     let plan = store
@@ -110,6 +121,9 @@ fn bench_session_move_preflight_by_entity_count(c: &mut Criterion) {
 // --- Phase separation ---
 
 fn bench_session_move_preflight_only(c: &mut Criterion) {
+    if !benchmark_requested("session_move_phase_preflight_only") {
+        return;
+    }
     let workspace = MoveBenchmarkWorkspace::new();
     let (store, target_workspace, ids) = build_session_fixture(&workspace, 1);
     let id = ids[0];
@@ -124,6 +138,9 @@ fn bench_session_move_preflight_only(c: &mut Criterion) {
 }
 
 fn bench_session_move_apply_only(c: &mut Criterion) {
+    if !benchmark_requested("session_move_phase_apply_only") {
+        return;
+    }
     let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_apply_only", |b| {
         iter_move_benchmark(
@@ -151,6 +168,9 @@ fn bench_session_move_apply_only(c: &mut Criterion) {
 }
 
 fn bench_session_move_preflight_plus_apply(c: &mut Criterion) {
+    if !benchmark_requested("session_move_phase_preflight_plus_apply") {
+        return;
+    }
     let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_preflight_plus_apply", |b| {
         iter_move_benchmark(
@@ -175,6 +195,9 @@ fn bench_session_move_preflight_plus_apply(c: &mut Criterion) {
 }
 
 fn bench_session_move_rollback(c: &mut Criterion) {
+    if !benchmark_requested("session_move_phase_rollback") {
+        return;
+    }
     let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_rollback", |b| {
         iter_move_benchmark(
@@ -210,6 +233,9 @@ fn bench_session_move_rollback(c: &mut Criterion) {
 /// public move API cannot synthesize a genuinely-interrupted move. See the
 /// module doc comment.
 fn bench_session_move_resume_idempotent_proxy(c: &mut Criterion) {
+    if !benchmark_requested("session_move_phase_resume_idempotent_proxy") {
+        return;
+    }
     let workspace = MoveBenchmarkWorkspace::new();
     c.bench_function("session_move_phase_resume_idempotent_proxy", |b| {
         iter_move_benchmark(

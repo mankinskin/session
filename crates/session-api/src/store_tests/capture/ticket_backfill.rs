@@ -608,6 +608,16 @@ fn backfill_transcript_dry_run_preserves_session_artifacts() {
     );
 
     let session_dir = store_root.join("sessions/session-dry-run");
+    let manifest_path = session_dir.join("session.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    manifest["metadata"]["workspace_path"] =
+        serde_json::Value::String(config.workspace_path.clone());
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).unwrap(),
+    )
+    .unwrap();
     let before_session = fs::read(session_dir.join("session.json")).unwrap();
     let before_transcript = fs::read(session_dir.join("transcript.json")).unwrap();
 

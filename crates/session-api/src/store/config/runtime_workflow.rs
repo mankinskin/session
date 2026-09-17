@@ -209,7 +209,9 @@ impl SessionStoreConfig {
                 .filter(|pin| pin.kind == SessionPinnedEntityKind::Rule)
             {
                 let parsed = parse_entity_urn(&pin.urn)?;
-                if parsed.workspace_path != self.workspace_path {
+                if parsed.workspace_path != "default"
+                    && parsed.workspace_path != self.workspace_path
+                {
                     return Err(SessionError::InvalidHookInput(format!(
                         "unsupported cross-workspace rule routing: URN workspace `{}` does not match session workspace `{}` ({})",
                         parsed.workspace_path, self.workspace_path, pin.urn

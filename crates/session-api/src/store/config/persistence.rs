@@ -233,6 +233,7 @@ impl SessionStoreConfig {
 
     fn default_ticket_state_resolver(&self) -> DefaultTicketStateResolver {
         DefaultTicketStateResolver {
+            session_store_root: self.root.clone(),
             workspace_path: self.workspace_path.clone(),
             ticket_stores: std::sync::Mutex::new(BTreeMap::new()),
             spec_stores: std::sync::Mutex::new(BTreeMap::new()),

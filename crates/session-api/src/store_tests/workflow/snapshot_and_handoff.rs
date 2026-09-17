@@ -72,6 +72,11 @@ fn workflow_snapshot_resolves_live_state_and_emits_missing_diagnostics() {
             .any(|diag| diag.node_id == "node-missing"
                 && diag.code == "ticket-state-unavailable")
     );
+    let target_file = tempdir
+        .path()
+        .join("store/src/model/handoff.rs");
+    std::fs::create_dir_all(target_file.parent().unwrap()).unwrap();
+    std::fs::write(&target_file, "fixture").unwrap();
 }
 
 #[test]
@@ -297,7 +302,6 @@ fn handoff_package_round_trip_persists_schema_fields() {
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
     let workspace_id = init.context.session_id;
-
     let package = crate::SessionHandoffPackage {
         objective: "Implement required-field enforcement".to_string(),
         target_tickets: vec![crate::SessionHandoffTargetTicket {
@@ -312,13 +316,11 @@ fn handoff_package_round_trip_persists_schema_fields() {
             title: "Program".to_string(),
             role: crate::SessionHandoffUpwardContextRole::Epic,
         }],
-        target_files: vec![
-            "workflow-tools/session/crates/session-api/src/model/handoff.rs".to_string(),
-        ],
+        target_files: vec!["src/lib.rs".to_string()],
         decisions: vec!["Use Option<SessionHandoffPackage> for backward compat"
             .to_string()],
         non_goals: vec!["UI/viewer representation".to_string()],
-        context_anchors: vec!["spec:5e52039d".to_string()],
+        context_anchors: vec!["src/lib.rs".to_string()],
         open_escalations: vec![],
         risk_notes: Some("Blocked on upstream ticket ownership".to_string()),
         predecessor_handoff: Some("handoff-previous-0001".to_string()),
@@ -370,7 +372,6 @@ fn handoff_package_with_nonexistent_target_file_fails_at_creation_time() {
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
     let workspace_id = init.context.session_id;
-
     let package = crate::SessionHandoffPackage {
         objective: "Implement a nonexistent-path regression".to_string(),
         target_tickets: vec![crate::SessionHandoffTargetTicket {
@@ -485,6 +486,11 @@ fn handoff_package_normalizes_backslash_target_files_to_forward_slash() {
         .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
         .unwrap();
     let workspace_id = init.context.session_id;
+    let target_file = tempdir
+        .path()
+        .join("store/src/model/handoff.rs");
+    std::fs::create_dir_all(target_file.parent().unwrap()).unwrap();
+    std::fs::write(&target_file, "fixture").unwrap();
 
     let package = crate::SessionHandoffPackage {
         objective: "Verify repo-root-relative forward-slash normalization"
@@ -504,14 +510,13 @@ fn handoff_package_normalizes_backslash_target_files_to_forward_slash() {
         // A real, existing repo file referenced with backslashes, as a
         // Windows-authored handoff payload might supply.
         target_files: vec![
-            "workflow-tools\\session\\crates\\session-api\\src\\model\\handoff.rs"
-                .to_string(),
+            "src\\lib.rs".to_string(),
         ],
         decisions: vec!["n/a".to_string()],
         non_goals: vec!["n/a".to_string()],
         // Store-qualified nested-store anchor (AC1: verified-to-exist path).
         context_anchors: vec![
-            "workflow-tools/session/crates/session-api/src/model/handoff.rs".to_string(),
+            "src/lib.rs".to_string(),
         ],
         open_escalations: vec![],
         risk_notes: None,
@@ -525,7 +530,7 @@ fn handoff_package_normalizes_backslash_target_files_to_forward_slash() {
     assert_eq!(
         record.target_files,
         vec![
-            "workflow-tools/session/crates/session-api/src/model/handoff.rs".to_string()
+            "src/lib.rs".to_string()
         ],
         "target_files must be normalized to forward-slash form"
     );

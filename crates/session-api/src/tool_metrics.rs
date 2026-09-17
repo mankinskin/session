@@ -1481,7 +1481,10 @@ mod tests {
         assert_eq!(ambiguous_tool.duration_ms_values, vec![50000]);
 
         // Aggregate and verify report
-        let window = ToolMetricsWindow::default();
+        let window = ToolMetricsWindow {
+            max_age_days: None,
+            max_sessions: None,
+        };
         let report = aggregate(vec![summary], window, &estimator);
 
         assert_eq!(report.tools.len(), 3);
@@ -1876,7 +1879,10 @@ mod tests {
 
         let report = aggregate(
             summaries,
-            ToolMetricsWindow::default(),
+            ToolMetricsWindow {
+                max_age_days: None,
+                max_sessions: None,
+            },
             &CharsPerTokenEstimator::default(),
         );
 
