@@ -1,0 +1,966 @@
+{
+  "3e9bc20b-4fe8-4996-ae7f-7be32525e429": {
+    "session_id": "3e9bc20b-4fe8-4996-ae7f-7be32525e429",
+    "subagent_count": 12,
+    "parent_tool_call_count": 5,
+    "parent_tools": {
+      "run_in_terminal": 5
+    },
+    "parent_shell_command_categories": {
+      "legitimate_dev": 2,
+      "other": 3
+    },
+    "subagents": [
+      {
+        "run_id": "toolu_0117CeVhdi9ArWKk8GPEFWJ7",
+        "agent_name": "Spec Agent",
+        "description": "Author spec for 41ff230b",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 21,
+        "tools": {
+          "list_dir": 1,
+          "mcp_spec-mcp_spec_create": 2,
+          "mcp_spec-mcp_spec_get": 2,
+          "mcp_spec-mcp_spec_list": 1,
+          "mcp_spec-mcp_spec_search": 1,
+          "mcp_spec-mcp_spec_tree": 1,
+          "mcp_ticket-mcp_get_ticket": 5,
+          "mcp_ticket-mcp_get_ticket_description": 5,
+          "read_file": 3
+        },
+        "failures": [
+          {
+            "tool_name": "mcp_spec-mcp_spec_create",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_011Csiqnu3zQ9gLLWtR5tHgd",
+        "agent_name": "Implement Agent",
+        "description": "Implement ticket 41ff230b",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 24,
+        "tools": {
+          "mcp_spec-mcp_spec_get": 1,
+          "mcp_spec-mcp_spec_list": 1,
+          "mcp_spec-mcp_spec_search": 2,
+          "mcp_test-mcp_test_record_execution": 4,
+          "mcp_test-mcp_test_record_spec": 4,
+          "mcp_ticket-mcp_get_ticket": 1,
+          "mcp_ticket-mcp_get_ticket_description": 1,
+          "read_file": 5,
+          "run_in_terminal": 4,
+          "send_to_terminal": 1
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 1,
+          "read_like_exploratory": 3
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/.session/runtime/workspaces/0101b7ef-e717-4c94-bebd-c8d55f6aaa82/handoffs/dcf86212-da18-4162-bcee-29967a527fe0.json",
+            "count": 5
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "mcp_test-mcp_test_record_spec",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "mcp_test-mcp_test_record_spec",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "mcp_test-mcp_test_record_execution",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "mcp_test-mcp_test_record_execution",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_011vxBZEEcXrTsLJUPxV5wVX",
+        "agent_name": "Testing Agent",
+        "description": "Record real validation specs",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 0,
+        "tools": {},
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_014mwKT3YqEbwfH4AmZYAd3c",
+        "agent_name": "Testing Agent",
+        "description": "Validate handoff test commands",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 0,
+        "tools": {},
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_0163NGtdJN483wu8k3cJmGZK",
+        "agent_name": "Explore Agent",
+        "description": "Verify validation gate schema",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 23,
+        "tools": {
+          "file_search": 2,
+          "grep_search": 8,
+          "read_file": 9,
+          "run_in_terminal": 4
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 2,
+          "legitimate_dev": 2
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/model/workflow.rs",
+            "count": 3
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/test-api/src/lib.rs",
+            "count": 3
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_017xWiG2RxpLHXkkeX1SQ8Jf",
+        "agent_name": "Handoff Agent",
+        "description": "Correct handoff validation section",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 28,
+        "tools": {
+          "file_search": 4,
+          "grep_search": 7,
+          "list_dir": 5,
+          "read_file": 2,
+          "run_in_terminal": 10
+        },
+        "shell_command_categories": {
+          "other": 5,
+          "read_like_exploratory": 5
+        },
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01CEM9tLns6aPeuT9cwiMn21",
+        "agent_name": "Audit Agent",
+        "description": "Verify spec and test results",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 29,
+        "tools": {
+          "file_search": 1,
+          "grep_search": 1,
+          "read_file": 4,
+          "run_in_terminal": 22,
+          "semantic_search": 1
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 2,
+          "legitimate_dev": 7,
+          "read_like_exploratory": 13
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/AppData/Roaming/Code/User/workspaceStorage/85c65471aaff0b651db0ce38f3719fa7/GitHub.copilot-chat/chat-session-resources/3e9bc20b-4fe8-4996-ae7f-7be32525e429/toolu_bdrk_01WJD9LpGpbUo3DUcVyEcn3r__vscode-1785109337458/content.txt",
+            "count": 2
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01EYic8YbfJnGKGEeKfnB4Zp",
+        "agent_name": "Explore Agent",
+        "description": "Audit commit file sweep",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 35,
+        "tools": {
+          "file_search": 3,
+          "grep_search": 9,
+          "list_dir": 1,
+          "read_file": 3,
+          "run_in_terminal": 19
+        },
+        "shell_command_categories": {
+          "legitimate_dev": 15,
+          "read_like_exploratory": 4
+        },
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01Gpgu4nC7tpr9WFCtr2P2Qp",
+        "agent_name": "Implement Agent",
+        "description": "Implement ticket 41ff230b",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 69,
+        "tools": {
+          "create_file": 2,
+          "read_file": 25,
+          "replace_string_in_file": 10,
+          "run_in_terminal": 32
+        },
+        "shell_command_categories": {
+          "legitimate_dev": 12,
+          "other": 1,
+          "read_like_exploratory": 19
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/subagent_rollup.rs",
+            "count": 6
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/.spec/specs/7be68a48-f4e5-49a2-b9a5-118f07b48b90/body.md",
+            "count": 4
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/lib.rs",
+            "count": 4
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/model/workflow.rs",
+            "count": 3
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/model.rs",
+            "count": 2
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01KS21Y61KoSGApvbj6sZgEA",
+        "agent_name": "Explore Agent",
+        "description": "Locate canonical handoff artifact",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 17,
+        "tools": {
+          "file_search": 2,
+          "grep_search": 4,
+          "list_dir": 3,
+          "read_file": 7,
+          "run_in_terminal": 1
+        },
+        "shell_command_categories": {
+          "read_like_exploratory": 1
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/.session/runtime/workspaces/0101b7ef-e717-4c94-bebd-c8d55f6aaa82/handoffs/dcf86212-da18-4162-bcee-29967a527fe0.json",
+            "count": 2
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01MSistpqU2sZ7N8yzGM6w2P",
+        "agent_name": "Implement Agent",
+        "description": "Fix canonical handoff validation",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 20,
+        "tools": {
+          "read_file": 6,
+          "replace_string_in_file": 1,
+          "run_in_terminal": 13
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 2,
+          "other": 3,
+          "read_like_exploratory": 8
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/.session/runtime/workspaces/0101b7ef-e717-4c94-bebd-c8d55f6aaa82/handoffs/dcf86212-da18-4162-bcee-29967a527fe0.json",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/model/handoff.rs",
+            "count": 2
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01RqXyFFfRnchFPrmxuGK4h6",
+        "agent_name": "Implement Agent",
+        "description": "Materialize spec and validation files",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 80,
+        "tools": {
+          "create_file": 2,
+          "read_file": 6,
+          "run_in_terminal": 72
+        },
+        "shell_command_categories": {
+          "cargo_run_cli": 16,
+          "cli_shadowing_mcp": 11,
+          "legitimate_dev": 3,
+          "other": 8,
+          "read_like_exploratory": 34
+        },
+        "repeat_commands": [
+          {
+            "key": "ls -la .spec/specs/7be68a48-f4e5-49a2-b9a5-118f07b48b90/",
+            "count": 2
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "create_file",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "create_file",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      }
+    ],
+    "cross_agent_duplicate_reads": [
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.session/runtime/workspaces/0101b7ef-e717-4c94-bebd-c8d55f6aaa82/handoffs/dcf86212-da18-4162-bcee-29967a527fe0.json",
+        "agent_count": 8,
+        "total_count": 14
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/model/workflow.rs",
+        "agent_count": 3,
+        "total_count": 7
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/src/model/handoff.rs",
+        "agent_count": 3,
+        "total_count": 4
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.session/runtime/workspaces/0101b7ef-e717-4c94-bebd-c8d55f6aaa82/handoffs/076408bf-0e61-4e34-9fee-516baca23d09.json",
+        "agent_count": 3,
+        "total_count": 3
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.spec/specs/7be68a48-f4e5-49a2-b9a5-118f07b48b90/body.md",
+        "agent_count": 2,
+        "total_count": 5
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/C:/Users/linus/git/3/meta-workspace/.workflow-tools/session/sessions/aaf84892-09e4-4be6-be4c-b360b140b15e/transcript.json",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/session-api/tests/delegated_session_data_collection.rs",
+        "agent_count": 2,
+        "total_count": 2
+      }
+    ],
+    "model_distribution": {
+      "Claude Sonnet 4.5 (copilot)": 12
+    },
+    "substitutable_shell_count": 77,
+    "exploratory_find_ls_count": 44,
+    "path_resolution_failures": 5,
+    "redispatch_count": 5,
+    "shell_command_categories": {
+      "cargo_run_cli": 16,
+      "cli_shadowing_mcp": 18,
+      "legitimate_dev": 41,
+      "other": 20,
+      "read_like_exploratory": 87
+    },
+    "mcp_tool_failure_fallback_count": 0,
+    "mcp_tool_discovery_failure_count": 17,
+    "mcp_tool_shadow_ambiguous_count": 1
+  },
+  "41966513-a8fa-4b44-98fa-9c57f0437cc0": {
+    "session_id": "41966513-a8fa-4b44-98fa-9c57f0437cc0",
+    "subagent_count": 13,
+    "parent_tool_call_count": 0,
+    "parent_tools": {},
+    "subagents": [
+      {
+        "run_id": "toolu_0111Hwi69BSyBJYyuPBZjvee",
+        "agent_name": "Audit Agent",
+        "description": "Investigate spec deletions",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 31,
+        "tools": {
+          "run_in_terminal": 31
+        },
+        "shell_command_categories": {
+          "legitimate_dev": 22,
+          "other": 4,
+          "read_like_exploratory": 5
+        },
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_011jXvXyToHDyTv4gfveHUUH",
+        "agent_name": "Explore Agent",
+        "description": "Verify wildcard tool grant reaches subagents",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 0,
+        "tools": {},
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_012bMvc337p4rhpGQ2WriZ3F",
+        "agent_name": "Implement Agent",
+        "description": "Extract compact-terminal-api crate",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 0,
+        "tools": {},
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_014wumuFjzaZx25rcqC9jfin",
+        "agent_name": "Spec Agent",
+        "description": "Promote spec and update traceability",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 18,
+        "tools": {
+          "mcp_spec-mcp_spec_get": 1,
+          "mcp_spec-mcp_spec_update": 3,
+          "mcp_ticket-mcp_get_ticket": 5,
+          "mcp_ticket-mcp_get_ticket_description": 1,
+          "mcp_ticket-mcp_subgraph": 1,
+          "mcp_ticket-mcp_update_ticket": 1,
+          "read_file": 2,
+          "replace_string_in_file": 3,
+          "run_in_terminal": 1
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 1
+        },
+        "failures": [
+          {
+            "tool_name": "mcp_spec-mcp_spec_update",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_0165HeG1kk9BnppG4RKyJzH1",
+        "agent_name": "Explore Agent",
+        "description": "Root-cause missing compact-terminal MCP server",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 65,
+        "tools": {
+          "create_file": 8,
+          "file_search": 4,
+          "grep_search": 9,
+          "read_file": 20,
+          "replace_string_in_file": 6,
+          "run_in_terminal": 18
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 6,
+          "legitimate_dev": 5,
+          "other": 3,
+          "read_like_exploratory": 4
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/src/server.rs",
+            "count": 3
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/Cargo.toml",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/Cargo.toml",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/peek-mcp/src/lib.rs",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/peek-mcp/src/server.rs",
+            "count": 2
+          }
+        ],
+        "repeat_commands": [
+          {
+            "key": "cd /c/Users/linus/git/graph_app/context-engine && cargo build -p compact-terminal-api 2>&1",
+            "count": 2
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_016xdEtDL3udppes5AQ6mKWy",
+        "agent_name": "Testing Agent",
+        "description": "Add compact-terminal-mcp integration tests",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 39,
+        "tools": {
+          "file_search": 2,
+          "grep_search": 7,
+          "list_dir": 2,
+          "read_file": 14,
+          "run_in_terminal": 14
+        },
+        "shell_command_categories": {
+          "legitimate_dev": 6,
+          "other": 1,
+          "read_like_exploratory": 7
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/src/server.rs",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/spec-mcp/src/server.rs",
+            "count": 2
+          }
+        ],
+        "repeat_commands": [
+          {
+            "key": "cargo test -p compact-terminal-mcp 2>&1",
+            "count": 3
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_0185KuEGibJvEfb5kp3MBnW1",
+        "agent_name": "Review Agent",
+        "description": "Re-review blocking defect closure",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 18,
+        "tools": {
+          "grep_search": 5,
+          "read_file": 8,
+          "run_in_terminal": 5
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 1,
+          "legitimate_dev": 4
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/src/server.rs",
+            "count": 3
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/tests/integration_tests.rs",
+            "count": 3
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01ATnWPXNcTzr5vUWFzqHBno",
+        "agent_name": "Explore Agent",
+        "description": "Empirical subagent tool-list probe",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 0,
+        "tools": {},
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01K2Ym7u26jeHGBMCHfjiPMs",
+        "agent_name": "Explore Agent",
+        "description": "Compact the spilled briefing",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 1,
+        "tools": {
+          "read_file": 1
+        },
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01MgGpfnmwWQci4XFCPTrYDu",
+        "agent_name": "Review Agent",
+        "description": "Review compact-terminal-api extraction",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 49,
+        "tools": {
+          "file_search": 3,
+          "grep_search": 4,
+          "list_dir": 3,
+          "read_file": 15,
+          "run_in_terminal": 23,
+          "semantic_search": 1
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 6,
+          "legitimate_dev": 9,
+          "other": 3,
+          "read_like_exploratory": 5
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/src/server.rs",
+            "count": 2
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "list_dir",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01T8uFsoHiHk6gfMGmuxhig4",
+        "agent_name": "Implement Agent",
+        "description": "Add CLI transport and fix MCP capability",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 50,
+        "tools": {
+          "create_file": 3,
+          "read_file": 12,
+          "replace_string_in_file": 12,
+          "run_in_terminal": 23
+        },
+        "shell_command_categories": {
+          "legitimate_dev": 10,
+          "other": 9,
+          "read_like_exploratory": 4
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/Cargo.toml",
+            "count": 2
+          }
+        ],
+        "repeat_commands": [
+          {
+            "key": "cargo test -p compact-terminal-cli 2>&1",
+            "count": 4
+          },
+          {
+            "key": "cargo build -p compact-terminal-cli 2>&1",
+            "count": 2
+          },
+          {
+            "key": "cargo build -p compact-terminal-mcp 2>&1",
+            "count": 2
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "read_file",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01Tfi2tCYVkNAtQoS4Q1FCh3",
+        "agent_name": "Research Agent",
+        "description": "Load compact-terminal-api handoff context",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 69,
+        "tools": {
+          "file_search": 13,
+          "grep_search": 10,
+          "list_dir": 9,
+          "read_file": 26,
+          "run_in_terminal": 11
+        },
+        "shell_command_categories": {
+          "cli_shadowing_mcp": 6,
+          "read_like_exploratory": 5
+        },
+        "repeat_reads": [
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/src/server.rs",
+            "count": 7
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/.github/mcp.json",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/.vscode/mcp.json",
+            "count": 2
+          },
+          {
+            "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/peek-api/src/lib.rs",
+            "count": 2
+          }
+        ],
+        "failures": [
+          {
+            "tool_name": "list_dir",
+            "summary": "tool call failed"
+          },
+          {
+            "tool_name": "list_dir",
+            "summary": "tool call failed"
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      },
+      {
+        "run_id": "toolu_01ViEKrq4Kc7fnsado8RH6i1",
+        "agent_name": "Commit Agent",
+        "description": "Commit compact-terminal-api extraction",
+        "declared_model": "Claude Sonnet 4.5 (copilot)",
+        "tool_call_count": 27,
+        "tools": {
+          "grep_search": 1,
+          "run_in_terminal": 26
+        },
+        "shell_command_categories": {
+          "legitimate_dev": 23,
+          "other": 2,
+          "read_like_exploratory": 1
+        },
+        "repeat_commands": [
+          {
+            "key": "git status --short",
+            "count": 4
+          },
+          {
+            "key": "cd memory-api && git status --short",
+            "count": 2
+          }
+        ],
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0
+      }
+    ],
+    "cross_agent_duplicate_reads": [
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/src/server.rs",
+        "agent_count": 6,
+        "total_count": 18
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/compact-terminal-mcp/Cargo.toml",
+        "agent_count": 4,
+        "total_count": 5
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/peek-mcp/Cargo.toml",
+        "agent_count": 4,
+        "total_count": 4
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/Cargo.toml",
+        "agent_count": 3,
+        "total_count": 5
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/peek-api/src/lib.rs",
+        "agent_count": 3,
+        "total_count": 4
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.spec/specs/63c60c9d-adbe-4ddb-8c1d-6156610d0753/body.md",
+        "agent_count": 3,
+        "total_count": 3
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.github/mcp.json",
+        "agent_count": 2,
+        "total_count": 3
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.vscode/mcp.json",
+        "agent_count": 2,
+        "total_count": 3
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/mcp/peek-mcp/src/server.rs",
+        "agent_count": 2,
+        "total_count": 3
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.spec/specs/3ccdde3a-368c-4655-a6c8-20a58822c83d/body.md",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/.ticket/tickets/bd5e9aee-f89b-4d38-be80-80d6c8c1a3b5/description.md",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/compact-terminal-api/Cargo.toml",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/compact-terminal-api/src/error.rs",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/compact-terminal-api/src/execute.rs",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/compact-terminal-api/src/lib.rs",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/compact-terminal-api/tests/integration_tests.rs",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/crates/peek-api/Cargo.toml",
+        "agent_count": 2,
+        "total_count": 2
+      },
+      {
+        "key": "c:/Users/linus/git/graph_app/context-engine/memory-api/tools/cli/peek-cli/Cargo.toml",
+        "agent_count": 2,
+        "total_count": 2
+      }
+    ],
+    "cross_agent_duplicate_commands": [
+      {
+        "key": "cargo test -p compact-terminal-cli 2>&1",
+        "agent_count": 2,
+        "total_count": 5
+      },
+      {
+        "key": "cargo test -p compact-terminal-mcp 2>&1",
+        "agent_count": 2,
+        "total_count": 4
+      },
+      {
+        "key": "git status --short",
+        "agent_count": 1,
+        "total_count": 4
+      }
+    ],
+    "model_distribution": {
+      "Claude Sonnet 4.5 (copilot)": 13
+    },
+    "substitutable_shell_count": 28,
+    "exploratory_find_ls_count": 15,
+    "path_resolution_failures": 5,
+    "redispatch_count": 5,
+    "shell_command_categories": {
+      "cli_shadowing_mcp": 20,
+      "legitimate_dev": 79,
+      "other": 22,
+      "read_like_exploratory": 31
+    },
+    "mcp_tool_failure_fallback_count": 1,
+    "mcp_tool_discovery_failure_count": 19,
+    "mcp_tool_shadow_ambiguous_count": 0
+  }
+}
