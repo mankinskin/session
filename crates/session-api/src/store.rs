@@ -246,24 +246,39 @@ use store_routing_types::{
     validate_session_id,
 };
 
-fn sibling_store_base(session_store_root: &Path) -> &Path {
-    if session_store_root
+fn sibling_store_base(session_store_root: &Path) -> PathBuf {
+    let is_legacy_session_store = session_store_root
         .file_name()
         .and_then(|name| name.to_str())
-        == Some(".session")
-    {
-        if let Some(parent) = session_store_root.parent() {
-            return parent;
-        }
+        == Some(".session");
+    let is_canonical_session_store = session_store_root
+        .file_name()
+        .and_then(|name| name.to_str())
+        == Some("session")
+        && session_store_root
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            == Some(memory_kernel::workspace::CANONICAL_STORES_DIR);
+    if is_legacy_session_store || is_canonical_session_store {
+        memory_kernel::workspace::resolve_workspace_root_from_store_root(
+            session_store_root,
+            ".session",
+        )
+    } else {
+        session_store_root.to_path_buf()
     }
-    session_store_root
 }
 
 fn sibling_store_root(
     session_store_root: &Path,
     sibling_store_dir: &str,
 ) -> PathBuf {
-    sibling_store_base(session_store_root).join(sibling_store_dir)
+    let workspace = sibling_store_base(session_store_root);
+    memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+        &workspace,
+        sibling_store_dir,
+    )
 }
 
 /// Resolves a URN workspace slug to a sibling store root. The literal slug
@@ -298,9 +313,11 @@ fn resolve_workspace_store_root(
             "workspace path `{workspace}` contains invalid path characters"
         ));
     }
-    Ok(sibling_store_base(session_store_root)
-        .join(workspace.as_ref())
-        .join(sibling_store_dir))
+    let workspace_root = sibling_store_base(session_store_root).join(workspace.as_ref());
+    Ok(memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+        &workspace_root,
+        sibling_store_dir,
+    ))
 }
 
 /// RAII guard that releases the runtime mutation lock on drop.

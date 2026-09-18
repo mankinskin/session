@@ -80,7 +80,7 @@ impl SessionStoreActivity {
 
     fn session_stores(&self) -> Result<Vec<PathBuf>, std::io::Error> {
         let mut stores = BTreeSet::from([self.session_store.clone()]);
-        let Some(main_checkout) = self.session_store.parent() else {
+        let Some(main_checkout) = session_workspace_root(&self.session_store) else {
             return Ok(stores.into_iter().collect());
         };
         let worktree_root = main_checkout.join(".worktrees");
@@ -97,20 +97,46 @@ impl SessionStoreActivity {
             if !path.is_dir() {
                 continue;
             }
-            let store = path.join(".session");
+            let store = existing_session_store(&path);
             if store.is_dir() {
                 stores.insert(store);
                 continue;
             }
             for nested in fs::read_dir(path)? {
                 let nested = nested?;
-                let store = nested.path().join(".session");
+                let store = existing_session_store(&nested.path());
                 if store.is_dir() {
                     stores.insert(store);
                 }
             }
         }
         Ok(stores.into_iter().collect())
+    }
+}
+
+fn existing_session_store(workspace: &Path) -> PathBuf {
+    let canonical = workspace.join(".workflow-tools/session");
+    if canonical.is_dir() {
+        canonical
+    } else {
+        workspace.join(".session")
+    }
+}
+
+fn session_workspace_root(store: &Path) -> Option<PathBuf> {
+    let is_canonical = store
+        .file_name()
+        .and_then(|name| name.to_str())
+        == Some("session")
+        && store
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            == Some(".workflow-tools");
+    if is_canonical {
+        store.parent()?.parent().map(Path::to_path_buf)
+    } else {
+        store.parent().map(Path::to_path_buf)
     }
 }
 

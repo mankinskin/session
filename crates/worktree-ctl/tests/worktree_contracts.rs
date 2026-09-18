@@ -223,7 +223,7 @@ fn create(
 fn workspace_root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .ancestors()
-        .nth(4)
+        .nth(2)
         .expect("workspace root")
 }
 
@@ -233,9 +233,9 @@ fn guidance_documents_nested_legacy_and_worktree_local_active_session_marker() {
         (
             ".agents/instructions/session/worktree-provisioning.instructions.md",
             [
-                ".worktrees/<full-session-uuid>/<slug>",
-                "Existing flat `.worktrees/<short-id>-<slug>` worktrees remain supported",
-                "worktree-local `.session/sessions/<uuid>/session.json`",
+                ".worktrees/<full-session-uuid>/<topic-slug>",
+                "The slug is lowercase kebab-case",
+                "canonical `.workflow-tools/session` store",
             ],
         ),
         (
@@ -243,15 +243,15 @@ fn guidance_documents_nested_legacy_and_worktree_local_active_session_marker() {
             [
                 ".worktrees/<session-uuid>/<slug>",
                 "Existing flat `.worktrees/<session-short-id>-<slug>` worktrees remain supported",
-                ".session/local/active_workspace_session.json",
+                ".workflow-tools/session/sessions/<session-uuid>/session.json",
             ],
         ),
         (
-            ".agents/instructions/commit/branch-worktree.instructions.md",
+            ".agents/instructions/worktree/worktree-commit.instructions.md",
             [
-                "<full-session-uuid>/session",
-                "Existing flat `.worktrees/<short-id>-<slug>` worktrees remain supported",
-                ".session/local/active_workspace_session.json",
+                "agent/<full-session-uuid>/<slug>",
+                "Verify the branch before staging",
+                "submodule",
             ],
         ),
     ] {

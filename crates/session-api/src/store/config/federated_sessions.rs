@@ -89,9 +89,11 @@ impl SessionStoreConfig {
 
     fn federated_store_roots(&self) -> Result<Vec<(SessionStoreConfig, bool)>, SessionError> {
         let mut stores = vec![(self.clone(), false)];
-        let Some(main_checkout) = self.root.parent() else {
-            return Ok(stores);
-        };
+        let main_checkout =
+            memory_kernel::workspace::resolve_workspace_root_from_store_root(
+                &self.root,
+                ".session",
+            );
         let worktree_root = main_checkout.join(".worktrees");
         let entries = match fs::read_dir(&worktree_root) {
             Ok(entries) => entries,
@@ -112,7 +114,11 @@ impl SessionStoreConfig {
             if !path.is_dir() {
                 continue;
             }
-            let store = path.join(".session");
+            let store =
+                memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+                    &path,
+                    ".session",
+                );
             if store.is_dir() {
                 roots.insert(store);
                 continue;
@@ -125,7 +131,10 @@ impl SessionStoreConfig {
                     path: path.clone(),
                     source,
                 })?;
-                let store = nested.path().join(".session");
+                let store = memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+                    &nested.path(),
+                    ".session",
+                );
                 if store.is_dir() {
                     roots.insert(store);
                 }

@@ -28,6 +28,10 @@ use session_worktree_provision::{
     policy::ProvisionPolicy,
 };
 
+fn canonical_session_store(workspace: &Path) -> PathBuf {
+    workspace.join(".workflow-tools/session")
+}
+
 const WORKTREE_PATH_OUTPUT_PREFIX: &str = "WORKTREE_PATH=";
 const FINISH_READY_TO_MERGE_MARKER: &str = "ready-to-merge";
 const DIRTY_MAIN_UNCOMMITTED_CHANGES_MESSAGE: &str = "uncommitted changes";
@@ -263,7 +267,7 @@ pub(crate) fn checkpoint_owned_session_changes(
     dry_run: bool,
 ) -> Result<(), String> {
     let activity = SessionStoreActivity::with_default_staleness(
-        git.main_checkout().join(".session"),
+        canonical_session_store(git.main_checkout()),
     );
     let session_worktree_provision::WorktreeOwnership::Owned(owner_session_id) =
         activity.worktree_ownership(&worktree.path)
@@ -297,7 +301,7 @@ pub(crate) fn checkpoint_session_mirror_changes(
     dry_run: bool,
 ) -> Result<(), String> {
     let activity = SessionStoreActivity::with_default_staleness(
-        git.main_checkout().join(".session"),
+        canonical_session_store(git.main_checkout()),
     );
     let session_worktree_provision::WorktreeOwnership::Owned(owner_session_id) =
         activity.worktree_ownership(&worktree.path)
@@ -645,7 +649,7 @@ fn handle_list(
     let git =
         WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
     let activity = SessionStoreActivity::with_default_staleness(
-        git.main_checkout().join(".session"),
+        canonical_session_store(git.main_checkout()),
     );
     let policy = ProvisionPolicy::default();
     let registered = git.list_worktrees().map_err(|error| error.to_string())?;
@@ -963,7 +967,7 @@ fn handle_clean(
     let git =
         WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let activity = SessionStoreActivity::with_default_staleness(
-        git.main_checkout().join(".session"),
+        canonical_session_store(git.main_checkout()),
     );
     let registered = selected_worktrees(&git, &selection)?;
     let mut removable = Vec::new();

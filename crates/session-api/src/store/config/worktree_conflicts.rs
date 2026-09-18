@@ -5,7 +5,8 @@ impl SessionStoreConfig {
         requested_path: &Path,
         ignored_session_ids: &[&str],
     ) -> Result<(), SessionError> {
-        let registry_dir = main_checkout.join(".session/local/worktrees");
+        let registry_dir = main_session_store_root(&self.root, main_checkout)
+            .join("local/worktrees");
         let entries = match std::fs::read_dir(&registry_dir) {
             Ok(entries) => entries,
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),

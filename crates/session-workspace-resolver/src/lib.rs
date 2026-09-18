@@ -805,7 +805,7 @@ mod tests {
 
         assert_eq!(
             resolved.store_root(".ticket").unwrap(),
-            worktree.join(".ticket")
+            worktree.join(".workflow-tools").join("ticket")
         );
         assert!(matches!(
             resolved.store_root("../.ticket"),

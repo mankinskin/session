@@ -275,9 +275,9 @@ impl WorktreeGit {
         }
 
         let dirty = self.dirty_paths(worktree)?;
-        if dirty.is_empty()
-            || dirty.iter().any(|path| !path.path.starts_with(&expected))
-        {
+        if dirty.is_empty() || dirty.iter().any(|path| {
+            !path.path.starts_with(&expected) && !expected.starts_with(&path.path)
+        }) {
             return Ok(false);
         }
 
@@ -302,19 +302,25 @@ impl WorktreeGit {
         worktree: &Path,
         owner_session_id: &str,
     ) -> Result<bool, WorktreeGitError> {
-        let expected = PathBuf::from(".session")
-            .join("sessions")
-            .join(owner_session_id);
-        let record = self.main_checkout.join(&expected).join("session.json");
+        let expected = existing_session_directory(
+            &self.main_checkout,
+            owner_session_id,
+        );
+        let record = expected.join("session.json");
         if !session_record_matches_owner(&record, owner_session_id, worktree) {
             return Ok(false);
         }
+        let relative = expected
+            .strip_prefix(&self.main_checkout)
+            .unwrap_or(&expected);
         let dirty = self.dirty_paths(&self.main_checkout)?;
-        if !dirty.iter().any(|path| path.path.starts_with(&expected)) {
+        if !dirty.iter().any(|path| {
+            path.path.starts_with(relative) || relative.starts_with(&path.path)
+        }) {
             return Ok(false);
         }
 
-        subprocess::run(&self.main_checkout, ["add", "--"], [&expected])?;
+        subprocess::run(&self.main_checkout, ["add", "--"], [relative])?;
         subprocess::run_arguments(
             &self.main_checkout,
             ["commit", "-m", "worktree-ctl checkpoint session mirror"],
@@ -814,9 +820,18 @@ fn remove_nested_submodule_worktrees_at(
 /// not prevent the other entity type from becoming usable.
 pub fn rebuild_entity_indexes(worktree: &Path) -> Vec<IndexRebuildOutcome> {
     vec![
-        rebuild_ticket_index(&worktree.join(".ticket")),
-        rebuild_spec_index(&worktree.join(".spec")),
+        rebuild_ticket_index(&store_root_for_workspace(worktree, "ticket")),
+        rebuild_spec_index(&store_root_for_workspace(worktree, "spec")),
     ]
+}
+
+fn store_root_for_workspace(workspace: &Path, domain: &str) -> PathBuf {
+    let canonical = workspace.join(".workflow-tools").join(domain);
+    if canonical.is_dir() {
+        canonical
+    } else {
+        workspace.join(format!(".{domain}"))
+    }
 }
 
 fn rebuild_ticket_index(store_root: &Path) -> IndexRebuildOutcome {
@@ -1007,11 +1022,28 @@ fn owned_session_directory(
     if components.next().is_some() || session_id != owner_session_id {
         return None;
     }
-    Some(
-        PathBuf::from(".session")
-            .join("sessions")
-            .join(owner_session_id),
-    )
+    let canonical = PathBuf::from(".workflow-tools/session/sessions")
+        .join(owner_session_id);
+    let legacy = PathBuf::from(".session/sessions").join(owner_session_id);
+    Some(if worktree.join(&canonical).exists() {
+        canonical
+    } else {
+        legacy
+    })
+}
+
+fn existing_session_directory(
+    workspace: &Path,
+    session_id: &str,
+) -> PathBuf {
+    let canonical = workspace
+        .join(".workflow-tools/session/sessions")
+        .join(session_id);
+    if canonical.exists() {
+        canonical
+    } else {
+        workspace.join(".session/sessions").join(session_id)
+    }
 }
 
 fn session_record_matches_owner(

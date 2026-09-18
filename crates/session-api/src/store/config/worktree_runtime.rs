@@ -83,10 +83,39 @@ thread_local! {
         const { std::cell::Cell::new(None) };
 }
 
-pub(crate) fn registry_path(main_checkout: &Path, session_id: &str) -> PathBuf {
-    main_checkout
-        .join(".session/local/worktrees")
+pub(crate) fn registry_path(session_store_root: &Path, session_id: &str) -> PathBuf {
+    session_store_root
+        .join("local/worktrees")
         .join(format!("{session_id}.json"))
+}
+
+fn main_session_store_root(
+    reference_store: &Path,
+    main_checkout: &Path,
+) -> PathBuf {
+    let is_legacy = reference_store
+        .file_name()
+        .and_then(|name| name.to_str())
+        == Some(".session");
+    let is_canonical = reference_store
+        .file_name()
+        .and_then(|name| name.to_str())
+        == Some("session")
+        && reference_store
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(|name| name.to_str())
+            == Some(memory_kernel::workspace::CANONICAL_STORES_DIR);
+    if is_legacy {
+        main_checkout.join(".session")
+    } else if is_canonical {
+        memory_kernel::workspace::canonical_store_root(main_checkout, ".session")
+    } else {
+        memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+            main_checkout,
+            ".session",
+        )
+    }
 }
 
 fn receipt_from_registry(
@@ -112,7 +141,8 @@ impl SessionStoreConfig {
         session_id: &str,
     ) -> Result<Option<WorktreeRegistryEntry>, SessionError> {
         let main_checkout = self.main_checkout_for_store()?;
-        match read_json(&registry_path(&main_checkout, session_id)) {
+        let main_store = main_session_store_root(&self.root, &main_checkout);
+        match read_json(&registry_path(&main_store, session_id)) {
             Ok(entry) => Ok(Some(entry)),
             Err(SessionError::NotFound { .. }) => Ok(None),
             Err(error) => Err(error),
@@ -120,15 +150,43 @@ impl SessionStoreConfig {
     }
 
     fn main_checkout_for_store(&self) -> Result<PathBuf, SessionError> {
-        let checkout = self.root.parent().ok_or_else(|| {
-            SessionError::InvalidStorePath(self.root.clone())
-        })?;
-        Ok(checkout
-            .ancestors()
-            .find(|path| path.file_name().is_some_and(|name| name == ".worktrees"))
-            .and_then(Path::parent)
+        let is_session_store = self
+            .root
+            .file_name()
+            .and_then(|name| name.to_str())
+            == Some(".session")
+            || (self
+                .root
+                .file_name()
+                .and_then(|name| name.to_str())
+                == Some("session")
+                && self
+                    .root
+                    .parent()
+                    .and_then(Path::file_name)
+                    .and_then(|name| name.to_str())
+                    == Some(memory_kernel::workspace::CANONICAL_STORES_DIR));
+        if is_session_store {
+            let workspace =
+                memory_kernel::workspace::resolve_workspace_root_from_store_root(
+                    &self.root,
+                    ".session",
+                );
+            return Ok(workspace
+                .ancestors()
+                .find(|path| {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        == Some(".worktrees")
+                })
+                .and_then(Path::parent)
+                .map(Path::to_path_buf)
+                .unwrap_or(workspace));
+        }
+        self.root
+            .parent()
             .map(Path::to_path_buf)
-            .unwrap_or_else(|| checkout.to_path_buf()))
+            .ok_or_else(|| SessionError::InvalidStorePath(self.root.clone()))
     }
 
     fn validate_managed_worktree(
@@ -244,7 +302,7 @@ impl SessionStoreConfig {
             predecessor_path: None,
         });
         self.persist_branch_only_manifest(&record)?;
-        let main_store = main_checkout.join(".session");
+        let main_store = main_session_store_root(&self.root, main_checkout);
         if main_store != self.root {
             SessionStoreConfig::new(main_store)
                 .persist_branch_only_manifest(&record)?;
@@ -280,19 +338,19 @@ impl SessionStoreConfig {
         predecessor_session_id: Option<&str>,
     ) -> Result<Vec<WorktreeFileSnapshot>, SessionError> {
         let mut paths = vec![
-            registry_path(main_checkout, session_id),
+            registry_path(&main_session_store_root(&self.root, main_checkout), session_id),
             self.paths_for_session_id(session_id)?.manifest_path,
         ];
-        let main_store = main_checkout.join(".session");
+        let main_store = main_session_store_root(&self.root, main_checkout);
         if main_store != self.root {
             paths.push(
-                SessionStoreConfig::new(main_store)
+                SessionStoreConfig::new(&main_store)
                     .paths_for_session_id(session_id)?
                     .manifest_path,
             );
         }
         if let Some(predecessor_session_id) = predecessor_session_id {
-            paths.push(registry_path(main_checkout, predecessor_session_id));
+            paths.push(registry_path(&main_store, predecessor_session_id));
         }
         paths.sort();
         paths.dedup();
@@ -347,7 +405,8 @@ impl SessionStoreConfig {
         validate_worktree_request(&request)?;
         let (main_checkout, worktree_path) = self.validate_managed_worktree(&request)?;
         request.worktree_path = worktree_path;
-        let registry_file = registry_path(&main_checkout, &request.session_id);
+        let main_store = main_session_store_root(&self.root, &main_checkout);
+        let registry_file = registry_path(&main_store, &request.session_id);
         let mut replaced_assignment = None;
         if let Ok(mut existing) = read_json::<WorktreeRegistryEntry>(&registry_file) {
             if existing.agent_id != request.owner_id || existing.ticket_id != request.ticket_id {
@@ -388,7 +447,7 @@ impl SessionStoreConfig {
             .map(|assignment| assignment.path.clone());
         let mut predecessor_update = None;
         if let Some(predecessor_session_id) = &request.predecessor_session_id {
-            let predecessor_registry = registry_path(&main_checkout, predecessor_session_id);
+            let predecessor_registry = registry_path(&main_store, predecessor_session_id);
             let mut predecessor = read_json::<WorktreeRegistryEntry>(&predecessor_registry)?;
             let predecessor_assignment = predecessor.assignment.clone();
 
@@ -465,7 +524,8 @@ impl SessionStoreConfig {
     ) -> Result<SessionWorktreeCheckInReceipt, SessionError> {
         let manifest = self.read_session_manifest(session_id)?;
         let main_checkout = self.main_checkout_for_store()?;
-        let registry_path = registry_path(&main_checkout, session_id);
+        let main_store = main_session_store_root(&self.root, &main_checkout);
+        let registry_path = registry_path(&main_store, session_id);
         let entry: WorktreeRegistryEntry = read_json(&registry_path).map_err(|error| match error {
             SessionError::NotFound { .. } => SessionError::MissingWorktreeAssignment { session_id: session_id.to_string() },
             other => other,

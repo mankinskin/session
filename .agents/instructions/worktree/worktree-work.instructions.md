@@ -23,7 +23,7 @@ declared root explicitly. After a write, read the entity back through the same
 transport and the same root; success against a different discovered or shadow
 store is not evidence that the intended mutation occurred.
 
-`.session`, `.ticket`, and `.spec` are version-controlled, so every worktree carries its own copy. The active copy is the one **inside the session's worktree**. The main checkout's copies are a merge target: they become current only when a branch merges, never by direct edit.
+`.workflow-tools/session`, `.workflow-tools/ticket`, and `.workflow-tools/spec` are version-controlled, so every worktree carries its own copy. Bare `.session`, `.ticket`, and `.spec` stores remain legacy compatibility layouts. The active copy is the one **inside the session's worktree**. The main checkout's copies are a merge target: they become current only when a branch merges, never by direct edit.
 
 - A session writes entity records only into its own worktree's stores. Writing an active store in the main checkout from an implementation session is forbidden — it forks authority between the store the agent can see and the store it actually wrote.
 - Pass the worktree explicitly on every entity CLI call, e.g. `ticket.exe --workspace <worktree> …`. Omitting it falls back to process working directory, which for a long-lived server or a shell started at the repository root is the main checkout.
@@ -31,7 +31,7 @@ store is not evidence that the intended mutation occurred.
 - After any batch of entity writes, confirm the main checkout stayed clean:
 
 ```bash
-git -C <repo-root> status --porcelain -- .ticket .spec .session
+git -C <repo-root> status --porcelain -- .workflow-tools
 ```
 
   Non-empty output means the write went to the wrong store. Stop and relocate it before continuing.

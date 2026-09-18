@@ -5,9 +5,9 @@ applyTo: "**"
 
 ## Single Session Identifier
 
-- The Copilot session UUID is the only session identifier. The UUID comes from the Copilot hook payload and keys the on-disk record directory `.session/sessions/<session-uuid>/`.
+- The Copilot session UUID is the only session identifier. The UUID comes from the Copilot hook payload and keys the on-disk record directory `.workflow-tools/session/sessions/<session-uuid>/`.
 - Session IDs must be UUIDs. A slug-shaped value is rejected; session identity must always be supplied explicitly, with no marker-file or other fallback.
-- Runtime state (`active_run_id`, `runs`, `pinned_entities`, and `workflow`) lives in `.session/sessions/<session-uuid>/session.json`.
+- Runtime state (`active_run_id`, `runs`, `pinned_entities`, and `workflow`) lives in `.workflow-tools/session/sessions/<session-uuid>/session.json`.
 - Pinned entities use the canonical URN scheme `ce://<workspace>/<store>/<entity>` (e.g. `ce://default/ticket/<id>`, `ce://default/spec/<id>`, `ce://default/rule/<id>`, `ce://default/dossier/<folder-name>`). Raw filesystem paths (e.g. `path:...`) are rejected by `session_runtime_pin`.
 - When a task chooses worktree isolation, new worktrees are named `.worktrees/<session-uuid>/<slug>` and branches are named `agent/<session-uuid>/<slug>`. Existing flat `.worktrees/<session-short-id>-<slug>` worktrees remain supported during transition and are not migrated. Positional discovery selects nested first; more than one valid slug directory for one UUID is `AmbiguousSessionWorktree`.
 
@@ -146,7 +146,7 @@ The command returns per-run `turn_count`, `tool_call_count`, `input_tokens`, `ou
 Read a prior handoff package from disk because no read subcommand exists:
 
 ```bash
-cat .session/sessions/<uuid>/handoffs/<handoff-id>/handoff.md
+cat .workflow-tools/session/sessions/<uuid>/handoffs/<handoff-id>/handoff.md
 ```
 
 The structured form is `handoff.json` in the same directory. `session.exe handoff` is write-only and requires `--objective`, `--higher-level-objective`, and at least one `--upward-context` JSON entry. Not every session has a `handoffs/` directory.
@@ -157,4 +157,4 @@ Convert every prior-session finding to `scope | finding | outcome | blocker | po
 
 ## Known Defect
 
-`./target/debug/session.exe query --workspace . --limit 5 --toon` aborts the entire listing when one record is unreadable: `session error: session data was not found at .session/sessions/<uuid>/session.json`. Until fixed, prefer `sessions-for-ticket` or a direct `ls .session/sessions/`. Ticket 7be23bd8 tracks the defect as out of scope.
+`./target/debug/session.exe query --workspace . --limit 5 --toon` aborts the entire listing when one record is unreadable: `session error: session data was not found at .workflow-tools/session/sessions/<uuid>/session.json`. Until fixed, prefer `sessions-for-ticket` or a direct `ls .workflow-tools/session/sessions/`. Ticket 7be23bd8 tracks the defect as out of scope.

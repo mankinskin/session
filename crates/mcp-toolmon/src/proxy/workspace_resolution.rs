@@ -32,6 +32,10 @@ use super::gating::{
 pub(crate) const MAIN_CHECKOUT_ENV: &str = "MCP_MAIN_CHECKOUT";
 pub(crate) const DEFAULT_STORE_DIR: &str = ".session";
 
+fn canonical_session_store_root(workspace: &Path) -> PathBuf {
+    workspace.join(".workflow-tools/session")
+}
+
 /// Builds the resolver anchored on the checkout the servers were launched in.
 ///
 /// The anchor is inferred from the process working directory, which is the
@@ -216,8 +220,7 @@ fn session_is_unassigned(
     repository_root: &Path,
     session_id: &str,
 ) -> Result<bool, String> {
-    let config =
-        SessionStoreConfig::new(repository_root.join(DEFAULT_STORE_DIR));
+    let config = SessionStoreConfig::new(canonical_session_store_root(repository_root));
     match config.read_session(session_id) {
         Ok(record) => Ok(match record.metadata.worktree {
             None => true,
@@ -324,7 +327,7 @@ fn try_resolve_session_check_in_bootstrap_workspace(
     }
     Ok(Some((
         normalized_path(&canonical_workspace),
-        canonical_workspace.join(DEFAULT_STORE_DIR),
+        canonical_session_store_root(&canonical_workspace),
     )))
 }
 

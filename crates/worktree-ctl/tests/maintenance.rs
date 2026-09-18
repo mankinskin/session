@@ -178,7 +178,10 @@ fn write_session_record(
     owner_worktree: &Path,
     captured_at: Option<&str>,
 ) {
-    let session_dir = root.join(".session").join("sessions").join(SESSION_UUID);
+    let session_dir = root
+        .join(".workflow-tools/session")
+        .join("sessions")
+        .join(SESSION_UUID);
     fs::create_dir_all(&session_dir).expect("create local session record");
     let captured_at = captured_at
         .map(|value| format!(",\"captured_at\":\"{value}\""))
@@ -941,7 +944,7 @@ fn rebase_checkpoints_owned_session_artifacts_before_mutating() {
     );
     assert!(
         git_revision(&worktree, &["show", "--format=", "--name-only", "HEAD"])
-            .contains(".session/sessions/12345678-1234-1234-1234-123456789abc/session.json")
+            .contains(".workflow-tools/session/sessions/12345678-1234-1234-1234-123456789abc/session.json")
     );
 }
 
@@ -1003,7 +1006,7 @@ fn clean_refuses_checkpoint_when_an_unrelated_path_is_dirty() {
     let status = git_revision(&worktree, &["status", "--porcelain"]);
     assert!(status.contains("unrelated.txt"), "{status}");
     assert!(
-        status.contains(".session/"),
+        status.contains(".workflow-tools/"),
         "session artifacts must remain uncommitted when unrelated changes exist: {status}"
     );
 }

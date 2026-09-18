@@ -17,7 +17,7 @@ Reference [README](../../README.md), [AGENTS](../../../AGENTS.md), [session-opti
 - a fresh checkout setup
 - current workspace orientation
 - a tour of the available workflow tools
-2. Inspect the current repository layout and discover the nearest `.ticket` and `.spec` stores before giving setup advice.
+2. Inspect the current repository layout and discover the nearest canonical `.workflow-tools/ticket` and `.workflow-tools/spec` stores before giving setup advice; treat bare `.ticket` and `.spec` directories as legacy compatibility stores.
 3. For a fresh checkout, guide the user through the minimum useful bootstrap commands:
 - build or install `spec`, `ticket`, and `audit`
 - identify any viewer or browser helpers worth starting

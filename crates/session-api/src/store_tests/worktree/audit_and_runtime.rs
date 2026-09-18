@@ -113,7 +113,7 @@ fn check_in_rolls_back_successor_registry_failure() {
 
     assert!(!tempdir
         .path()
-        .join(".session/local/worktrees")
+        .join(".workflow-tools/session/local/worktrees")
         .join(format!("{WORKTREE_SESSION_B}.json"))
         .exists());
     assert!(!tempdir
@@ -170,7 +170,7 @@ fn check_in_rolls_back_predecessor_update_failure() {
     );
     assert!(!tempdir
         .path()
-        .join(".session/local/worktrees")
+        .join(".workflow-tools/session/local/worktrees")
         .join(format!("{WORKTREE_SESSION_B}.json"))
         .exists());
     assert!(!tempdir
@@ -219,7 +219,7 @@ fn successful_rotation_supersedes_predecessor_once() {
     config.check_in_worktree(handoff.clone()).unwrap();
     let predecessor_registry = tempdir
         .path()
-        .join(".session/local/worktrees")
+        .join(".workflow-tools/session/local/worktrees")
         .join(format!("{WORKTREE_SESSION_A}.json"));
     let predecessor_after_rotation = std::fs::read(&predecessor_registry).unwrap();
 
@@ -266,7 +266,7 @@ fn duplicate_active_canonical_path_without_predecessor_is_a_conflict() {
 
     let first_registry = tempdir
         .path()
-        .join(".session/local/worktrees")
+        .join(".workflow-tools/session/local/worktrees")
         .join(format!("{WORKTREE_SESSION_A}.json"));
     let mut registry: serde_json::Value = serde_json::from_slice(
         &std::fs::read(&first_registry).unwrap(),

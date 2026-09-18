@@ -47,7 +47,7 @@ git -C .worktrees/<name> diff --stat          # unstaged tracked changes
 git -C .worktrees/<name> diff --stat --cached # staged tracked changes
 ```
 
-Both commands must be empty; otherwise commit or stash the tracked changes first. Untracked `.session/sessions/` entries do not block a rename: the capture hook writes those continuously as background noise.
+Both commands must be empty; otherwise commit or stash the tracked changes first. Untracked `.workflow-tools/session/sessions/` entries do not block a rename: the capture hook writes those continuously as background noise.
 
 ```bash
 ./target/debug/worktree-ctl.exe rename <full-session-uuid>/<current-slug> <full-session-uuid>/<topic-slug>
@@ -67,4 +67,4 @@ The output must show all populated submodules: `memory-viewers`, `context-stack`
 
 ### Renaming again when focus changes
 
-Re-renaming is allowed but should be rare: run `./target/debug/worktree-ctl.exe rename <current-name> <target-name>` only when scope materially changes to a different feature or ticket, not for every sub-task. Re-run `session_check_in` with the new `worktree_path` and `branch` so the store is not stale, and run `board_check_in` when the claimed files change. Do not rename with uncommitted tracked modifications, staged or unstaged; commit or stash those first. Untracked `.session/sessions/` entries are capture-hook background noise and never block a rename. Never rename while a viewer, `cargo` build, or another agent has its current directory inside the worktree.
+Re-renaming is allowed but should be rare: run `./target/debug/worktree-ctl.exe rename <current-name> <target-name>` only when scope materially changes to a different feature or ticket, not for every sub-task. Re-run `session_check_in` with the new `worktree_path` and `branch` so the store is not stale, and run `board_check_in` when the claimed files change. Do not rename with uncommitted tracked modifications, staged or unstaged; commit or stash those first. Untracked `.workflow-tools/session/sessions/` entries are capture-hook background noise and never block a rename. Never rename while a viewer, `cargo` build, or another agent has its current directory inside the worktree.
