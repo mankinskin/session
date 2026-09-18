@@ -97,6 +97,20 @@ session: <uuid> | checkout: main | ticket: <short-id> <title>
 
 Resolve every placeholder from the current session and its claimed ticket; never copy values from a previous transcript or instruction example. Main-checkout tasks do not invent a worktree or branch in the footer.
 
+### Feedback-Summary Segment
+
+Per [feedback-turn-visibility.instructions.md](../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md), a response that has called `feedback_session_summary` appends one optional trailing segment to either footer form: `| feedback: <n> new entries this session` (or `| feedback: none` when the summary is empty). Place it last, after `ticket:`:
+
+```
+session: <uuid> | checkout: main | ticket: <short-id> <title> | feedback: 2 new entries this session
+```
+
+```
+session: <uuid> | worktree: .worktrees/<uuid>/<slug> | branch: agent/<uuid>/<slug> | ticket: <short-id> <title> | feedback: none
+```
+
+Omit the segment entirely only when [feedback-turn-visibility.instructions.md](../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md) does not apply to the current response (for example, a dispatched sub-agent following its own return contract); otherwise render `feedback: none` rather than dropping the segment silently.
+
 The footer applies to sub-agents too: a sub-agent's single returned message carries the footer, so a write-and-die Worker's one step remains attributable after the session is gone. See [write-and-die.instructions.md](../../../../.agents/instructions/workflow/write-and-die.instructions.md).
 
 ## Inspecting a Prior Session
