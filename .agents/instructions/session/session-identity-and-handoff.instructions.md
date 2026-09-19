@@ -99,10 +99,10 @@ Resolve every placeholder from the current session and its claimed ticket; never
 
 ### Feedback-Summary Segment
 
-Per [feedback-turn-visibility.instructions.md](../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md), a response that has called `feedback_session_summary` appends one optional trailing segment to either footer form: `| feedback: <n> new entries this session` (or `| feedback: none` when the summary is empty). Place it last, after `ticket:`:
+Per [feedback-turn-visibility.instructions.md](../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md), a response that has called `feedback_session_summary` appends one optional trailing segment to either footer form: `| feedback: <n> new entries this turn` (or `| feedback: none` when the summary is empty). The count is scoped to the agent's best-effort derived turn number, not the whole session — see that instruction for how the turn number is derived. Place it last, after `ticket:`:
 
 ```
-session: <uuid> | checkout: main | ticket: <short-id> <title> | feedback: 2 new entries this session
+session: <uuid> | checkout: main | ticket: <short-id> <title> | feedback: 2 new entries this turn
 ```
 
 ```
