@@ -63,6 +63,10 @@ pub struct SessionCli {
     #[arg(long = "workspace", alias = "workspace-root", global = true)]
     pub workspace_root: Option<PathBuf>,
 
+    /// Explicit store root retained for compatibility with older callers.
+    #[arg(long = "store-root", global = true, conflicts_with = "workspace_root")]
+    pub store_root: Option<PathBuf>,
+
     #[command(subcommand)]
     pub command: SessionCommand,
 }
@@ -453,6 +457,9 @@ pub struct MoveArgs {
     /// Destination workspace root.
     #[arg(long = "to-workspace-root")]
     pub to_workspace_root: Option<PathBuf>,
+    /// Explicit source store root, such as a legacy `.session` directory.
+    #[arg(long = "source-store-root")]
+    pub source_store_root: Option<PathBuf>,
     /// Plan only; do not execute the move.
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
@@ -711,13 +718,16 @@ pub enum CliRunError {
 pub fn run(cli: SessionCli) -> Result<CliOutput, CliRunError> {
     if matches!(cli.command, SessionCommand::CheckIn(_))
         && cli.workspace_root.is_none()
+        && cli.store_root.is_none()
     {
         return Err(CliRunError::BadRequest(
             "entity creation requires explicit --workspace <path>".to_string(),
         ));
     }
 
-    let store_root = match cli.workspace_root.as_deref() {
+    let store_root = match cli.store_root.as_deref() {
+        Some(store_root) => store_root.to_path_buf(),
+        None => match cli.workspace_root.as_deref() {
         Some(workspace_root) => workspace::resolve_store_root_for_initialization_from(
             workspace_root,
             SESSION_STORE_DIR,
@@ -726,6 +736,7 @@ pub fn run(cli: SessionCli) -> Result<CliOutput, CliRunError> {
             workspace::working_dir().as_deref(),
             SESSION_STORE_DIR,
         ),
+        },
     };
     let config = SessionStoreConfig::new(store_root);
 
@@ -1429,6 +1440,12 @@ fn move_command(
     config: &SessionStoreConfig,
     args: MoveArgs,
 ) -> Result<Value, CliRunError> {
+    let source_config = args
+        .source_store_root
+        .as_ref()
+        .map(|root| SessionStoreConfig::new(root.clone()));
+    let config = source_config.as_ref().unwrap_or(config);
+
     if args.resume.is_some() && args.rollback.is_some() {
         return Err(CliRunError::BadRequest(
             "move accepts only one of --resume or --rollback".to_string(),
@@ -1709,7 +1726,7 @@ mod tests {
         ])
         .expect("parse check-in");
 
-        assert_eq!(cli.workspace_path, "default");
+        assert!(cli.workspace_root.is_none());
         match cli.command {
             SessionCommand::CheckIn(args) => {
                 assert_eq!(
@@ -2039,10 +2056,7 @@ mod tests {
             .unwrap();
 
         let session_id = "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71";
-        let config = SessionStoreConfig::new(
-            source_store_root.clone(),
-            "default".to_string(),
-        );
+        let config = SessionStoreConfig::new(source_store_root.clone());
         let payload = CopilotHookPayload {
             session_id: session_id.to_string(),
             workspace_path: "default".to_string(),
@@ -2069,10 +2083,12 @@ mod tests {
         let cli = parse_cli_from([
             "session",
             "--json",
-            "--store-root",
-            source_store_root.to_string_lossy().as_ref(),
+            "--workspace",
+            repo_root.to_string_lossy().as_ref(),
             "move",
             session_id,
+            "--source-store-root",
+            source_store_root.to_string_lossy().as_ref(),
             "--to-workspace-root",
             target_workspace_root.to_string_lossy().as_ref(),
         ])
@@ -2087,10 +2103,8 @@ mod tests {
             other => panic!("unexpected output: {other:?}"),
         }
 
-        let target_config = SessionStoreConfig::new(
-            target_workspace_root.join(".session"),
-            "default".to_string(),
-        );
+        let target_config =
+            SessionStoreConfig::new(target_workspace_root.join(".session"));
         assert!(matches!(
             config.read_session(session_id),
             Err(SessionError::NotFound { .. })
@@ -2104,10 +2118,7 @@ mod tests {
     #[test]
     fn handoff_reference_completeness_includes_durable_identity_fields() {
         let temp = tempdir().unwrap();
-        let config = SessionStoreConfig::new(
-            temp.path().join(".session"),
-            "default".to_string(),
-        );
+        let config = SessionStoreConfig::new(temp.path().join(".session"));
 
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
