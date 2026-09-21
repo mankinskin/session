@@ -860,6 +860,68 @@ mod tests {
     }
 
     #[test]
+    fn unassigned_session_mutation_works_without_worktrees_directory() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let main_checkout = temp.path().join("repository");
+        std::fs::create_dir_all(main_checkout.join(".git")).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session"))
+            .unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            call("update_ticket", Some("gpt-5-mini")),
+            &test_gate(),
+            "update_ticket",
+            json!({"workspace": {"type": "string"}}),
+        ) else {
+            panic!("unassigned mutation should use a git checkout without worktrees");
+        };
+        assert_eq!(
+            forwarded["params"]["arguments"]["workspace"],
+            json!(normalized(&main_checkout))
+        );
+
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn fs_delete_dir_accepts_absolute_paths_from_unassigned_checkout() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let temp = tempfile::tempdir().unwrap();
+        let main_checkout = temp.path().join("repository");
+        let target = main_checkout.join("context-engine").join(".ticket");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".git")).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session"))
+            .unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+
+        let mut request = call("fs_delete_dir", Some("gpt-5-mini"));
+        request["params"]["arguments"]["path"] = json!(target);
+        request["params"]["arguments"]["root"] = json!(main_checkout);
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            request,
+            &test_gate(),
+            "fs_delete_dir",
+            json!({
+                "path": {"type": "string"},
+                "recursive": {"type": "boolean"},
+                "root": {"type": "string"}
+            }),
+        ) else {
+            panic!("fs_delete_dir should forward from an unassigned checkout");
+        };
+        assert_eq!(forwarded["params"]["arguments"]["path"], json!(target));
+        assert_eq!(
+            forwarded["params"]["arguments"]["root"],
+            json!(main_checkout)
+        );
+
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
     fn unassigned_session_mutation_is_forwarded_regardless_of_workspace_representation()
      {
         // Gating must key off the *resolved* checkout scope, not how the

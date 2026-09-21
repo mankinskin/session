@@ -147,7 +147,7 @@ fn resolve_unassigned_session_target(
     let looks_like_repository_root = candidates.len() == 1
         && candidates[0]
             .parent()
-            .is_some_and(|root| root.join(".worktrees").is_dir());
+            .is_some_and(|root| root.join(".git").exists());
     if !looks_like_repository_root {
         return Err(ResolutionError::UnanchoredDefault {
             session_id: session_id.to_string(),
