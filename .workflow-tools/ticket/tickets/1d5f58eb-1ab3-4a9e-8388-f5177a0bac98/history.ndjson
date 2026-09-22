@@ -1,0 +1,1 @@
+{"rev":1,"ts":"2026-08-04T23:59:53.806840400+00:00","fields":{"component":"session-api","priority":"high","state":"open","title":"Backfill session→ticket attribution from transcript tool-call signals","type":"feature"}}

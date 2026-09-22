@@ -1,0 +1,12 @@
+id = "8cfdce69-a8b5-49dd-8ad7-96518bf0b8cc"
+created_at = "2026-06-06T00:44:35.825867100+00:00"
+title = "[session-api] Transcript skeleton peeking"
+state = "planning"
+acceptance_criteria = "1. SessionStoreConfig has peek_transcript_skeleton(session_id) returning a list of SessionTurnSkeletons. 2. SessionTurnSkeleton contains sequence, role, captured_at, tool_name, content_len, and a short content_preview. 3. Full content is not serialized. 4. Focused unit tests cover skeleton generation and preview truncation."
+component = "session"
+effort = "1200"
+parts = [{ id = "51549979-9429-46db-8935-24ab04ef8d00", kind = "objective", path = "parts/51549979-9429-46db-8935-24ab04ef8d00.md", frozen = false, created_at = "2026-07-30T21:02:30.161731200Z" }, { id = "fc2a21fb-8502-4315-9f8a-e88f6dd18750", kind = "validation", path = "parts/fc2a21fb-8502-4315-9f8a-e88f6dd18750.md", frozen = false, created_at = "2026-07-30T21:02:30.165411500Z" }]
+priority = "high"
+risk_level = "medium"
+tags = "session-api,token-efficiency,peeking"
+type = "tracker-improvement"

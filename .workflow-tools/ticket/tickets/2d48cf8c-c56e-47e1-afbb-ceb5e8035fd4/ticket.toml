@@ -1,0 +1,7 @@
+id = "2d48cf8c-c56e-47e1-afbb-ceb5e8035fd4"
+created_at = "2026-08-07T23:20:54.074367600+00:00"
+title = "Verify VS Code delivers hookSpecificOutput.additionalContext to the model on UserPromptSubmit"
+state = "planning"
+component = "session"
+priority = "high"
+type = "task"

@@ -1,0 +1,1 @@
+Tracker ticket to keep d1b3a6c9 (Route workflow diagnostics upward and add structural workflow-graph validation) connected to the depends_on graph, per ticket-store health check graph_participation finding. d1b3a6c9 is standalone session-api bug work, unrelated in scope to the merge/pickup provenance epic (d28afbc0).

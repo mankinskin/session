@@ -1,0 +1,8 @@
+id = "723c2bea-3b5d-4cf2-a519-958bcab036a3"
+created_at = "2026-08-07T23:57:41.587257100+00:00"
+title = "Fix shared-config core.worktree hijack in submodule worktrees"
+state = "done"
+component = "session"
+parts = [{ id = "6a867fe0-4580-4865-86d8-58b99ee724f7", kind = "requirements", path = "parts/6a867fe0-4580-4865-86d8-58b99ee724f7.md", frozen = false, created_at = "2026-08-08T00:00:00.745690600Z" }]
+priority = "high"
+type = "bug"

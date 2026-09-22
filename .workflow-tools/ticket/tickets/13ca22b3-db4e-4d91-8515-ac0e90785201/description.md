@@ -1,0 +1,8 @@
+Ticket d1b3a6c9 "Route workflow diagnostics upward and add structural workflow-graph validation" has no `acceptance_criteria` field and no linked spec. During review, spec c737328d was checked as a candidate link but covers an unrelated track ("Session merge and pickup: handoff-edge provenance graph and first-class tracks") and does not list d1b3a6c9 in its `ticket_ids`.
+
+Per reviewer decision during the d1b3a6c9 review, this ticket's behavior change (removing diag_* bubble-node emission from workflow mermaid rendering, adding `validate_workflow_graph` structural checks, and gating `create_handoff_record` on structural issues and unresolved resolver diagnostics) should be documented in a spec with explicit acceptance criteria before the work is considered fully closed.
+
+Acceptance criteria:
+- Create or extend a spec (in session-api's component scope) that documents: the diagnostics-routing contract (why diagnostics now hard-block handoff/finish instead of only rendering as informational bubble nodes), the structural validation rules (dangling-edge, duplicate-node-id), and the decision that this blocking applies to all workflow nodes regardless of requirement/status (Required/Optional/Done/Deferred) — matching the reviewer's explicit acceptance of that behavior as intended.
+- Link d1b3a6c9 into the new/extended spec's `ticket_ids`.
+- Backfill `acceptance_criteria` onto d1b3a6c9 (or an equivalent structured criteria list) so future review does not need to reconstruct criteria from narrative description alone.

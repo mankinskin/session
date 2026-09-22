@@ -1,0 +1,7 @@
+id = "6cc88405-62f2-4e36-b95e-a37f498175eb"
+created_at = "2026-07-25T18:55:57.745983100+00:00"
+title = "Add literal task/category example to MCP workflow schema"
+state = "done"
+effort = "300"
+type = "task"
+component = "session"

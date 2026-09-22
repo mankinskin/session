@@ -1,0 +1,9 @@
+id = "0afe45b5-9ec8-4f4a-af74-f46f06cc7516"
+created_at = "2026-08-08T20:38:39+00:00"
+title = "[ticket-api][session-api] Store resolution enumerates .worktrees/* and mis-anchors the active store"
+state = "done"
+component = "session"
+parts = [{ id = "78cf25ef-11e5-4ef3-8a2f-bd789fc3cc78", kind = "validation", path = "parts/78cf25ef-11e5-4ef3-8a2f-bd789fc3cc78.md", frozen = false, created_at = "2026-08-09T17:49:52.298929900Z" }]
+priority = "high"
+spec = "5d9e5a99-74b5-4f4e-9e6f-0a6cc3741ddf"
+type = "bug"

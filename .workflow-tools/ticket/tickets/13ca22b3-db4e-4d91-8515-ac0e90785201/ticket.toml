@@ -1,0 +1,7 @@
+id = "13ca22b3-db4e-4d91-8515-ac0e90785201"
+created_at = "2026-07-29T18:37:09.142422900+00:00"
+title = "Link d1b3a6c9 (workflow diagnostics routing + structural validation) to a spec with explicit acceptance criteria"
+state = "cancelled"
+component = "session"
+priority = "medium"
+type = "task"

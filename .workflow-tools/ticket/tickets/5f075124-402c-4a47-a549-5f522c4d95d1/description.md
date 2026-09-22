@@ -1,0 +1,1 @@
+Add a one-command worktree bootstrap path that creates or reuses the assigned worktree and runs the repository initializer in that worktree. The command must leave `new` as Git-only, support dry runs without mutations, and remain safe to rerun after a failed initialization.

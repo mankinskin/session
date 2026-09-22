@@ -1,0 +1,9 @@
+id = "66c85d65-98bc-4432-b6f6-6c41664645f8"
+created_at = "2026-07-25T22:34:05.360811800+00:00"
+title = "tool_metrics surfaces + rollup writer"
+state = "done"
+component = "session"
+depends_on = ["b64cc71d-8594-4617-b3fb-3057fca0b56b"]
+risk_level = "low"
+type = "feature"
+workflow_stage = "planning"

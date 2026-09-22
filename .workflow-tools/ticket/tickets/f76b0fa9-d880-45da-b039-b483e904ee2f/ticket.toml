@@ -1,0 +1,11 @@
+id = "f76b0fa9-d880-45da-b039-b483e904ee2f"
+created_at = "2026-06-06T00:44:39.037682100+00:00"
+title = "[session-api] Add session-cli and session-mcp for session subcommands"
+state = "done"
+acceptance_criteria = "1. session-cli supports check-in, lookup, query, peek-range, and peek-skeleton subcommands. 2. session-mcp server exposes corresponding tools with JSON schema validation. 3. CLI and MCP surfaces return compact TOON or JSON outputs. 4. Focused integration tests cover CLI and MCP tool invocations."
+component = "session"
+parts = [{ id = "52e47d3d-aaf1-43e3-ac7f-37b49378b5bb", kind = "objective", path = "parts/52e47d3d-aaf1-43e3-ac7f-37b49378b5bb.md", frozen = false, created_at = "2026-07-30T21:05:26.384372300Z" }, { id = "1c2cfd12-a2b5-4a0b-b0f4-89a53c061529", kind = "validation", path = "parts/1c2cfd12-a2b5-4a0b-b0f4-89a53c061529.md", frozen = false, created_at = "2026-07-30T21:05:26.388149100Z" }]
+priority = "high"
+risk_level = "medium"
+tags = "session-api,cli,mcp"
+type = "tracker-improvement"

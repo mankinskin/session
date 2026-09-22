@@ -1,0 +1,13 @@
+id = "857593ec-11d6-4c73-b5d8-7bf3b7eadd37"
+created_at = "2026-06-06T00:44:33.817096300+00:00"
+title = "[session-api] Token-efficient transcript range peeking"
+state = "planning"
+acceptance_criteria = "1. SessionStoreConfig has peek_transcript_range(session_id, start, end) returning only turns in that range. 2. SessionStoreConfig has peek_transcript_window(session_id, target, window) returning a window centered around target. 3. Out-of-bounds ranges are truncated gracefully. 4. Focused unit tests cover range, window, and out-of-bounds peeking."
+component = "session"
+effort = "1200"
+linked = ["8cfdce69-a8b5-49dd-8ad7-96518bf0b8cc"]
+parts = [{ id = "2c28a459-5d64-4118-8eb2-e3b2c5e6eaa6", kind = "objective", path = "parts/2c28a459-5d64-4118-8eb2-e3b2c5e6eaa6.md", frozen = false, created_at = "2026-07-30T21:02:30.184527400Z" }, { id = "cf0abac7-a377-43d9-b9c6-4145a9cda198", kind = "validation", path = "parts/cf0abac7-a377-43d9-b9c6-4145a9cda198.md", frozen = false, created_at = "2026-07-30T21:02:30.188713300Z" }]
+priority = "high"
+risk_level = "medium"
+tags = "session-api,token-efficiency,peeking"
+type = "tracker-improvement"

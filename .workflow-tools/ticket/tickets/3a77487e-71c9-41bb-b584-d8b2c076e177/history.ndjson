@@ -1,0 +1,2 @@
+{"rev":1,"ts":"2026-07-27T14:40:32.115028700+00:00","fields":{"component":"session-api","risk_level":"low","state":"open","title":"Spec: formalize track-scoped multi-session execution","type":"task"}}
+{"rev":2,"ts":"2026-07-27T21:41:15.888649200+00:00","fields":{"component":"session-api","depends_on":["16e4063a-32c6-416c-a6fe-160df9f9edd0"],"risk_level":"low","state":"open","title":"Spec: formalize track-scoped multi-session execution","type":"task"}}

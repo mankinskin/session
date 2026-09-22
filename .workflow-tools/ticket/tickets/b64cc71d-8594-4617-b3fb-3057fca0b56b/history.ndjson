@@ -1,0 +1,4 @@
+{"rev":1,"ts":"2026-07-25T22:33:57.799494900+00:00","fields":{"component":"session-api","risk_level":"medium","state":"open","title":"session-api tool_metrics core","type":"feature","workflow_stage":"planning"}}
+{"rev":2,"ts":"2026-07-26T00:23:41.205955100+00:00","fields":{"component":"session-api","risk_level":"medium","state":"open","title":"session-api tool_metrics core","type":"feature","workflow_stage":"planning"}}
+{"rev":3,"ts":"2026-07-26T00:26:00.052543500+00:00","fields":{"component":"session-api","risk_level":"medium","state":"in-review","title":"session-api tool_metrics core","type":"feature","workflow_stage":"planning"}}
+{"rev":4,"ts":"2026-07-26T01:05:38.684332600+00:00","fields":{"component":"session-api","risk_level":"medium","state":"done","title":"session-api tool_metrics core","type":"feature","workflow_stage":"planning"}}

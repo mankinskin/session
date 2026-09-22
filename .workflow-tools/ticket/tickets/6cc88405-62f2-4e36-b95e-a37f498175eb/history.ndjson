@@ -1,0 +1,4 @@
+{"rev":1,"ts":"2026-07-25T18:55:57.792062100+00:00","fields":{"effort":"300","state":"open","title":"Add literal task/category example to MCP workflow schema","type":"task"}}
+{"rev":2,"ts":"2026-07-25T19:42:35.433081200+00:00","fields":{"effort":"300","state":"in-implementation","title":"Add literal task/category example to MCP workflow schema","type":"task"},"author":"review-agent"}
+{"rev":3,"ts":"2026-07-25T20:21:07.825114400+00:00","fields":{"effort":"300","state":"in-review","title":"Add literal task/category example to MCP workflow schema","type":"task"}}
+{"rev":4,"ts":"2026-07-25T21:56:07.902725900+00:00","fields":{"effort":"300","state":"done","title":"Add literal task/category example to MCP workflow schema","type":"task"}}

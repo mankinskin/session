@@ -1,0 +1,8 @@
+id = "1d08620b-1ef6-4e62-9cb5-6ccf8386c3ed"
+created_at = "2026-08-05T13:49:42.525868900+00:00"
+title = "Author mcp-toolmon session-guard specification"
+state = "planning"
+component = "session"
+effort = "4000"
+priority = "high"
+type = "task"

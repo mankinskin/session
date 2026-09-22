@@ -1,0 +1,9 @@
+id = "06407599-b504-4a2a-a71e-cd33ca69b317"
+created_at = "2026-07-30T22:03:30.128825800+00:00"
+title = "session-cli handoff hardcodes package: None, blocking handoff packages over the CLI transport"
+state = "planning"
+component = "session"
+parts = [{ id = "6994ca39-8271-4f9c-a165-9b4f4ec5b6b2", kind = "acceptance_criteria", path = "parts/6994ca39-8271-4f9c-a165-9b4f4ec5b6b2.md", frozen = false, created_at = "2026-07-30T22:11:34.949874700Z" }, { id = "26c65502-b54e-496b-850e-9dad2b06f6b3", kind = "objective", path = "parts/26c65502-b54e-496b-850e-9dad2b06f6b3.md", frozen = false, created_at = "2026-07-30T22:11:35.105647Z" }]
+priority = "low"
+risk_level = "low"
+type = "bug"

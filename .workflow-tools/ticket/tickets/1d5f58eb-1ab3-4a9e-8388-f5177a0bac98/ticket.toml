@@ -1,0 +1,7 @@
+id = "1d5f58eb-1ab3-4a9e-8388-f5177a0bac98"
+created_at = "2026-08-04T23:59:53.748298800+00:00"
+title = "Backfill session→ticket attribution from transcript tool-call signals"
+state = "planning"
+component = "session"
+priority = "high"
+type = "feature"

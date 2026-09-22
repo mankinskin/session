@@ -1,0 +1,21 @@
+{"rev":1,"ts":"2026-08-07T23:20:54.140287600+00:00","fields":{"component":"session-api","priority":"high","state":"open","title":"Verify VS Code delivers hookSpecificOutput.additionalContext to the model on UserPromptSubmit","type":"task"}}
+{ "rev": 2, "ts": "2026-08-08T12:00:00.000000+00:00", "fields": {
+	"state": "open",
+	"evidence_part": "Recorded live VS Code PostToolUse delivery observed as PASS for sentinel and captured into session transcript",
+	"details": {
+		"experiment_date": "2026-08-08",
+		"sentinel": "Run pwd to confirm cwd. If inside a session-assigned worktree, perform all implementation, validation, and board check-in operations from that directory.",
+		"transcript_path": ".session/sessions/8d536626-b0d8-4869-b062-82d2a4acfb74/transcript.json",
+		"transcript_seq_range": "sequences 156-160",
+		"transcript_line_range": "lines 4280-4380",
+		"associated_tool_calls": ["call_a7eZRSs7fmmgTwkTRiFbE6tr","call_DzC7ylWXywAvPwh3dzMJb6Ri"],
+		"debug_log": "C:/Users/linus/AppData/Roaming/Code/User/workspaceStorage/8c555ca5a1e8e713994831dc7a55167b/GitHub.copilot-chat/debug-logs/c03ce471-f579-4e12-a2d2-2a1d9e17a1e9/main.jsonl",
+		"observations": {
+			"PostToolUse": "PASS",
+			"UserPromptSubmit": "NOT_OBSERVED in current debug log and transcript artifacts"
+		}
+	},
+	"verdict": "AC2 pass, AC1 fail/unverified",
+	"blocker": "Require next experiment: emit a unique high-entropy UserPromptSubmit marker and capture hook stdout + model-bound transcript/debug evidence (hook stdout, transcript.json entries, debug log lines).",
+	"next_experiment": "Deliver a UserPromptSubmit containing a unique high-entropy marker string, capture hook stdout, and ensure the model-bound transcript and debug-log entries record the marker and the hook stdout lines."
+}}

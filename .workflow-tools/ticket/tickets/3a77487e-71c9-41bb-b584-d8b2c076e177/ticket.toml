@@ -1,0 +1,8 @@
+id = "3a77487e-71c9-41bb-b584-d8b2c076e177"
+created_at = "2026-07-27T14:40:32.059893200+00:00"
+title = "Spec: formalize track-scoped multi-session execution"
+state = "planning"
+component = "session"
+depends_on = ["16e4063a-32c6-416c-a6fe-160df9f9edd0"]
+risk_level = "low"
+type = "task"

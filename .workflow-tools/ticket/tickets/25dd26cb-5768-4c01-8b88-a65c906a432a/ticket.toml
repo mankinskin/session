@@ -1,0 +1,7 @@
+id = "25dd26cb-5768-4c01-8b88-a65c906a432a"
+created_at = "2026-07-27T13:50:27.604956800+00:00"
+title = "Parallel sessions within a track"
+state = "blocked"
+component = "session"
+risk_level = "high"
+type = "task"
