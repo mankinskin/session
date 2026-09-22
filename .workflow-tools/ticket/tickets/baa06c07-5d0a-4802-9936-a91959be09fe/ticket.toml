@@ -1,0 +1,9 @@
+id = "baa06c07-5d0a-4802-9936-a91959be09fe"
+created_at = "2026-07-29T12:52:49.478455+00:00"
+title = "[session-api] Best-effort backfill migration for populated legacy cross-session links"
+state = "planning"
+component = "session"
+depends_on = ["0869353b-417c-4ce0-82bb-333e9fd39945"]
+effort = "1400"
+risk_level = "medium"
+type = "task"

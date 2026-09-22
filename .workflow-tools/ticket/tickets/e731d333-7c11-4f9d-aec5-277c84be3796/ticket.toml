@@ -1,0 +1,10 @@
+id = "e731d333-7c11-4f9d-aec5-277c84be3796"
+created_at = "2026-07-15T20:13:08.858389200+00:00"
+title = "[session-api][runtime] Resume-time pin resolution and dead-pin garbage collection"
+state = "planning"
+component = "session"
+depends_on = ["0a45bedb-6dfe-466e-893f-fddfd225f1f6"]
+effort = "2000"
+priority = "medium"
+risk_level = "medium"
+type = "tracker-improvement"

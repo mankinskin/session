@@ -1,0 +1,10 @@
+id = "0a45bedb-6dfe-466e-893f-fddfd225f1f6"
+created_at = "2026-07-15T20:59:57.587188800+00:00"
+title = "[session-api][store] Flatten session store layout, unify identity, and git-track durable artifacts"
+state = "done"
+component = "session"
+depends_on = ["41ed4585-5b1e-4681-96e8-4883ed140c18", "4817a5cc-5e91-4280-b7ed-aed296a480b3", "7a4f9c3d-bf5f-4849-93c7-b8c2706dac61", "fc86f42d-3fc0-4f07-911a-525098248dcf"]
+effort = "2000"
+priority = "high"
+risk_level = "medium"
+type = "tracker-improvement"

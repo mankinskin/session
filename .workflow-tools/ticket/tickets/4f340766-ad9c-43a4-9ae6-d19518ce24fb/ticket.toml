@@ -1,0 +1,10 @@
+id = "4f340766-ad9c-43a4-9ae6-d19518ce24fb"
+created_at = "2026-08-05T22:35:30.500695500+00:00"
+title = "[session-api][handoff] Render resolved ticket narrative and upward context in handoff markdown"
+state = "planning"
+component = "session"
+depends_on = ["c77369eb-3fd0-44ca-ba8b-cec32132512e"]
+effort = "2.5k tokens"
+risk_level = "medium"
+scope = "handoff"
+type = "task"

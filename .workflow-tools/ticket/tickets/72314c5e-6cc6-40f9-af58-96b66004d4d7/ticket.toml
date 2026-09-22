@@ -1,0 +1,9 @@
+id = "72314c5e-6cc6-40f9-af58-96b66004d4d7"
+created_at = "2026-08-07T23:57:25.870066800+00:00"
+title = "Add a rename subcommand for topic-slug worktrees"
+state = "done"
+component = "session"
+depends_on = ["5e6cf4f8-120c-4674-95de-d7b79c99f5b3"]
+parts = [{ id = "35247b65-33e3-4add-9126-73ec12ba7a0b", kind = "requirements", path = "parts/35247b65-33e3-4add-9126-73ec12ba7a0b.md", frozen = false, created_at = "2026-08-07T23:58:29.111022Z" }]
+priority = "medium"
+type = "feature"

@@ -1,0 +1,4 @@
+{"rev":1,"ts":"2026-07-27T14:40:31.954108400+00:00","fields":{"component":"session-api","risk_level":"low","state":"open","title":"CLI parity for track query and rollup","type":"task"}}
+{"rev":2,"ts":"2026-07-27T14:41:24.955577500+00:00","fields":{"component":"session-api","depends_on":["185a00a2-a849-48b1-b4ce-08cc8fd3552d"],"risk_level":"low","state":"open","title":"CLI parity for track query and rollup","type":"task"}}
+{"rev":3,"ts":"2026-07-27T21:41:01.795527600+00:00","fields":{"component":"session-api","depends_on":["185a00a2-a849-48b1-b4ce-08cc8fd3552d"],"risk_level":"low","state":"open","status":"new","title":"CLI parity for track query and rollup","type":"task"}}
+{"rev":4,"ts":"2026-07-27T21:41:33.211542100+00:00","fields":{"component":"session-api","depends_on":["185a00a2-a849-48b1-b4ce-08cc8fd3552d"],"risk_level":"low","state":"open","status":"new","title":"CLI parity for track query and rollup","type":"task"}}

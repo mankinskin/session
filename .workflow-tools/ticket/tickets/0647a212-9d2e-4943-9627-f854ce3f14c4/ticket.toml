@@ -1,0 +1,9 @@
+id = "0647a212-9d2e-4943-9627-f854ce3f14c4"
+created_at = "2026-07-14T00:18:57.322541100+00:00"
+title = "[session-api][handoff] Persist handoff records and resume durable session workspaces"
+state = "done"
+component = "session"
+depends_on = ["70cd7056-c342-4433-ad60-5bc798f61aa6"]
+effort = "2000"
+priority = "high"
+type = "tracker-improvement"

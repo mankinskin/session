@@ -1,0 +1,10 @@
+id = "e8bdb7cf-6605-4879-ab48-2c67da57df65"
+created_at = "2026-07-15T20:30:37.680067800+00:00"
+title = "[session-api][handoff] Populate resolved validation outcome and new_entities at handoff creation"
+state = "planning"
+component = "session"
+depends_on = ["a6f17580-f7ea-4c4e-92e7-0c77c68185fe"]
+effort = "1200"
+priority = "high"
+risk_level = "medium"
+type = "tracker-improvement"

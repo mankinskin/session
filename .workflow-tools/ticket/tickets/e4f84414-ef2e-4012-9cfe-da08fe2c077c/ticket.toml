@@ -1,0 +1,10 @@
+id = "e4f84414-ef2e-4012-9cfe-da08fe2c077c"
+created_at = "2026-07-29T13:59:12.477272100+00:00"
+title = "Render workflow mermaid graph in handoff markdown"
+state = "done"
+component = "session"
+effort = "20"
+linked = ["25b5f3e7-cace-4822-a955-bc2e3202be77", "742dbc65-a100-4278-9274-7d99a3e2afc4"]
+parts = [{ id = "b549166c-fd5e-4815-a68d-4fc527958c0d", kind = "objective", path = "parts/b549166c-fd5e-4815-a68d-4fc527958c0d.md", frozen = false, created_at = "2026-07-30T21:02:28.728082300Z" }, { id = "693b6b7c-a394-4c5c-8dc8-252426034a79", kind = "notes", path = "parts/693b6b7c-a394-4c5c-8dc8-252426034a79.md", frozen = false, created_at = "2026-07-30T21:02:28.732448500Z" }]
+priority = "medium"
+type = "tracker-improvement"

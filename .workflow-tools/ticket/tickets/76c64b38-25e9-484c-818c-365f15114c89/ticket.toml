@@ -1,0 +1,11 @@
+id = "76c64b38-25e9-484c-818c-365f15114c89"
+created_at = "2026-08-12T00:42:09.896872500+00:00"
+title = "Decouple Copilot session UUID from workspace runtime context identity"
+state = "done"
+component = "session"
+depends_on = ["0a45bedb-6dfe-466e-893f-fddfd225f1f6", "fc86f42d-3fc0-4f07-911a-525098248dcf"]
+parts = [{ id = "acd006f0-65f7-44b4-8941-f6b367c1d94d", kind = "acceptance_criteria", path = "parts/acd006f0-65f7-44b4-8941-f6b367c1d94d.md", frozen = true, created_at = "2026-08-12T10:56:01.440686500Z" }, { id = "29efb917-23ba-40f5-b084-0834ab0e09bb", kind = "validation", path = "parts/29efb917-23ba-40f5-b084-0834ab0e09bb.md", frozen = false, created_at = "2026-08-12T15:12:25.390591700Z" }, { id = "128bdcbc-3cfa-430c-9e13-3e00eba77daa", kind = "objective", path = "parts/128bdcbc-3cfa-430c-9e13-3e00eba77daa.md", frozen = true, created_at = "2026-08-12T15:12:43.288395600Z" }, { id = "a32bd939-2174-4d31-bd3e-541a2c444fd2", kind = "requirements", path = "parts/a32bd939-2174-4d31-bd3e-541a2c444fd2.md", frozen = true, created_at = "2026-08-12T15:12:43.288644900Z" }, { id = "4c645873-9d96-45eb-8931-b017db892cb5", kind = "design", path = "parts/4c645873-9d96-45eb-8931-b017db892cb5.md", frozen = true, created_at = "2026-08-12T15:12:43.288889900Z" }, { id = "65a18006-cec3-4aa1-a387-1394ffd08350", kind = "examples", path = "parts/65a18006-cec3-4aa1-a387-1394ffd08350.md", frozen = true, created_at = "2026-08-12T15:12:43.289089100Z" }]
+plan_revision = 1
+priority = "high"
+risk_level = "high"
+type = "bug"

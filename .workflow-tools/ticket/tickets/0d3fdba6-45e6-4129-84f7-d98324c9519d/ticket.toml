@@ -1,0 +1,10 @@
+id = "0d3fdba6-45e6-4129-84f7-d98324c9519d"
+created_at = "2026-07-15T20:13:08.504796700+00:00"
+title = "[session-api][handoff] Handoff completeness gate for session-created and owned entities"
+state = "planning"
+component = "session"
+depends_on = ["0a45bedb-6dfe-466e-893f-fddfd225f1f6", "6431985e-e729-426b-9f91-66ad4b1c6fe6"]
+effort = "2500"
+priority = "medium"
+risk_level = "medium"
+type = "tracker-improvement"

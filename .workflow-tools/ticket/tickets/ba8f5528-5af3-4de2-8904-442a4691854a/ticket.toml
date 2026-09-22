@@ -1,0 +1,13 @@
+id = "ba8f5528-5af3-4de2-8904-442a4691854a"
+created_at = "2026-08-05T22:36:31.556750300+00:00"
+title = "[session-api][handoff] Render resolved ticket narrative and upward context in handoff markdown"
+state = "done"
+component = "session"
+depends_on = ["742dbc65-a100-4278-9274-7d99a3e2afc4"]
+effort = "2.5k tokens"
+linked = ["25b5f3e7-cace-4822-a955-bc2e3202be77", "742dbc65-a100-4278-9274-7d99a3e2afc4"]
+parts = [{ id = "f1280a05-da5d-4dc3-a546-6cf6dd958b9c", kind = "notes", path = "parts/f1280a05-da5d-4dc3-a546-6cf6dd958b9c.md", frozen = false, created_at = "2026-08-06T01:02:23.758655400Z" }, { id = "b4ba0c93-e540-43eb-9d94-30c48a9fa5d2", kind = "review", path = "parts/b4ba0c93-e540-43eb-9d94-30c48a9fa5d2.md", frozen = false, created_at = "2026-08-06T01:46:48.073961300Z" }]
+risk_level = "medium"
+scope = "handoff"
+status = "ready"
+type = "task"

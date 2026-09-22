@@ -1,0 +1,8 @@
+id = "648a64a6-5bea-41a1-b31f-2a4b0ed9d6fc"
+created_at = "2026-07-27T14:40:31.978966700+00:00"
+title = "Sub-agent board registration and WIP budget"
+state = "planning"
+component = "session"
+depends_on = ["c410ca60-e079-430c-93b0-5db144dd99ad"]
+risk_level = "medium"
+type = "task"

@@ -1,0 +1,5 @@
+# Excluded local index artifacts created by memory-kernel tools.
+tickets.db
+tickets.db-shm
+tickets.db-wal
+search_index/

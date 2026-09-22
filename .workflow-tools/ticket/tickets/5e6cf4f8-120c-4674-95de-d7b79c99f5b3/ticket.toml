@@ -1,0 +1,8 @@
+id = "5e6cf4f8-120c-4674-95de-d7b79c99f5b3"
+created_at = "2026-08-07T12:19:32.728916200+00:00"
+title = "Rewrite worktree.sh as a Rust binary and add worktree lifecycle recycling"
+state = "done"
+component = "session"
+depends_on = ["a1b911ab-9394-4ba8-9134-1b2687e96ccd"]
+priority = "high"
+type = "feature"

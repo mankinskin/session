@@ -1,0 +1,8 @@
+id = "b43363e1-a89e-4c7e-a540-304d04eaa3f9"
+created_at = "2026-07-27T14:40:32.316700500+00:00"
+title = "Docs: track API, routing contract, and migration guide"
+state = "planning"
+component = "session"
+depends_on = ["185a00a2-a849-48b1-b4ce-08cc8fd3552d", "648a64a6-5bea-41a1-b31f-2a4b0ed9d6fc", "9cd9440e-ec01-47db-a67f-ec0ee9509ac7", "c410ca60-e079-430c-93b0-5db144dd99ad"]
+risk_level = "low"
+type = "task"

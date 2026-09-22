@@ -1,0 +1,11 @@
+id = "99e040a2-f7fb-40cf-8714-2bc487076d72"
+created_at = "2026-08-11T14:13:08.006987900+00:00"
+title = "Remove main-checkout session registry with dual-layout worktree discovery"
+state = "done"
+component = "session"
+depends_on = ["674e8e44-55ee-472f-8044-5d6e473438cf"]
+effort = "18k"
+linked = ["3d535b2c-7361-4f08-bfb4-63b0b3174afc", "565ae4b1-dd93-4685-955d-58490a0dd3fb", "5e6cf4f8-120c-4674-95de-d7b79c99f5b3", "a1b911ab-9394-4ba8-9134-1b2687e96ccd", "db6980d1-38bf-4819-8c07-b6db09229c1c", "ff83caf7-059b-4f2e-a0fb-eaa7757096a8"]
+parts = [{ id = "17bd7b80-812e-43b6-bd39-e975afdf5b52", kind = "validation", path = "parts/17bd7b80-812e-43b6-bd39-e975afdf5b52.md", frozen = false, created_at = "2026-08-11T16:57:54.424449600Z" }]
+priority = "high"
+type = "bug"

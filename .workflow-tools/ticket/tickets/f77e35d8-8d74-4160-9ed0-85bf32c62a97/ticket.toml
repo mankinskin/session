@@ -1,0 +1,10 @@
+id = "f77e35d8-8d74-4160-9ed0-85bf32c62a97"
+created_at = "2026-07-15T20:30:37.861177400+00:00"
+title = "[session-api][handoff] Thread handoff narrative fields through CLI, MCP, and /handoff prompt"
+state = "planning"
+component = "session"
+depends_on = ["e8bdb7cf-6605-4879-ab48-2c67da57df65"]
+effort = "1000"
+priority = "medium"
+risk_level = "low"
+type = "tracker-improvement"

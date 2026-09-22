@@ -1,0 +1,10 @@
+id = "185a00a2-a849-48b1-b4ce-08cc8fd3552d"
+created_at = "2026-07-27T14:40:32.227785600+00:00"
+title = "MCP tool surface for track query and rollup"
+state = "planning"
+component = "session"
+depends_on = ["938a7ae9-570e-40c4-91f5-d32d2fae0b4f", "ab02e15a-df68-41bc-a2dc-638f1fd01694"]
+effort = "1400"
+risk_level = "medium"
+status = "new"
+type = "task"

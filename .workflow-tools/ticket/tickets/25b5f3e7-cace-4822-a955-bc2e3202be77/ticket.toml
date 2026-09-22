@@ -1,0 +1,12 @@
+id = "25b5f3e7-cace-4822-a955-bc2e3202be77"
+created_at = "2026-08-05T22:36:37.744398100+00:00"
+title = "[session-api][handoff] Make upward context and ticket narrative reproducible in handoff markdown"
+state = "done"
+component = "session"
+depends_on = ["742dbc65-a100-4278-9274-7d99a3e2afc4", "ba8f5528-5af3-4de2-8904-442a4691854a"]
+effort = "800 tokens"
+linked = ["742dbc65-a100-4278-9274-7d99a3e2afc4", "ba8f5528-5af3-4de2-8904-442a4691854a", "e4f84414-ef2e-4012-9cfe-da08fe2c077c"]
+risk_level = "medium"
+scope = "handoff"
+status = "in-review"
+type = "epic"

@@ -1,0 +1,10 @@
+id = "938a7ae9-570e-40c4-91f5-d32d2fae0b4f"
+created_at = "2026-07-27T13:50:27.352345500+00:00"
+title = "Track query and rollup surface"
+state = "planning"
+component = "session"
+depends_on = ["a2194b92-d0b2-4eb8-a2a6-975919ab4035", "ab02e15a-df68-41bc-a2dc-638f1fd01694"]
+effort = "1800"
+risk_level = "medium"
+status = "new"
+type = "task"

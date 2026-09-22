@@ -1,0 +1,11 @@
+id = "580019e8-b253-42ee-80fc-990f6d26baf6"
+created_at = "2026-07-27T20:24:01.720133+00:00"
+title = "[session-api][repo] Untrack 76 committed events.json files (~99MB) with git rm --cached, no history rewrite"
+state = "done"
+component = "session"
+depends_on = ["4817a5cc-5e91-4280-b7ed-aed296a480b3"]
+effort = "400"
+handoff_package = { handoff_id = "e35e7d76-efc7-4fef-830b-df32f362c17e", objective = "Remove the legacy runtime-path fallback shims and add a guard that fails loudly on any write under .session/runtime/ (ticket 7fabc77a), then untrack the 76 committed events.json files (ticket 580019e8), unblocking the Batch 1 chain at ab02e15a.", target_tickets = ["7fabc77a-7704-448b-aef8-1f3e22dd18dd", "580019e8-b253-42ee-80fc-990f6d26baf6"], target_files = ["memory-api/crates/session-api/src/store/config/persistence.rs", "memory-api/crates/session-api/src/store/config/worktree_runtime.rs", "memory-api/crates/session-api/tests/gitignore_policy.rs", ".gitignore", "memory-api/.gitignore"], validation = [{ validation_spec_id = "vt-events-json-untracked", required = true, command = "git ls-files | grep -c \"events\\.json\"" }, { validation_spec_id = "vt-session-core-suites", required = true, command = "cargo test -p session-api -p session-mcp -p session-cli -p ticket-api" }, { validation_spec_id = "vt-session-gitignore-policy", required = true, command = "cargo test -p session-api --test gitignore_policy" }, { validation_spec_id = "vt-session-no-legacy-runtime-path", required = true, command = "rg -n \"legacy_runtime_paths_for_workspace|legacy_active_workspace_session_path|\\.session/runtime\" memory-api/crates/session-api/src memory-api/tools" }], open_escalations = [] }
+linked = ["4817a5cc-5e91-4280-b7ed-aed296a480b3"]
+risk_level = "medium"
+type = "tracker-improvement"

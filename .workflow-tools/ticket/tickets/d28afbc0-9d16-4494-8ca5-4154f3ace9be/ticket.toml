@@ -1,0 +1,8 @@
+id = "d28afbc0-9d16-4494-8ca5-4154f3ace9be"
+created_at = "2026-07-29T12:46:30.238909500+00:00"
+title = "[session-api] Session merge and pickup: handoff-edge provenance graph and first-class tracks"
+state = "planning"
+component = "session"
+depends_on = ["0869353b-417c-4ce0-82bb-333e9fd39945", "12641ad0-3eea-48e7-927d-20b814b1b7e3", "185a00a2-a849-48b1-b4ce-08cc8fd3552d", "1d378109-28d2-442b-a2a1-4e18cd716327", "47e4b2e5-d5c0-4f2e-9133-7ea98e08964e", "618eb6e6-7544-47cc-9ddb-ecdfbfdaf0a1", "938a7ae9-570e-40c4-91f5-d32d2fae0b4f", "a2194b92-d0b2-4eb8-a2a6-975919ab4035", "baa06c07-5d0a-4802-9936-a91959be09fe", "d085cf2b-7683-4aea-8566-99dc883ee491", "f35f4dd9-1a05-47ee-b334-809bb34e63a7", "fe221c20-bfd1-4673-aac6-2bbcf6169e95"]
+effort = "4000"
+type = "epic"

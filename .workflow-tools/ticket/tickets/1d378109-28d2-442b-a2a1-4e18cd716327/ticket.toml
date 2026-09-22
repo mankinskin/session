@@ -1,0 +1,10 @@
+id = "1d378109-28d2-442b-a2a1-4e18cd716327"
+created_at = "2026-07-29T12:52:49.165660900+00:00"
+title = "[session-api] CLI + MCP exposure of fan_out / merge / pickup"
+state = "planning"
+component = "session"
+depends_on = ["618eb6e6-7544-47cc-9ddb-ecdfbfdaf0a1"]
+effort = "1800"
+linked = ["185a00a2-a849-48b1-b4ce-08cc8fd3552d"]
+risk_level = "medium"
+type = "task"

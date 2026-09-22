@@ -1,0 +1,9 @@
+id = "d085cf2b-7683-4aea-8566-99dc883ee491"
+created_at = "2026-07-29T12:52:48.803174900+00:00"
+title = "[session-api] Bidirectional depends_on track edges + derived overlaps"
+state = "planning"
+component = "session"
+depends_on = ["a2194b92-d0b2-4eb8-a2a6-975919ab4035"]
+effort = "1800"
+risk_level = "medium"
+type = "task"

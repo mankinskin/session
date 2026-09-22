@@ -1,0 +1,10 @@
+id = "89d1f983-5081-4bfa-b22d-9398c5aae58c"
+created_at = "2026-07-15T20:30:37.746056200+00:00"
+title = "[session-api][handoff] Delta/baseline handoff serialization with full reconstruct path"
+state = "planning"
+component = "session"
+depends_on = ["68c8a5ef-fc7e-4700-956e-aea832c85011"]
+effort = "1800"
+priority = "low"
+risk_level = "medium"
+type = "tracker-improvement"

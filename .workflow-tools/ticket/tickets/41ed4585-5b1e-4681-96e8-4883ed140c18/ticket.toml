@@ -1,0 +1,10 @@
+id = "41ed4585-5b1e-4681-96e8-4883ed140c18"
+created_at = "2026-07-15T20:59:57.745002400+00:00"
+title = "[session-api][handoff] Store handoffs as folders with handoff.json + rendered handoff.md"
+state = "done"
+component = "session"
+depends_on = ["7a4f9c3d-bf5f-4849-93c7-b8c2706dac61"]
+effort = "1200"
+priority = "high"
+risk_level = "low"
+type = "tracker-improvement"

@@ -1,0 +1,9 @@
+id = "12641ad0-3eea-48e7-927d-20b814b1b7e3"
+created_at = "2026-07-29T12:52:49.397890900+00:00"
+title = "[session-api] Remove parent_session_id / spawned_session_id / predecessor_handoff (keep predecessor_run_id)"
+state = "planning"
+component = "session"
+depends_on = ["baa06c07-5d0a-4802-9936-a91959be09fe"]
+effort = "1500"
+risk_level = "high"
+type = "task"

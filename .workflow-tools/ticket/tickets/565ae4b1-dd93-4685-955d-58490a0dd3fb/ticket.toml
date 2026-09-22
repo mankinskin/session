@@ -1,0 +1,9 @@
+id = "565ae4b1-dd93-4685-955d-58490a0dd3fb"
+created_at = "2026-08-07T23:20:54.250149800+00:00"
+title = "Make copilot-capture-hook provisioning outcome observable"
+state = "done"
+component = "session"
+parts = [{ id = "20caa789-7c23-4958-8c41-87afa3f254bb", kind = "objective", path = "parts/20caa789-7c23-4958-8c41-87afa3f254bb.md", frozen = true, created_at = "2026-08-08T00:03:09.545796Z" }, { id = "8b164354-538c-4286-baf6-393f501ae06b", kind = "requirements", path = "parts/8b164354-538c-4286-baf6-393f501ae06b.md", frozen = true, created_at = "2026-08-08T00:03:09.546088300Z" }, { id = "10057623-b496-4b53-a59d-0363acce718b", kind = "design", path = "parts/10057623-b496-4b53-a59d-0363acce718b.md", frozen = true, created_at = "2026-08-08T00:03:09.546389Z" }, { id = "4bbc9f35-a829-423e-8758-73290a838f87", kind = "examples", path = "parts/4bbc9f35-a829-423e-8758-73290a838f87.md", frozen = true, created_at = "2026-08-08T00:03:09.546666500Z" }, { id = "1e3d99b2-aec6-4127-a593-f6b4124fec1e", kind = "acceptance_criteria", path = "parts/1e3d99b2-aec6-4127-a593-f6b4124fec1e.md", frozen = true, created_at = "2026-08-08T00:03:09.546826200Z" }, { id = "17e8d2a3-9da0-4620-85ca-0c370773baff", kind = "review", path = "parts/17e8d2a3-9da0-4620-85ca-0c370773baff.md", frozen = false, created_at = "2026-08-08T11:50:29.743840300Z" }, { id = "9fd5a73c-5acd-45d8-a658-c03befb41750", kind = "amendment", path = "parts/9fd5a73c-5acd-45d8-a658-c03befb41750.md", frozen = false, created_at = "2026-08-08T17:18:55.385013700Z", supersedes = "1e3d99b2-aec6-4127-a593-f6b4124fec1e" }, { id = "f4d2c9b1-9a2e-4f6b-8c3d-2a9e5b6c7d8e", kind = "evidence", path = "parts/f4d2c9b1-9a2e-4f6b-8c3d-2a9e5b6c7d8e.md", frozen = false, created_at = "2026-08-08T18:02:00.000000Z" }]
+plan_revision = 1
+priority = "medium"
+type = "task"

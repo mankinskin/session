@@ -1,0 +1,9 @@
+id = "9cd9440e-ec01-47db-a67f-ec0ee9509ac7"
+created_at = "2026-07-27T14:40:31.795828400+00:00"
+title = "CLI parity for track query and rollup"
+state = "planning"
+component = "session"
+depends_on = ["185a00a2-a849-48b1-b4ce-08cc8fd3552d"]
+risk_level = "low"
+status = "new"
+type = "task"

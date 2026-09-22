@@ -1,0 +1,9 @@
+id = "a2194b92-d0b2-4eb8-a2a6-975919ab4035"
+created_at = "2026-07-29T12:52:48.972755100+00:00"
+title = "[session-api] Track entity and store under .session/tracks/<id>/"
+state = "planning"
+component = "session"
+depends_on = ["0869353b-417c-4ce0-82bb-333e9fd39945"]
+effort = "1600"
+risk_level = "medium"
+type = "task"

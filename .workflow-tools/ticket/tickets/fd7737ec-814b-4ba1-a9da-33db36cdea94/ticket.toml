@@ -1,0 +1,12 @@
+id = "fd7737ec-814b-4ba1-a9da-33db36cdea94"
+created_at = "2026-07-27T14:40:31.623553700+00:00"
+title = "Session track migration and reconciliation"
+state = "done"
+accepted_limitation = "test_existing_sessions_load_without_error_real_data verifies 10 real sessions locally but passes vacuously when .session/sessions/ is empty (e.g. fresh clone or CI)"
+commit_sha = "84ab0c9e60f81bbc7e0f5bdbe3d55d8fc6f7221e (memory-api)"
+component = "session"
+depends_on = ["ab02e15a-df68-41bc-a2dc-638f1fd01694"]
+handoff_package = { handoff_id = "3fbe883e-afd0-43fe-b516-ed4625cc9c36", objective = "Add the nullable track fields (track_id, anchor_ticket_id, parent_session_id) to SessionRecord and activate spawned_session_id (ticket ab02e15a), then implement the fail-open track migration so pre-existing sessions load with track_id null and no backfill (ticket fd7737ec).", target_tickets = ["ab02e15a-df68-41bc-a2dc-638f1fd01694", "fd7737ec-814b-4ba1-a9da-33db36cdea94"], target_files = ["memory-api/crates/session-api/src/model.rs", "memory-api/crates/session-api/src/store.rs"], validation = [{ validation_spec_id = "vt-session-core-suites", required = true, command = "cargo test -p session-api -p session-mcp -p session-cli -p ticket-api" }], open_escalations = [] }
+risk_level = "medium"
+type = "task"
+validation_result = "339 passed / 0 failed"

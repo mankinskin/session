@@ -1,0 +1,13 @@
+id = "742dbc65-a100-4278-9274-7d99a3e2afc4"
+created_at = "2026-08-05T22:36:31.663001100+00:00"
+title = "[session-api][handoff] Model and enforce upward context for implementation-ready handoffs"
+state = "done"
+__previous_part_id__ = "3e10f341-e520-4f96-98a0-b9a7e679e64a"
+component = "session"
+effort = "2.5k tokens"
+linked = ["25b5f3e7-cace-4822-a955-bc2e3202be77", "ba8f5528-5af3-4de2-8904-442a4691854a", "e4f84414-ef2e-4012-9cfe-da08fe2c077c"]
+parts = [{ id = "92a3fefd-bf1c-4cf6-bdb1-e39709f4e10b", kind = "notes", path = "parts/92a3fefd-bf1c-4cf6-bdb1-e39709f4e10b.md", frozen = false, created_at = "2026-08-06T01:02:23.753541900Z" }, { id = "dc1c95b1-e75c-48e8-96f4-2c0a72b70853", kind = "review", path = "parts/dc1c95b1-e75c-48e8-96f4-2c0a72b70853.md", frozen = false, created_at = "2026-08-06T01:46:39.691796400Z" }, { id = "3e10f341-e520-4f96-98a0-b9a7e679e64a", kind = "amendment", path = "parts/3e10f341-e520-4f96-98a0-b9a7e679e64a.md", frozen = false, created_at = "2026-08-06T01:47:24.039485Z", supersedes = "dc1c95b1-e75c-48e8-96f4-2c0a72b70853" }, { id = "a9f3e2b1-6c7d-4f8a-9b2c-6d5e4f3a2b1c", kind = "evidence", path = "parts/a9f3e2b1-6c7d-4f8a-9b2c-6d5e4f3a2b1c.md", frozen = false, created_at = "2026-08-08T12:00:00Z" }]
+risk_level = "medium"
+scope = "handoff"
+status = "ready"
+type = "task"

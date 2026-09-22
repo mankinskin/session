@@ -1,0 +1,12 @@
+id = "4817a5cc-5e91-4280-b7ed-aed296a480b3"
+created_at = "2026-07-15T20:59:57.893160800+00:00"
+title = "[session-api][store] Git-tracking policy: track durable session artifacts, ignore local pointers/locks"
+state = "done"
+component = "session"
+depends_on = ["41ed4585-5b1e-4681-96e8-4883ed140c18", "67d7c279-6661-461b-8204-7a1bd7e028c5"]
+effort = "800"
+linked = ["16e4063a-32c6-416c-a6fe-160df9f9edd0"]
+parts = [{ id = "a15b012b-fce0-4cae-bacc-35ee8c082727", kind = "objective", path = "parts/a15b012b-fce0-4cae-bacc-35ee8c082727.md", frozen = false, created_at = "2026-07-30T21:02:28.795226900Z" }, { id = "369f98f6-98e7-4694-9de7-4996e748cf2e", kind = "review", path = "parts/369f98f6-98e7-4694-9de7-4996e748cf2e.md", frozen = false, created_at = "2026-07-30T21:02:28.799417100Z" }, { id = "d7c41285-0d09-4fb3-a188-c3bcd98249e7", kind = "objective", path = "parts/d7c41285-0d09-4fb3-a188-c3bcd98249e7.md", frozen = false, created_at = "2026-07-30T21:02:28.804043900Z" }]
+priority = "high"
+risk_level = "medium"
+type = "tracker-improvement"

@@ -1,0 +1,8 @@
+id = "be1552ba-99d8-4b9b-ac86-4163f5c5af54"
+created_at = "2026-07-27T13:50:26.951229400+00:00"
+title = "Lazy session artifact creation"
+state = "planning"
+component = "session"
+depends_on = ["0a45bedb-6dfe-466e-893f-fddfd225f1f6", "ab02e15a-df68-41bc-a2dc-638f1fd01694"]
+risk_level = "medium"
+type = "task"

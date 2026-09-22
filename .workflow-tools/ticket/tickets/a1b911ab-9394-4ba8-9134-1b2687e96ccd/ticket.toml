@@ -1,0 +1,8 @@
+id = "a1b911ab-9394-4ba8-9134-1b2687e96ccd"
+created_at = "2026-08-07T12:05:36.683542700+00:00"
+title = "Discover a session's worktree from session_id, and recycle worktrees on session completion"
+state = "done"
+component = "session"
+parts = [{ id = "d70b7fcb-a124-4d75-8b12-c19919f41372", kind = "test-plan", path = "parts/d70b7fcb-a124-4d75-8b12-c19919f41372.md", frozen = false, created_at = "2026-08-07T12:07:25.449059300Z" }, { id = "34661ddb-96af-4ed1-a258-9689aa062066", kind = "decisions", path = "parts/34661ddb-96af-4ed1-a258-9689aa062066.md", frozen = false, created_at = "2026-08-07T12:14:28.723463600Z" }]
+priority = "high"
+type = "feature"

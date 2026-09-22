@@ -1,0 +1,12 @@
+id = "f35f4dd9-1a05-47ee-b334-809bb34e63a7"
+created_at = "2026-07-28T18:38:43.263966400+00:00"
+title = "[session-api] Embed a persistent step graph (nodes + edges snapshot) in the handoff package"
+state = "planning"
+acceptance_criteria = "session_handoff accepts a step graph as an embedded snapshot of nodes and edges; supplied workflow node ids and target ticket ids are each validated to exist; nodes and tickets may be supplied independently or together, including nodes with no ticket and tickets with no node; a node may specify an operation qualifier over a ticket id such as review or implement; step order is derived from order/depends-on edges with no dedicated next-step field; a package lacking a step graph is not implementation-ready; the snapshot is persisted in the session store and not mirrored onto target tickets; spec 5e52039d Handoff Package Schema is updated in place to document the new field"
+component = "session"
+depends_on = ["0869353b-417c-4ce0-82bb-333e9fd39945"]
+effort = "2400"
+handoff_package = { handoff_id = "25ac3db7-aa2e-4fc3-919a-b3ccd39084a6", objective = "Embed a persistent step-graph snapshot in session_handoff (ticket f35f4dd9-1a05-47ee-b334-809bb34e63a7) and then author interruption-recovery instructions plus a resume-interrupted prompt template (ticket 36b04541-9bf1-433c-b100-77c3b7cb5855), which depends on it, directly targeting this session's own stale-handoff failure mode.", target_tickets = ["f35f4dd9-1a05-47ee-b334-809bb34e63a7", "36b04541-9bf1-433c-b100-77c3b7cb5855"], target_files = ["memory-api/crates/session-api/src/model/handoff.rs", "memory-api/crates/session-api/src/model/workflow.rs", "memory-api/crates/session-api/src/store/config/handoff_finish.rs", "memory-api/crates/session-api/src/store/config/workflow.rs", "memory-api/crates/session-api/src/store/config/runtime_workflow.rs", "memory-api/crates/session-api/tests/handoff_roundtrip.rs", "memory-api/crates/session-api/tests/handoff_folder_storage.rs", ".spec/specs/5e52039d-aabc-434d-bdf3-eca63e312476/spec.toml"], validation = [], open_escalations = [] }
+priority = "high"
+risk_level = "medium"
+type = "feature"

@@ -1,0 +1,81 @@
+{
+  "objective": "Drive critical path prerequisites for track-scoped multi-session execution: approve 3eaceaae, close in-review nodes 7a4f9c3d and 4817a5cc, implement 41ed4585 (handoffs as folders), then 0a45bedb (flatten store layout).",
+  "target_tickets": [
+    {
+      "id": "3eaceaae",
+      "title": "[session-mcp][session-api] Surface and echo workspace_session_id inline",
+      "state": "in-review",
+      "effort": "600",
+      "action": "approval"
+    },
+    {
+      "id": "7a4f9c3d",
+      "title": "[session-api][store] Flatten .session layout under sessions/<session_id>/ and relocate local pointers/locks",
+      "state": "in-review",
+      "effort": "2000",
+      "depends_on": ["fc86f42d"],
+      "action": "close"
+    },
+    {
+      "id": "4817a5cc",
+      "title": "[session-api][store] Git-tracking policy: track durable session artifacts, ignore local pointers/locks",
+      "state": "in-review",
+      "effort": "800",
+      "depends_on": ["41ed4585", "67d7c279"],
+      "action": "close"
+    },
+    {
+      "id": "41ed4585",
+      "title": "[session-api][handoff] Store handoffs as folders with handoff.json + rendered handoff.md",
+      "state": "new",
+      "effort": "1200",
+      "depends_on": ["7a4f9c3d"],
+      "action": "implement"
+    },
+    {
+      "id": "0a45bedb",
+      "title": "[session-api][store] Flatten session store layout, unify identity, and git-track durable artifacts",
+      "state": "new",
+      "effort": "2000",
+      "depends_on": ["41ed4585", "4817a5cc", "7a4f9c3d"],
+      "action": "implement_after_41ed4585"
+    }
+  ],
+  "target_files": [
+    "memory-api/crates/session-api/src/model.rs",
+    "memory-api/crates/session-api/src/store.rs",
+    "memory-api/tools/mcp/session-mcp/src/server.rs",
+    "memory-api/tools/cli/session-cli/src/lib.rs",
+    "memory-kernel/src/storage/board.rs"
+  ],
+  "decisions": [
+    "Naming: 'track'. Session schema gains nullable track_id, anchor_ticket_id, parent_session_id; spawned_session_id is activated.",
+    "No track entity, no new store. Anchor TICKET owns goal/DoD/progress; SPEC owns requirements.",
+    "Handoff conformance gate is BLOCKING and MECHANICAL in session_handoff write path: must cite anchor_ticket_id and enumerate unmet DoD items, else rejected.",
+    "Sub-agent sessions use same schema with lazy artifact creation (no second session class).",
+    "Traceability via session_runtime_render_instructions + hook; best-effort prose, no post-processing.",
+    "Sub-agent sessions register on board; read-only sub-agents WIP-exempt; WIP limit raised to 20.",
+    "Track complete when anchor ticket closes."
+  ],
+  "validation": [
+    "Tickets 3eaceaae, 7a4f9c3d, 4817a5cc move to done.",
+    "Tickets 41ed4585, 0a45bedb move to in-review with passing tests.",
+    "Session schema updated in model.rs with track_id and anchor_ticket_id fields.",
+    "session_handoff enforces anchor_ticket_id citation and unmet DoD enumeration.",
+    "Board WIP limit updated to 20; read-only sub-agents WIP-exempt."
+  ],
+  "non_goals": [
+    "Do NOT start ab02e15a or any other new track ticket until 3eaceaae and 0a45bedb are closed.",
+    "Do NOT implement parallel sessions within a track (deferred).",
+    "Do NOT create track entity or new store.",
+    "Do NOT implement weighted board budget (deferred)."
+  ],
+  "context_anchors": [
+    "Epic 16e4063a: Track-scoped multi-session execution",
+    "Source proposal: transcripts/27-07-2026_session-track-management/input.clean.md",
+    "Commits: 924d25c8 (tickets), b2aee53a (transcript)",
+    "Related tickets: 3eaceaae (in-review, validation passed), 0a45bedb (depends on critical path)",
+    "Previous session ticket: fc86f42d (related to 7a4f9c3d)"
+  ],
+  "open_escalations": []
+}

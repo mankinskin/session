@@ -1,0 +1,9 @@
+id = "fe221c20-bfd1-4673-aac6-2bbcf6169e95"
+created_at = "2026-07-29T12:52:49.581705300+00:00"
+title = "[session-api] Orchestrator round-trip fixture and provenance-graph reconstruction unit tests"
+state = "planning"
+component = "session"
+depends_on = ["618eb6e6-7544-47cc-9ddb-ecdfbfdaf0a1", "d085cf2b-7683-4aea-8566-99dc883ee491"]
+effort = "2000"
+risk_level = "medium"
+type = "task"

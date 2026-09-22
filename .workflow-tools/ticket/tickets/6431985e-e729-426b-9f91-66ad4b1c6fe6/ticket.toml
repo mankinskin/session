@@ -1,0 +1,10 @@
+id = "6431985e-e729-426b-9f91-66ad4b1c6fe6"
+created_at = "2026-07-15T20:13:08.933984700+00:00"
+title = "[session-api][handoff] Persist blockers, resolved validation outcome, and structured narrative in handoff record"
+state = "planning"
+component = "session"
+depends_on = ["0647a212-9d2e-4943-9627-f854ce3f14c4", "0a45bedb-6dfe-466e-893f-fddfd225f1f6", "a6f17580-f7ea-4c4e-92e7-0c77c68185fe", "e8bdb7cf-6605-4879-ab48-2c67da57df65", "f77e35d8-8d74-4160-9ed0-85bf32c62a97"]
+effort = "3000"
+priority = "high"
+risk_level = "medium"
+type = "tracker-improvement"

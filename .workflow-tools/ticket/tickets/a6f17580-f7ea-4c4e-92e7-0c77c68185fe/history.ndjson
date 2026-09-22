@@ -1,0 +1,1 @@
+{"rev":1,"ts":"2026-07-15T20:30:38.046462500+00:00","fields":{"component":"session-api","effort":"1000","priority":"high","risk_level":"low","state":"open","title":"[session-api][handoff] Add narrative/blockers/new_entities fields to SessionHandoffRecord model","type":"tracker-improvement"}}

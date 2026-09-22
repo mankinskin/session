@@ -1,0 +1,2 @@
+{"rev":1,"ts":"2026-07-27T14:40:32.034207+00:00","fields":{"component":"session-api","risk_level":"medium","state":"open","title":"Sub-agent board registration and WIP budget","type":"task"}}
+{"rev":2,"ts":"2026-07-27T14:41:28.664500900+00:00","fields":{"component":"session-api","depends_on":["c410ca60-e079-430c-93b0-5db144dd99ad"],"risk_level":"medium","state":"open","title":"Sub-agent board registration and WIP budget","type":"task"}}
