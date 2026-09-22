@@ -1,0 +1,8 @@
+id = "c81f3938-0b4b-42a0-bbf1-888ddd9d2262"
+created_at = "2026-07-25T23:02:10.982862+00:00"
+title = "upward escalation workflow"
+state = "done"
+component = "session"
+depends_on = ["6737a239-60fa-44af-8bf3-a60f8eb1e8a8"]
+risk_level = "medium"
+type = "feature"

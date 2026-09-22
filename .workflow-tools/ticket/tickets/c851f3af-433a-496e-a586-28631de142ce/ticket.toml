@@ -1,0 +1,8 @@
+id = "c851f3af-433a-496e-a586-28631de142ce"
+created_at = "2026-07-08T23:04:19.129145400+00:00"
+title = "[session-optimization] empty assistant.message events create session-noise"
+state = "done"
+effort = "900"
+priority = "medium"
+type = "bug"
+component = "session"

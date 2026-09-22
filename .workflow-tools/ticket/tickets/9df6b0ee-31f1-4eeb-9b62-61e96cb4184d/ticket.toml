@@ -1,0 +1,7 @@
+id = "9df6b0ee-31f1-4eeb-9b62-61e96cb4184d"
+created_at = "2026-09-03T19:16:54.332585700+00:00"
+title = "Complete Waypoint 5: migrate session domain (310 records) to an isolated destination"
+state = "done"
+component = "session"
+tags = "migration,session-domain,waypoint-5"
+type = "task"

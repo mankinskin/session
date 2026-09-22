@@ -1,0 +1,5 @@
+{"rev":1,"ts":"2026-07-25T23:02:11.453454900+00:00","fields":{"component":"session-api","risk_level":"medium","state":"open","title":"upward escalation workflow","type":"feature"}}
+{"rev":2,"ts":"2026-07-25T23:02:50.525674400+00:00","fields":{"component":"session-api","depends_on":["6737a239-60fa-44af-8bf3-a60f8eb1e8a8"],"risk_level":"medium","state":"open","title":"upward escalation workflow","type":"feature"}}
+{"rev":3,"ts":"2026-07-26T00:23:57.192904800+00:00","fields":{"component":"session-api","depends_on":["6737a239-60fa-44af-8bf3-a60f8eb1e8a8"],"risk_level":"medium","state":"open","title":"upward escalation workflow","type":"feature"}}
+{"rev":4,"ts":"2026-07-26T00:26:20.984447800+00:00","fields":{"component":"session-api","depends_on":["6737a239-60fa-44af-8bf3-a60f8eb1e8a8"],"risk_level":"medium","state":"in-review","title":"upward escalation workflow","type":"feature"}}
+{"rev":5,"ts":"2026-07-26T01:05:52.103821500+00:00","fields":{"component":"session-api","depends_on":["6737a239-60fa-44af-8bf3-a60f8eb1e8a8"],"risk_level":"medium","state":"done","title":"upward escalation workflow","type":"feature"}}

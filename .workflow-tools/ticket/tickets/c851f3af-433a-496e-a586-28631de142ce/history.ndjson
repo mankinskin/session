@@ -1,0 +1,4 @@
+{"rev":1,"ts":"2026-07-08T23:04:19.565359600+00:00","fields":{"priority":"medium","state":"open","title":"[session-optimization] empty assistant.message events create session-noise","type":"bug"}}
+{"rev":2,"ts":"2026-07-08T23:05:38.647379+00:00","fields":{"effort":"900","priority":"medium","state":"open","title":"[session-optimization] empty assistant.message events create session-noise","type":"bug"}}
+{"rev":3,"ts":"2026-07-08T23:14:55.578829400+00:00","fields":{"effort":"900","priority":"medium","state":"in-review","title":"[session-optimization] empty assistant.message events create session-noise","type":"bug"}}
+{"rev":4,"ts":"2026-07-08T23:14:56.897321700+00:00","fields":{"effort":"900","priority":"medium","state":"done","title":"[session-optimization] empty assistant.message events create session-noise","type":"bug"}}

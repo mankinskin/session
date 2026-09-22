@@ -1,0 +1,7 @@
+id = "dbb8fc83-a319-4f40-8124-149a24361068"
+created_at = "2026-07-25T19:11:57.198105800+00:00"
+title = "Register task and epic ticket workflow schemas"
+state = "done"
+effort = "800"
+type = "task"
+component = "session"

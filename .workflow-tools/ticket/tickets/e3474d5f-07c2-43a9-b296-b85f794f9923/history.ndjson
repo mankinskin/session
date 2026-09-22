@@ -1,0 +1,1 @@
+{"rev":1,"ts":"2026-07-28T20:31:51.233752600+00:00","fields":{"component":"session-api","effort":"1000","priority":"high","risk_level":"medium","state":"open","title":"[session-api] session CLI has no prune/gc subcommand for dangling session records","type":"tracker-improvement"}}
