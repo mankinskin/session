@@ -5,7 +5,7 @@
 //! newline-delimited JSON on stdio and calls into here.
 
 mod gating;
-mod path_rewriting;
+mod path_arguments;
 mod telemetry;
 mod workspace_resolution;
 
@@ -30,7 +30,7 @@ use toolmon_policy_api::{
     inject_caller_model_schema,
 };
 
-use path_rewriting::{
+use path_arguments::{
     PathArgument,
     PathArgumentKind,
     registered_path_argument,
@@ -46,7 +46,8 @@ use telemetry::{
     normalize_caller_model,
     now_rfc3339,
 };
-use workspace_resolution::resolve_workspace_for_tool;
+use gating::{ToolAccess, tool_access};
+use workspace_resolution::{canonicalize_tool_path, resolve_workspace_for_tool};
 
 /// Optional grant id argument for budget offset.
 pub const GRANT_ID_ARG: &str = "grant_id";
@@ -54,7 +55,7 @@ pub const GRANT_ID_ARG: &str = "grant_id";
 /// What the proxy should do with a client→server message.
 #[derive(Debug)]
 pub enum ClientAction {
-    /// Forward this (possibly rewritten) message to the real server.
+    /// Forward the message with proxy-only arguments removed.
     Forward(Value),
     /// Do not forward; send this response straight back to the client.
     Respond(Value),
@@ -287,20 +288,11 @@ pub fn handle_client_message(
                 },
                 Decision::Allow => {
                     let path_arguments = pending.path_arguments(&tool);
-                    let workspace = path_arguments
-                        .iter()
-                        .find(|argument| {
-                            argument.kind == PathArgumentKind::Workspace
-                        })
-                        .and_then(|argument| {
-                            msg.get("params")
-                                .and_then(|params| params.get("arguments"))
-                                .and_then(|arguments| {
-                                    arguments.get(argument.name)
-                                })
-                                .and_then(Value::as_str)
-                        });
-                    let (target_root, store_root) =
+                    let workspace = path_arguments.iter()
+                        .find(|argument| argument.kind == PathArgumentKind::Workspace)
+                        .and_then(|argument| msg["params"]["arguments"][argument.name].as_str())
+                        .map(|value| if value.is_empty() || value == "default" { "." } else { value });
+                    let (_, store_root) =
                         match resolve_workspace_for_tool(
                             &tool,
                             &session_id,
@@ -320,47 +312,49 @@ pub fn handle_client_message(
                                 );
                             },
                         };
-                    let mut rewrites = Vec::new();
                     for argument in &path_arguments {
                         let value = msg
                             .get("params")
                             .and_then(|params| params.get("arguments"))
                             .and_then(|arguments| arguments.get(argument.name))
-                            .and_then(Value::as_str);
+                            .and_then(Value::as_str)
+                            .or_else(|| {
+                                (argument.kind == PathArgumentKind::Workspace
+                                    && tool_access(&tool) == ToolAccess::Mutation)
+                                    .then_some(".")
+                            });
                         let Some(value) = value else {
-                            if argument.kind == PathArgumentKind::Workspace {
-                                rewrites
-                                    .push((argument.name, target_root.clone()));
-                            }
                             continue;
                         };
-                        if Path::new(value).is_absolute() {
-                            if let Err(error) = resolve_workspace_for_tool(
-                                &tool,
-                                &session_id,
-                                Some(value),
-                            ) {
-                                let telemetry = immediate_telemetry(
-                                    "reject-workspace",
-                                    Some(caller_model),
-                                );
-                                return (
-                                    ClientAction::Respond(error_result(
-                                        &id, &error,
-                                    )),
-                                    Some(telemetry),
-                                );
+                        let value = if argument.kind == PathArgumentKind::Workspace
+                            && (value.is_empty() || value == "default")
+                        {
+                            "."
+                        } else {
+                            value
+                        };
+                        let validation = if argument.kind == PathArgumentKind::RenameDestination
+                            && !Path::new(value).is_absolute()
+                        {
+                            let from = msg["params"]["arguments"]["from"].as_str();
+                            match from {
+                                Some(from) => canonicalize_tool_path(Path::new(from))
+                                    .and_then(|source| {
+                                        let parent = source.parent().ok_or_else(|| {
+                                            format!("cannot determine rename parent for '{from}'")
+                                        })?;
+                                        let destination = parent.join(value);
+                                        resolve_workspace_for_tool(
+                                            &tool, &session_id, Some(&destination.to_string_lossy()),
+                                        )
+                                    }),
+                                None => continue,
                             }
-                            continue;
-                        }
-                        match resolve_workspace_for_tool(
-                            &tool,
-                            &session_id,
-                            Some(value),
-                        ) {
-                            Ok((rewritten, _)) => {
-                                rewrites.push((argument.name, rewritten));
-                            },
+                        } else {
+                            resolve_workspace_for_tool(&tool, &session_id, Some(value))
+                        };
+                        match validation {
+                            Ok(_) => {},
                             Err(error) => {
                                 let telemetry = immediate_telemetry(
                                     "reject-workspace",
@@ -387,9 +381,6 @@ pub fn handle_client_message(
                     {
                         args.remove(CALLER_MODEL_ARG);
                         args.remove(GRANT_ID_ARG);
-                        for (name, value) in rewrites {
-                            args.insert(name.to_string(), Value::String(value));
-                        }
                     }
                     let decision_label = if soft_warning.is_some() {
                         "allow-normalized"
@@ -781,27 +772,20 @@ mod tests {
     }
 
     #[test]
-    fn session_resolving_to_worktree_rewrites_workspace_argument() {
+    fn session_resolving_to_worktree_does_not_insert_workspace_argument() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
-        let (_temp, main_checkout, worktree) =
+        let (_temp, main_checkout, _worktree) =
             routing_fixture(SessionWorktreeStatus::Active, false);
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
-            allowed_call(),
+            call("get_ticket", Some("gpt-5-mini")),
             &test_gate(),
-            "read_file",
+            "get_ticket",
             json!({"workspace": {"type": "string"}}),
         ) else {
             panic!("expected forwarded request");
         };
-        assert_eq!(
-            forwarded["params"]["arguments"]["workspace"],
-            json!(normalized(&worktree))
-        );
-        assert_ne!(
-            forwarded["params"]["arguments"]["workspace"],
-            json!(normalized(&main_checkout))
-        );
+        assert!(forwarded["params"]["arguments"].get("workspace").is_none());
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
@@ -825,10 +809,7 @@ mod tests {
             ) else {
                 panic!("{tool} should forward from the main checkout");
             };
-            assert_eq!(
-                forwarded["params"]["arguments"]["workspace"],
-                json!(normalized(&main_checkout))
-            );
+            assert!(forwarded["params"]["arguments"].get("workspace").is_none());
         }
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
@@ -843,8 +824,10 @@ mod tests {
         let (_temp, main_checkout) = main_checkout_fixture();
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
         for tool in ["update_ticket", "unknown_tool", "get_unknown"] {
+            let mut request = call(tool, Some("gpt-5-mini"));
+            request["params"]["arguments"]["workspace"] = json!(normalized(&main_checkout));
             let (ClientAction::Forward(forwarded), _) = route_with_schema(
-                call(tool, Some("gpt-5-mini")),
+                request,
                 &test_gate(),
                 tool,
                 json!({"workspace": {"type": "string"}}),
@@ -869,8 +852,10 @@ mod tests {
             .unwrap();
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
+        let mut request = call("update_ticket", Some("gpt-5-mini"));
+        request["params"]["arguments"]["workspace"] = json!(normalized(&main_checkout));
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
-            call("update_ticket", Some("gpt-5-mini")),
+            request,
             &test_gate(),
             "update_ticket",
             json!({"workspace": {"type": "string"}}),
@@ -922,12 +907,8 @@ mod tests {
     }
 
     #[test]
-    fn unassigned_session_mutation_is_forwarded_regardless_of_workspace_representation()
+    fn workspace_defaults_are_validated_against_actual_working_directory()
      {
-        // Gating must key off the *resolved* checkout scope, not how the
-        // caller happened to spell `workspace`: "default", empty, unset, and
-        // an explicit absolute path to the same main checkout must all reach
-        // the same outcome for an unassigned session's mutation.
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout) = main_checkout_fixture();
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
@@ -942,50 +923,40 @@ mod tests {
             if let Some(workspace) = workspace {
                 request["params"]["arguments"]["workspace"] = json!(workspace);
             }
-            let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            let (action, _) = route_with_schema(
                 request,
                 &test_gate(),
                 "update_ticket",
                 json!({"workspace": {"type": "string"}}),
-            ) else {
-                panic!(
-                    "update_ticket should forward from an unassigned session \
-                     regardless of workspace representation ({workspace:?})"
-                );
-            };
-            assert_eq!(
-                forwarded["params"]["arguments"]["workspace"],
-                json!(normalized(&main_checkout))
             );
+            if workspace == Some(main_checkout_workspace.as_str()) {
+                let ClientAction::Forward(forwarded) = action else {
+                    panic!("explicit checkout path should forward");
+                };
+                assert_eq!(forwarded["params"]["arguments"]["workspace"], json!(workspace));
+            } else {
+                assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
+            }
         }
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
     #[test]
-    fn assigned_session_with_vanished_worktree_falls_back_to_main_checkout()
+    fn assigned_session_with_vanished_worktree_blocks_mutation()
      {
-        // An assignment recorded in the session store whose worktree no
-        // longer exists on disk (removed, or a failed provisioning attempt
-        // that never created it) is a broken assignment, not real isolation.
-        // It must not permanently wall the session off from the main
-        // checkout; mutations fall back the same as an unassigned session.
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, worktree) =
             routing_fixture(SessionWorktreeStatus::Active, false);
         std::fs::remove_dir_all(&worktree).unwrap();
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
-        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+        let (action, _) = route_with_schema(
             call("update_ticket", Some("gpt-5-mini")),
             &test_gate(),
             "update_ticket",
             json!({"workspace": {"type": "string"}}),
-        ) else {
-            panic!("update_ticket should forward when the assigned worktree vanished");
-        };
-        assert_eq!(
-            forwarded["params"]["arguments"]["workspace"],
-            json!(normalized(&main_checkout))
         );
+        let text = response_text(action);
+        assert!(text.to_ascii_lowercase().contains("worktree"), "{text}");
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
@@ -1206,18 +1177,13 @@ mod tests {
 
         let mut request = allowed_call();
         request["params"]["arguments"]["workspace"] = json!("nested");
-        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+        let (action, _) = route_with_schema(
             request,
             &test_gate(),
             "read_file",
             json!({"workspace": {"type": "string"}}),
-        ) else {
-            panic!("expected forwarded request");
-        };
-        assert_eq!(
-            forwarded["params"]["arguments"]["workspace"],
-            json!(normalized(&inside))
         );
+        assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
@@ -1227,8 +1193,10 @@ mod tests {
         let (_temp, main_checkout, worktree) =
             routing_fixture(SessionWorktreeStatus::Active, false);
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", main_checkout) };
+        let mut request = allowed_call();
+        request["params"]["arguments"]["workspace"] = json!(normalized(&worktree));
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
-            allowed_call(),
+            request,
             &test_gate(),
             "read_file",
             json!({"workspace": {"type": "string"}}),
@@ -1243,7 +1211,7 @@ mod tests {
     }
 
     #[test]
-    fn registered_paths_rewrite_only_declared_schema_arguments() {
+    fn registered_paths_validate_without_changing_declared_arguments() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, worktree) =
             routing_fixture(SessionWorktreeStatus::Active, false);
@@ -1252,7 +1220,8 @@ mod tests {
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
         let mut request = call("peek_read", Some("gpt-5-mini"));
-        request["params"]["arguments"]["path"] = json!("nested");
+        let supplied_path = nested.join("..").join("nested");
+        request["params"]["arguments"]["path"] = json!(supplied_path);
         request["params"]["arguments"]["untouched"] = json!("value");
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
             request,
@@ -1267,7 +1236,7 @@ mod tests {
         };
         assert_eq!(
             forwarded["params"]["arguments"]["path"],
-            json!(normalized(&nested))
+            json!(supplied_path)
         );
         assert_eq!(
             forwarded["params"]["arguments"]["untouched"],
@@ -1316,6 +1285,156 @@ mod tests {
             forwarded["params"]["arguments"]["workspace"],
             json!("unchanged")
         );
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn relative_rename_paths_from_main_checkout_are_forwarded_unchanged() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let cwd = std::env::current_dir().unwrap();
+        let temp = tempfile::tempdir_in(&cwd).unwrap();
+        let main_checkout = temp.path().join("repository");
+        let source = main_checkout.join("nested").join("ROADMAP.md");
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".git")).unwrap();
+        std::fs::create_dir_all(main_checkout.join(".session")).unwrap();
+        std::fs::write(&source, "roadmap").unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+
+        let mut request = call("fs_rename_file", Some("gpt-5-mini"));
+        request["params"]["arguments"]["from"] = json!(source.strip_prefix(&cwd).unwrap());
+        request["params"]["arguments"]["to"] = json!("ROADMAP.v1.md");
+        request["params"]["arguments"]["root"] = json!(main_checkout);
+        let mut expected = request["params"]["arguments"].clone();
+        expected.as_object_mut().unwrap().remove(CALLER_MODEL_ARG);
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            request, &test_gate(), "fs_rename_file",
+            json!({"from": {}, "to": {}, "root": {}}),
+        ) else {
+            panic!("relative rename inside actual checkout should forward");
+        };
+        assert_eq!(forwarded["params"]["arguments"], expected);
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn worktree_rename_to_missing_destination_preserves_arguments() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        let source = worktree.join("nested").join("ROADMAP.md");
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::write(&source, "roadmap").unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+
+        let mut request = call("fs_rename_file", Some("gpt-5-mini"));
+        request["params"]["arguments"]["from"] = json!(source);
+        request["params"]["arguments"]["to"] = json!("ROADMAP.v1.md");
+        request["params"]["arguments"]["root"] = json!(worktree);
+        let mut expected = request["params"]["arguments"].clone();
+        expected.as_object_mut().unwrap().remove(CALLER_MODEL_ARG);
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            request, &test_gate(), "fs_rename_file",
+            json!({"from": {}, "to": {}, "root": {}}),
+        ) else {
+            panic!("rename to a new sibling in the worktree should forward");
+        };
+        assert_eq!(forwarded["params"]["arguments"], expected);
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn mutations_reject_destinations_outside_assigned_worktree() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        for (tool, destination) in [
+            ("fs_move_file", json!(main_checkout.join("missing").join("new.md"))),
+            ("fs_copy_file", json!(main_checkout.join("README.md"))),
+            ("fs_rename_file", json!(main_checkout.join("new.md"))),
+            ("fs_rename_file", json!("../outside.md")),
+        ] {
+            let mut request = call(tool, Some("gpt-5-mini"));
+            request["params"]["arguments"]["from"] = json!(worktree.join("README.md"));
+            request["params"]["arguments"]["to"] = destination;
+            request["params"]["arguments"]["root"] = json!(worktree);
+            let (action, _) = route_with_schema(
+                request, &test_gate(), tool,
+                json!({"from": {}, "to": {}, "root": {}}),
+            );
+            let text = response_text(action);
+            assert!(text.contains("PATH_OUTSIDE_SESSION_WORKTREE"), "{tool}: {text}");
+        }
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn mutation_to_missing_nested_worktree_destination_is_forwarded_unchanged() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let mut request = call("fs_move_file", Some("gpt-5-mini"));
+        let destination = worktree.join("new").join("nested").join("file.md");
+        request["params"]["arguments"]["from"] = json!(worktree.join("README.md"));
+        request["params"]["arguments"]["to"] = json!(destination);
+        request["params"]["arguments"]["root"] = json!(worktree);
+        let (ClientAction::Forward(forwarded), _) = route_with_schema(
+            request, &test_gate(), "fs_move_file",
+            json!({"from": {}, "to": {}, "root": {}}),
+        ) else {
+            panic!("missing destination inside assigned worktree should forward");
+        };
+        assert_eq!(forwarded["params"]["arguments"]["to"], json!(destination));
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn relative_mutation_path_is_not_reinterpreted_as_worktree_relative() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, _worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let mut request = call("fs_delete_file", Some("gpt-5-mini"));
+        request["params"]["arguments"]["path"] = json!("README.md");
+        let (action, _) = route_with_schema(
+            request, &test_gate(), "fs_delete_file", json!({"path": {}}),
+        );
+        assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn junction_or_symlink_escape_is_rejected_even_for_missing_destination() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        let outside = main_checkout.join("outside");
+        let link = worktree.join("escape");
+        std::fs::create_dir_all(&outside).unwrap();
+        #[cfg(windows)]
+        {
+            let output = Command::new("cmd")
+                .args(["/C", "mklink", "/J"])
+                .arg(&link)
+                .arg(&outside)
+                .output()
+                .unwrap();
+            assert!(output.status.success(), "{output:?}");
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let mut request = call("fs_move_file", Some("gpt-5-mini"));
+        request["params"]["arguments"]["from"] = json!(worktree.join("README.md"));
+        request["params"]["arguments"]["to"] = json!(link.join("missing").join("new.md"));
+        request["params"]["arguments"]["root"] = json!(worktree);
+        let (action, _) = route_with_schema(
+            request, &test_gate(), "fs_move_file",
+            json!({"from": {}, "to": {}, "root": {}}),
+        );
+        assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
 

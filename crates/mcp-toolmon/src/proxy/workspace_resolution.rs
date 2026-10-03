@@ -1,17 +1,11 @@
-//! Resolves the session→checkout mapping used to rewrite `workspace`
-//! arguments before forwarding a call, and the main-checkout mutation gate.
-//!
-//! Resolution always runs first, independent of how the caller's `workspace`
-//! argument was expressed (unset, `"default"`, empty, relative, or
-//! absolute): that argument only ever selects a sub-path within whichever
-//! checkout the session resolves to, never which checkout that is. Gating
-//! (read vs. mutation, unassigned-session fallback) is applied to the
-//! resolved scope, never to the literal input string.
+//! Validates caller-supplied paths against the session checkout without
+//! substituting paths or selecting a different execution directory.
 
 use std::path::{
     Path,
     PathBuf,
 };
+use std::io::ErrorKind;
 
 use session_api::{
     SessionError,
@@ -64,22 +58,9 @@ fn resolve_workspace(
 ) -> Result<(String, PathBuf), String> {
     let store_dir = DEFAULT_STORE_DIR.to_string();
     let resolver = anchored_resolver()?;
-    let absolute_workspace = workspace
-        .filter(|value| Path::new(value).is_absolute())
-        .map(PathBuf::from);
-    let relative_workspace = workspace
-        .filter(|value| !value.is_empty() && *value != "default")
-        .filter(|value| !Path::new(value).is_absolute())
-        .map(Path::new);
-
-    // Resolve the checkout scope first, independent of how `workspace` was
-    // expressed (unset, "default", empty, relative, or absolute): the
-    // argument only ever selects a sub-path within whichever checkout the
-    // session resolves to, never which checkout that is. Gating below runs
-    // against that resolved scope, not the literal input string.
     let (canonical_target_root, store_root) = match resolver.resolve(ResolveRequest {
         session_id,
-        relative_workspace,
+        relative_workspace: None,
         store_dir: &store_dir,
     }) {
         Ok(resolved) => {
@@ -104,17 +85,17 @@ fn resolve_workspace(
             resolve_unassigned_session_target(&resolver, session_id, &store_dir, access)?,
         Err(other) => return Err(other.to_string()),
     };
-    let target_root = absolute_workspace
-        .map(|workspace| {
-            let canonical_workspace = std::fs::canonicalize(&workspace).map_err(|error| {
-                format!("workspace '{}' could not be canonicalized: {error}", workspace.display())
-            })?;
+    let target_root = workspace
+        .map(|value| {
+            let workspace = Path::new(value);
+            let canonical_workspace = canonicalize_tool_path(workspace)?;
             if !canonical_workspace.starts_with(&canonical_target_root) {
                 return Err(format!(
-                    "workspace '{}' (canonical '{}') is outside resolved session worktree '{}'",
+                    "PATH_OUTSIDE_SESSION_WORKTREE: path '{}' (canonical '{}') is outside resolved session worktree '{}' for session '{}'. Supply a path inside the assigned checkout; paths are not rewritten.",
                     workspace.display(),
                     canonical_workspace.display(),
-                    canonical_target_root.display()
+                    canonical_target_root.display(),
+                    session_id
                 ));
             }
             Ok(canonical_workspace)
@@ -127,6 +108,37 @@ fn resolve_workspace(
         .trim_end_matches('/')
         .to_string();
     Ok((target_root, store_root))
+}
+
+pub(crate) fn canonicalize_tool_path(path: &Path) -> Result<PathBuf, String> {
+    let absolute_path = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|error| format!("cannot determine tool working directory: {error}"))?
+            .join(path)
+    };
+    match std::fs::canonicalize(&absolute_path) {
+        Ok(canonical) => Ok(canonical),
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            match std::fs::symlink_metadata(&absolute_path) {
+                Err(metadata_error) if metadata_error.kind() == ErrorKind::NotFound => {},
+                _ => return Err(format!(
+                    "cannot validate path '{}': {error}", absolute_path.display()
+                )),
+            }
+            let parent = absolute_path.parent().ok_or_else(|| {
+                format!("cannot validate path '{}': {error}", absolute_path.display())
+            })?;
+            let name = absolute_path.file_name().ok_or_else(|| {
+                format!("cannot validate path '{}': {error}", absolute_path.display())
+            })?;
+            Ok(canonicalize_tool_path(parent)?.join(name))
+        },
+        Err(error) => Err(format!(
+            "cannot validate path '{}': {error}", absolute_path.display()
+        )),
+    }
 }
 
 /// Resolves the checkout scope for a session with no discoverable worktree
@@ -206,16 +218,8 @@ fn repository_root_target(
     Ok((canonical_target_root, store_root))
 }
 
-/// A worktree assignment whose own `path` is the repository's main checkout
-/// (e.g. left over from a stale hook-inference bug, or a failed provisioning
-/// attempt that fell back to main) is not worktree isolation. Treating it as
-/// "assigned" would then require a matching `.worktrees/<id>/...` checkout
-/// that never existed, permanently blocking a session that only ever worked
-/// in the main checkout. Such an assignment is treated the same as no
-/// assignment at all. A failed provisioning attempt (the assignment points
-/// at a worktree path that was never created, or was since removed) is the
-/// same story: the path won't canonicalize, and that broken assignment must
-/// not permanently wall the session off from the main checkout either.
+/// A legacy assignment to the main checkout is not worktree isolation.
+/// A missing assigned worktree remains assigned and blocks mutation fallback.
 fn session_is_unassigned(
     repository_root: &Path,
     session_id: &str,
@@ -226,7 +230,6 @@ fn session_is_unassigned(
             None => true,
             Some(assignment) => {
                 assignment_targets_repository_root(repository_root, &assignment.path)
-                    || !assignment.path.is_dir()
             },
         }),
         Err(SessionError::NotFound { .. }) => Ok(true),
