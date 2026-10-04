@@ -223,6 +223,131 @@ async fn inflight_request_synthesized_error_on_kill() {
 }
 
 #[tokio::test]
+async fn pending_request_resolved_during_drain_receives_original_response() {
+    let shadow_root = TempDir::new().unwrap();
+    let canonical_dir = TempDir::new().unwrap();
+    let canonical = canonical_dir.path().join(canonical_exe_name());
+    write_exe(&canonical, &fake_v1_bytes());
+
+    let command = vec![canonical.to_string_lossy().to_string()];
+    let supervisor = std::sync::Arc::new(
+        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
+            .unwrap(),
+    );
+
+    perform_handshake(&supervisor).await;
+
+    let pending_id = json!(77);
+    supervisor.record_pending(&pending_id).await;
+
+    // Round-trip the request concurrently with the swap's drain window: the
+    // fake binary answers almost immediately, well inside a drain window
+    // generous enough that the real response resolves the pending id before
+    // `fail_all_pending` can run. Mirrors main.rs's reader loop, which calls
+    // `resolve_pending` the instant a response carrying the id arrives.
+    let caller_supervisor = supervisor.clone();
+    let caller = tokio::spawn(async move {
+        let req = json!({"jsonrpc":"2.0","id":77,"method":"tools/call","params":{"name":"generation","arguments":{}}});
+        assert!(caller_supervisor.write_line(&req.to_string()).await);
+        let line = caller_supervisor
+            .read_line()
+            .await
+            .expect("child closed without responding");
+        caller_supervisor.resolve_pending(&json!(77)).await;
+        serde_json::from_str::<Value>(&line).unwrap()
+    });
+
+    let (synthesized, caller_result) =
+        tokio::join!(supervisor.swap_child_with_drain_ms(500), caller);
+    let response = caller_result.unwrap();
+
+    assert!(
+        synthesized.is_empty(),
+        "a request resolved before the drain deadline must not also receive a synthesized error"
+    );
+    assert_eq!(
+        generation_text(&response),
+        "v1",
+        "a request resolved during the drain window must receive its original, unmodified response"
+    );
+    assert!(
+        supervisor.has_healthy_child().await,
+        "the swap must still complete a healthy respawn after the drained request resolved"
+    );
+
+    let _ = supervisor.shutdown().await;
+}
+
+#[tokio::test]
+async fn sibling_supervisor_remains_available_during_reload() {
+    let shadow_root_a = TempDir::new().unwrap();
+    let canonical_dir_a = TempDir::new().unwrap();
+    let canonical_a = canonical_dir_a.path().join(canonical_exe_name());
+    write_exe(&canonical_a, &fake_v1_bytes());
+
+    let shadow_root_b = TempDir::new().unwrap();
+    let canonical_dir_b = TempDir::new().unwrap();
+    let canonical_b = canonical_dir_b.path().join(canonical_exe_name());
+    write_exe(&canonical_b, &fake_v1_bytes());
+
+    let supervisor_a = std::sync::Arc::new(
+        Supervisor::spawn_with_shadow_dir(
+            &[canonical_a.to_string_lossy().to_string()],
+            Some(shadow_root_a.path()),
+        )
+        .unwrap(),
+    );
+    let supervisor_b = std::sync::Arc::new(
+        Supervisor::spawn_with_shadow_dir(
+            &[canonical_b.to_string_lossy().to_string()],
+            Some(shadow_root_b.path()),
+        )
+        .unwrap(),
+    );
+
+    perform_handshake(&supervisor_a).await;
+    perform_handshake(&supervisor_b).await;
+
+    // Trigger a reload on domain A's supervisor while concurrently
+    // round-tripping requests through independent domain B's supervisor: B
+    // must keep serving throughout, proving the two domains' supervisors
+    // share no lock, state, or child process.
+    write_exe(&canonical_a, &fake_v2_bytes());
+    let swap_a = supervisor_a.swap_child_with_drain_ms(200);
+
+    let supervisor_b_task = supervisor_b.clone();
+    let b_calls = tokio::spawn(async move {
+        let mut responses = Vec::new();
+        for i in 0..5i64 {
+            let resp = call_generation(&supervisor_b_task, i).await;
+            responses.push(generation_text(&resp).to_string());
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+        responses
+    });
+
+    let (synthesized_a, b_responses) = tokio::join!(swap_a, b_calls);
+    let b_responses = b_responses.unwrap();
+
+    assert!(
+        synthesized_a.is_empty(),
+        "no requests were pending against domain A during this swap"
+    );
+    assert!(
+        b_responses.iter().all(|r| r == "v1"),
+        "sibling domain B must remain healthy and serve every request while domain A reloads: {b_responses:?}"
+    );
+    assert!(
+        supervisor_a.has_healthy_child().await,
+        "domain A must recover a healthy child after its own reload"
+    );
+    assert!(supervisor_b.has_healthy_child().await);
+
+    let _ = supervisor_a.shutdown().await;
+    let _ = supervisor_b.shutdown().await;
+}
+
+#[tokio::test]
 async fn respawn_backoff_no_process_exit() {
     let shadow_root = TempDir::new().unwrap();
     let canonical_dir = TempDir::new().unwrap();
