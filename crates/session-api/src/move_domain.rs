@@ -296,6 +296,12 @@ mod tests {
         })
     }
 
+    fn canonical_target_session_store(workspace_root: &Path) -> PathBuf {
+        workspace_root
+            .join(memory_kernel::workspace::CANONICAL_STORES_DIR)
+            .join("session")
+    }
+
     #[test]
     fn session_store_reuses_move_kernel_between_stores() {
         let temp = tempdir().unwrap();
@@ -307,7 +313,7 @@ mod tests {
         let target_workspace = repo.join("target");
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR))
             .unwrap();
-        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR))
+        std::fs::create_dir_all(canonical_target_session_store(&target_workspace))
             .unwrap();
 
         let session_id = Uuid::new_v4();
@@ -326,9 +332,8 @@ mod tests {
         let outcome = source_store.execute_move_with_journal(&plan).unwrap();
         assert_eq!(outcome.journal.phase, MoveExecutionPhase::Validated);
 
-        let target_store = SessionStoreConfig::new(
-            target_workspace.join(SESSION_INDEX_DIR),
-        );
+        let target_store =
+            SessionStoreConfig::new(canonical_target_session_store(&target_workspace));
         assert!(matches!(
             source_store.read_session(&session_id.to_string()),
             Err(SessionError::NotFound { .. })
@@ -409,7 +414,7 @@ mod tests {
         let source_workspace = repo.join("source");
         let target_workspace = repo.join("target");
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
-        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
         let source_store =
             SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
@@ -435,8 +440,9 @@ mod tests {
             assert_eq!(entity_outcome.journal.phase, MoveExecutionPhase::Validated);
         }
 
-        let target_store =
-            SessionStoreConfig::new(target_workspace.join(SESSION_INDEX_DIR));
+        let target_store = SessionStoreConfig::new(
+            canonical_target_session_store(&target_workspace),
+        );
         for session_id in [first_id, second_id] {
             assert!(matches!(
                 source_store.read_session(&session_id.to_string()),
@@ -464,7 +470,7 @@ mod tests {
         let source_workspace = repo.join("source");
         let target_workspace = repo.join("target");
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
-        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
         let source_store =
             SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
@@ -496,7 +502,7 @@ mod tests {
         let source_workspace = repo.join("source");
         let target_workspace = repo.join("target");
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
-        std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
         let source_store =
             SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
@@ -515,8 +521,9 @@ mod tests {
         let rolled_back = source_store.rollback_move_set(journal_id).unwrap();
         assert_eq!(rolled_back.journal.id, journal_id);
 
-        let target_store =
-            SessionStoreConfig::new(target_workspace.join(SESSION_INDEX_DIR));
+        let target_store = SessionStoreConfig::new(
+            canonical_target_session_store(&target_workspace),
+        );
         assert!(source_store
             .read_session(&session_id.to_string())
             .is_ok());

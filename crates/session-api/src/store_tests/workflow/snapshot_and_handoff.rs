@@ -298,8 +298,28 @@ fn handoff_package_round_trip_persists_schema_fields() {
     let tempdir = TempDir::new().unwrap();
     let config =
         SessionStoreConfig::new(tempdir.path().join("store"));
+    let session_id = uuid::Uuid::new_v4().to_string();
+    let worktree = managed_worktree(
+        &tempdir,
+        &session_id,
+        "handoff-round-trip",
+        "agent/handoff-round-trip",
+    );
+    let target_file = worktree.join("src/lib.rs");
+    std::fs::create_dir_all(target_file.parent().unwrap()).unwrap();
+    std::fs::write(&target_file, "fixture").unwrap();
+    config
+        .check_in_worktree(crate::SessionWorktreeCheckInRequest {
+            session_id: session_id.clone(),
+            owner_id: "copilot".to_string(),
+            ticket_id: "ticket-handoff-round-trip".to_string(),
+            worktree_path: worktree,
+            branch: "agent/handoff-round-trip".to_string(),
+            predecessor_session_id: None,
+        })
+        .unwrap();
     let init = config
-        .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(session_id), ..Default::default() })
         .unwrap();
     let workspace_id = init.context.session_id;
     let package = crate::SessionHandoffPackage {
@@ -482,15 +502,30 @@ fn handoff_package_normalizes_backslash_target_files_to_forward_slash() {
     let tempdir = TempDir::new().unwrap();
     let config =
         SessionStoreConfig::new(tempdir.path().join("store"));
-    let init = config
-        .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
-        .unwrap();
-    let workspace_id = init.context.session_id;
-    let target_file = tempdir
-        .path()
-        .join("store/src/model/handoff.rs");
+    let session_id = uuid::Uuid::new_v4().to_string();
+    let worktree = managed_worktree(
+        &tempdir,
+        &session_id,
+        "handoff-normalized-path",
+        "agent/handoff-normalized-path",
+    );
+    let target_file = worktree.join("src/lib.rs");
     std::fs::create_dir_all(target_file.parent().unwrap()).unwrap();
     std::fs::write(&target_file, "fixture").unwrap();
+    config
+        .check_in_worktree(crate::SessionWorktreeCheckInRequest {
+            session_id: session_id.clone(),
+            owner_id: "copilot".to_string(),
+            ticket_id: "ticket-handoff-normalized-path".to_string(),
+            worktree_path: worktree,
+            branch: "agent/handoff-normalized-path".to_string(),
+            predecessor_session_id: None,
+        })
+        .unwrap();
+    let init = config
+        .init_runtime_context(crate::SessionRuntimeInitRequest { session_id: Some(session_id), ..Default::default() })
+        .unwrap();
+    let workspace_id = init.context.session_id;
 
     let package = crate::SessionHandoffPackage {
         objective: "Verify repo-root-relative forward-slash normalization"
