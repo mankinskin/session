@@ -160,6 +160,8 @@ pub use store::{
     PersistedSessionTranscript,
     RelationStrength,
     SessionQuery,
+    SessionQueryDiagnostic,
+    SessionQueryResult,
     SessionRuntimePaths,
     SessionStoreConfig,
     SessionStorePaths,

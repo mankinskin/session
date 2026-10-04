@@ -1640,13 +1640,14 @@ impl SessionServer {
             text: input.text,
             limit: input.limit,
         };
-        let sessions = self
+        let result = self
             .config()
             .query_sessions(&query)
             .map_err(Self::session_err)?;
         Self::json_result(&serde_json::json!({
-            "count": sessions.len(),
-            "sessions": sessions,
+            "count": result.sessions.len(),
+            "sessions": result.sessions,
+            "diagnostics": result.diagnostics,
         }))
     }
 
@@ -2239,7 +2240,7 @@ mod tests {
         let store_root = dir.path().join(".session");
         let worktree = dir.path().join("wt");
         let server =
-            SessionServer::new(store_root.clone(), "default".to_string());
+            SessionServer::new(store_root.clone());
 
         let receipt = server
             .session_check_in(Parameters(CheckInInput {
@@ -2270,7 +2271,7 @@ mod tests {
         let session_root = dir.path().join(".session");
         let workspace = session_root.display().to_string();
         let session_id = "88888888-8888-4888-8888-888888888888";
-        let server = SessionServer::new(session_root.clone(), "default".to_string());
+        let server = SessionServer::new(session_root.clone());
         let config = SessionStoreConfig::new(session_root);
         config
             .init_runtime_context(SessionRuntimeInitRequest {
@@ -2333,7 +2334,7 @@ mod tests {
         std::fs::write(&target, "assigned worktree target").unwrap();
         let workspace = worktree.display().to_string();
         let session_id = "99999999-9999-4999-8999-999999999999";
-        let server = SessionServer::new(main_store, "default".to_string());
+        let server = SessionServer::new(main_store);
 
         server
             .session_check_in(Parameters(CheckInInput {
@@ -2391,7 +2392,7 @@ mod tests {
         let store_root = dir.path().join(".session");
         let worktree = dir.path().join("wt");
         let server =
-            SessionServer::new(store_root.clone(), "default".to_string());
+            SessionServer::new(store_root.clone());
 
         server
             .session_check_in(Parameters(CheckInInput {
@@ -2466,7 +2467,7 @@ mod tests {
                 None,
             )
             .expect("pin rule");
-        let server = SessionServer::new(session_root.clone(), "default".into());
+        let server = SessionServer::new(session_root.clone());
 
         let result = server
             .session_runtime_render_instructions(Parameters(RuntimeViewInput {
@@ -2488,10 +2489,17 @@ mod tests {
     async fn query_and_peek() {
         let dir = tempdir().unwrap();
         let store_root = dir.path().join(".session");
-        let server =
-            SessionServer::new(store_root.clone(), "default".to_string());
-        let config = SessionStoreConfig::new(store_root);
+        let server = SessionServer::new(store_root.clone());
+        let config = SessionStoreConfig::new(store_root.clone());
         seed(&config, "22222222-2222-4222-8222-222222222222", "agent-2");
+        let unreadable_id = "f3333333-3333-4333-8333-333333333333";
+        let unreadable_dir = store_root.join("sessions").join(unreadable_id);
+        std::fs::create_dir_all(&unreadable_dir).unwrap();
+        std::fs::write(
+            unreadable_dir.join("session.json"),
+            b"private malformed session payload",
+        )
+        .unwrap();
 
         let query = server
             .session_query(Parameters(QueryInput {
@@ -2504,6 +2512,27 @@ mod tests {
             .await
             .expect("query");
         assert!(!query.is_error.unwrap_or(false));
+        let payload = extract_json(query);
+        assert_eq!(payload["count"], 1);
+        assert_eq!(
+            payload["sessions"][0]["session_id"],
+            "22222222-2222-4222-8222-222222222222"
+        );
+        assert_eq!(payload["diagnostics"][0]["session_id"], unreadable_id);
+        assert_eq!(
+            payload["diagnostics"][0]["code"],
+            "unreadable_session_record"
+        );
+        assert!(
+            !payload
+                .to_string()
+                .contains("private malformed session payload")
+        );
+        assert!(
+            !payload
+                .to_string()
+                .contains(store_root.to_string_lossy().as_ref())
+        );
 
         let skeleton = server
             .session_peek_skeleton(Parameters(PeekSkeletonInput {
@@ -2536,16 +2565,10 @@ mod tests {
             .unwrap();
 
         let session_id = "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71";
-        let config = SessionStoreConfig::new(
-            source_store_root.clone(),
-            "default".to_string(),
-        );
+        let config = SessionStoreConfig::new(source_store_root.clone());
         seed(&config, session_id, "agent-3");
 
-        let server = SessionServer::new(
-            source_store_root.clone(),
-            "default".to_string(),
-        );
+        let server = SessionServer::new(source_store_root.clone());
         let preflight = server
             .session_move_preflight(Parameters(SessionMoveInput {
                 id: session_id.to_string(),
@@ -2574,10 +2597,8 @@ mod tests {
         assert_eq!(apply_json["mode"], "apply");
         assert!(apply_json["outcome"]["journal"]["id"].is_string());
 
-        let target_config = SessionStoreConfig::new(
-            target_workspace_root.join(".session"),
-            "default".to_string(),
-        );
+        let target_config =
+            SessionStoreConfig::new(target_workspace_root.join(".session"));
         assert!(matches!(
             config.read_session(session_id),
             Err(SessionError::NotFound { .. })
@@ -2699,8 +2720,7 @@ mod tests {
     async fn runtime_init_result_exposes_session_id_top_line() {
         let dir = tempdir().unwrap();
         let session_root = dir.path().join(".session");
-        let server =
-            SessionServer::new(session_root.clone(), "default".to_string());
+        let server = SessionServer::new(session_root.clone());
 
         let result = server
             .session_runtime_init(Parameters(RuntimeInitInput {
@@ -2745,8 +2765,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let session_root = dir.path().join(".session");
         let workspace = session_root.display().to_string();
-        let server =
-            SessionServer::new(session_root.clone(), "default".to_string());
+        let server = SessionServer::new(session_root.clone());
         let config = server.config_for_workspace(&workspace).unwrap();
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
@@ -2863,8 +2882,7 @@ mod tests {
     async fn capabilities_lists_session_lifecycle_and_enums() {
         let dir = tempdir().unwrap();
         let session_root = dir.path().join(".session");
-        let server =
-            SessionServer::new(session_root.clone(), "default".to_string());
+        let server = SessionServer::new(session_root.clone());
 
         let result = server
             .session_capabilities(Parameters(CapabilitiesInput::default()))

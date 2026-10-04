@@ -225,11 +225,9 @@ impl SessionStoreConfig {
         })
     }
 
-    pub fn query_sessions(
-        &self,
-        query: &SessionQuery,
-    ) -> Result<Vec<SessionRecord>, SessionError> {
+    pub fn query_sessions(&self, query: &SessionQuery) -> Result<SessionQueryResult, SessionError> {
         let mut records = vec![];
+        let mut diagnostics = vec![];
         for entry in self.federated_sessions()? {
             let record = match entry.store.read_session(&entry.session_id) {
                 Ok(record) => record,
@@ -239,8 +237,12 @@ impl SessionStoreConfig {
                         entry.session_id,
                         entry.source_path.display()
                     );
+                    diagnostics.push(SessionQueryDiagnostic {
+                        session_id: entry.session_id,
+                        code: "unreadable_session_record".to_string(),
+                    });
                     continue;
-                },
+                }
             };
             if session_matches_query(&record, query) {
                 records.push(record);
@@ -258,7 +260,10 @@ impl SessionStoreConfig {
             records.truncate(limit);
         }
 
-        Ok(records)
+        Ok(SessionQueryResult {
+            sessions: records,
+            diagnostics,
+        })
     }
 
     pub fn latest_session_id(&self) -> Result<Option<String>, SessionError> {

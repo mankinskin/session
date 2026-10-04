@@ -68,6 +68,7 @@ fn federated_query_unions_main_nested_and_legacy_with_worktree_duplicate_winner(
 
     let records = main.query_sessions(&SessionQuery::default()).unwrap();
     let ids = records
+        .sessions
         .iter()
         .map(|record| record.session_id.as_str())
         .collect::<Vec<_>>();
@@ -80,7 +81,7 @@ fn federated_query_unions_main_nested_and_legacy_with_worktree_duplicate_winner(
             "session-main"
         ]
     );
-    assert_eq!(records[0].turns[0].content, "worktree copy");
+    assert_eq!(records.sessions[0].turns[0].content, "worktree copy");
 }
 
 #[test]

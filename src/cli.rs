@@ -860,10 +860,11 @@ fn dispatch(
                 text: args.text,
                 limit: args.limit,
             };
-            let sessions = config.query_sessions(&query)?;
+            let result = config.query_sessions(&query)?;
             to_value(&json!({
-                "count": sessions.len(),
-                "sessions": sessions,
+                "count": result.sessions.len(),
+                "sessions": result.sessions,
+                "diagnostics": result.diagnostics,
             }))
         },
         SessionCommand::SessionsForTicket(args) => {

@@ -119,6 +119,19 @@ pub struct SessionQuery {
     pub limit: Option<usize>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SessionQueryResult {
+    pub sessions: Vec<SessionRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<SessionQueryDiagnostic>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionQueryDiagnostic {
+    pub session_id: String,
+    pub code: String,
+}
+
 /// Widening relation tiers for [`SessionStoreConfig::sessions_for_ticket`].
 /// Each tier includes every match from the tiers before it.
 #[derive(

@@ -249,6 +249,14 @@ fn query_returns_seeded_session() {
     let config =
         SessionStoreConfig::new(store_root.clone());
     seed_session(&config, "22222222-2222-4222-8222-222222222222", "agent-q");
+    let unreadable_id = "f3333333-3333-4333-8333-333333333333";
+    let unreadable_dir = store_root.join("sessions").join(unreadable_id);
+    std::fs::create_dir_all(&unreadable_dir).unwrap();
+    std::fs::write(
+        unreadable_dir.join("session.json"),
+        b"private malformed session payload",
+    )
+    .unwrap();
 
     let result = run_machine(&[
         "session",
@@ -264,6 +272,17 @@ fn query_returns_seeded_session() {
         result["sessions"][0]["session_id"],
         "22222222-2222-4222-8222-222222222222"
     );
+    assert_eq!(result["diagnostics"][0]["session_id"], unreadable_id);
+    assert_eq!(
+        result["diagnostics"][0]["code"],
+        "unreadable_session_record"
+    );
+    assert!(
+        !result
+            .to_string()
+            .contains("private malformed session payload")
+    );
+    assert!(!result.to_string().contains(&store_root_str));
 }
 
 #[test]

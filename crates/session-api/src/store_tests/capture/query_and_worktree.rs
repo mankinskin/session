@@ -128,10 +128,46 @@ fn query_sessions_filters_by_text_and_metadata() {
         })
         .unwrap();
 
-    assert_eq!(by_text.len(), 1);
-    assert_eq!(by_text[0].session_id, "session-beta");
-    assert_eq!(by_conversation.len(), 1);
-    assert_eq!(by_conversation[0].session_id, "session-alpha");
+    assert_eq!(by_text.sessions.len(), 1);
+    assert_eq!(by_text.sessions[0].session_id, "session-beta");
+    assert_eq!(by_conversation.sessions.len(), 1);
+    assert_eq!(by_conversation.sessions[0].session_id, "session-alpha");
+}
+
+#[test]
+fn query_sessions_skips_unreadable_records_and_reports_safe_diagnostics() {
+    let tempdir = TempDir::new().unwrap();
+    let store_root = tempdir.path().join("store");
+    let config = SessionStoreConfig::new(&store_root);
+    config
+        .capture_copilot_hook(sample_payload(
+            "session-readable",
+            Some("conversation-readable"),
+            sample_time(),
+            &["Readable session"],
+        ))
+        .unwrap();
+
+    let unreadable_id = "f3333333-3333-4333-8333-333333333333";
+    let unreadable_dir = store_root.join("sessions").join(unreadable_id);
+    std::fs::create_dir_all(&unreadable_dir).unwrap();
+    std::fs::write(
+        unreadable_dir.join("session.json"),
+        b"private malformed session payload",
+    )
+    .unwrap();
+
+    let result = config.query_sessions(&SessionQuery::default()).unwrap();
+
+    assert_eq!(result.sessions.len(), 1);
+    assert_eq!(result.sessions[0].session_id, "session-readable");
+    assert_eq!(result.diagnostics.len(), 1);
+    assert_eq!(result.diagnostics[0].session_id, unreadable_id);
+    assert_eq!(result.diagnostics[0].code, "unreadable_session_record");
+
+    let diagnostics_json = serde_json::to_string(&result.diagnostics).unwrap();
+    assert!(!diagnostics_json.contains("private malformed session payload"));
+    assert!(!diagnostics_json.contains(store_root.to_string_lossy().as_ref()));
 }
 
 #[test]
