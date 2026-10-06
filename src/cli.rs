@@ -38,6 +38,8 @@ use session_api::{
     ToolMetricsWindow,
 };
 
+mod write_policy;
+
 const SESSION_STORE_DIR: &str = ".session";
 
 // ── CLI root ───────────────────────────────────────────────────────────────────
@@ -715,14 +717,24 @@ pub enum CliRunError {
 
 // ── entry point ───────────────────────────────────────────────────────────────
 
-pub fn run(cli: SessionCli) -> Result<CliOutput, CliRunError> {
-    if matches!(cli.command, SessionCommand::CheckIn(_))
+pub fn run(mut cli: SessionCli) -> Result<CliOutput, CliRunError> {
+    if write_policy::command_writes_store(&cli.command)
         && cli.workspace_root.is_none()
         && cli.store_root.is_none()
     {
         return Err(CliRunError::BadRequest(
-            "entity creation requires explicit --workspace <path>".to_string(),
+            "session writes require explicit --workspace <path> or --store-root <path>".to_string(),
         ));
+    }
+
+    if write_policy::command_writes_store(&cli.command) {
+        if let Some(workspace_root) = cli.workspace_root.as_ref() {
+            let selector = workspace_root.to_string_lossy();
+            cli.workspace_root = Some(
+                workspace::normalize_explicit_workspace_selector(Some(&selector))
+                    .map_err(|err| CliRunError::BadRequest(err.to_string()))?,
+            );
+        }
     }
 
     let store_root = match cli.store_root.as_deref() {
@@ -1492,7 +1504,7 @@ fn move_command(
             "move requires <id> unless --resume/--rollback is used".to_string(),
         )
     })?;
-    let to_workspace_root =
+    let target_selector =
         args.to_workspace_root.as_deref().ok_or_else(|| {
             CliRunError::BadRequest(
                 "move requires --to-workspace-root in plan/execute mode"
@@ -1500,15 +1512,19 @@ fn move_command(
             )
         })?;
 
+    let target_selector = target_selector.to_string_lossy();
+    let target_selector =
+        workspace::normalize_explicit_workspace_selector(Some(&target_selector))
+            .map_err(|error| CliRunError::BadRequest(error.to_string()))?;
     let session_id = id.parse::<Uuid>().map_err(|error| {
         CliRunError::BadRequest(format!("invalid session UUID: {error}"))
     })?;
     let target_workspace_root =
-        workspace::canonicalize_workspace_root_strict(to_workspace_root)
+        workspace::canonicalize_workspace_root_strict(&target_selector)
             .map_err(|error| {
                 CliRunError::BadRequest(format!(
                     "workspace root canonicalization failed for '{}': {error}",
-                    to_workspace_root.display()
+                    target_selector.display()
                 ))
             })?;
     let report =
@@ -1738,6 +1754,55 @@ mod tests {
                 assert!(args.predecessor_session_id.is_none());
             },
             other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_in_rejects_ambient_workspace_aliases() {
+        for selector in ["", "  ", "default", ".."] {
+            let mut cli = parse_cli_from([
+                "session",
+                "--workspace",
+                ".",
+                "check-in",
+                "--session-id",
+                "11111111-1111-4111-8111-111111111111",
+                "--owner-id",
+                "agent-1",
+                "--ticket-id",
+                "ticket-1",
+                "--worktree-path",
+                "/repo/wt",
+                "--branch",
+                "feature/x",
+            ])
+            .expect("parse check-in");
+            cli.workspace_root = Some(PathBuf::from(selector));
+
+            match run(cli) {
+                Err(CliRunError::BadRequest(message)) => {
+                    assert!(message.contains("requires an explicit workspace path"));
+                }
+                _ => panic!("ambient workspace selector must be rejected"),
+            }
+        }
+    }
+
+    #[test]
+    fn init_requires_explicit_workspace_or_store_root() {
+        let cli = parse_cli_from([
+            "session",
+            "init",
+            "--session-id",
+            "11111111-1111-4111-8111-111111111111",
+        ])
+        .expect("parse init");
+
+        match run(cli) {
+            Err(CliRunError::BadRequest(message)) => {
+                assert!(message.contains("writes require explicit --workspace"));
+            }
+            _ => panic!("init must reject an ambient workspace before writing"),
         }
     }
 
@@ -2017,6 +2082,31 @@ mod tests {
     }
 
     #[test]
+    fn move_rejects_ambient_workspace_aliases() {
+        let temp = tempdir().unwrap();
+        let missing_source = temp.path().join("not-created-source");
+
+        for selector in ["", "  ", "default", ".."] {
+            let mut cli = parse_cli_from([
+                "session",
+                "move",
+                "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71",
+                "--to-workspace-root",
+                ".",
+                "--store-root",
+                missing_source.to_string_lossy().as_ref(),
+            ])
+            .expect("parse move");
+            if let SessionCommand::Move(args) = &mut cli.command {
+                args.to_workspace_root = Some(PathBuf::from(selector));
+            }
+
+            assert!(run(cli).is_err(), "selector {selector:?} must be rejected");
+            assert!(!missing_source.exists());
+        }
+    }
+
+    #[test]
     fn parses_sessions_for_ticket_command() {
         let cli = parse_cli_from([
             "session",
@@ -2050,10 +2140,12 @@ mod tests {
             .then_some(())
             .expect("git init failed");
 
-        let source_store_root = repo_root.join(".session");
+        let source_store_root = repo_root.join(".workflow-tools/session");
         std::fs::create_dir_all(&source_store_root).unwrap();
         let target_workspace_root = repo_root.join("target-workspace");
-        std::fs::create_dir_all(target_workspace_root.join(".session"))
+        std::fs::create_dir_all(
+            target_workspace_root.join(".workflow-tools/session"),
+        )
             .unwrap();
 
         let session_id = "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71";
@@ -2104,8 +2196,9 @@ mod tests {
             other => panic!("unexpected output: {other:?}"),
         }
 
-        let target_config =
-            SessionStoreConfig::new(target_workspace_root.join(".session"));
+        let target_config = SessionStoreConfig::new(
+            target_workspace_root.join(".workflow-tools/session"),
+        );
         assert!(matches!(
             config.read_session(session_id),
             Err(SessionError::NotFound { .. })

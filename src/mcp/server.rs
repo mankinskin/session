@@ -742,14 +742,14 @@ impl SessionServer {
         &self,
         workspace_selector: &str,
     ) -> Result<SessionStoreConfig, McpError> {
-        let workspace_selector =
-            workspace::validate_explicit_workspace_selector(Some(
+        let workspace_root =
+            workspace::normalize_explicit_workspace_selector(Some(
                 workspace_selector,
             ))
             .map_err(|err| McpError::invalid_params(err.to_string(), None))?;
         Ok(SessionStoreConfig::new(
             workspace::resolve_store_root_for_initialization_from(
-                std::path::Path::new(workspace_selector),
+                &workspace_root,
                 ".session",
             ),
         ))
@@ -1995,8 +1995,15 @@ impl SessionServer {
                 None,
             )
         })?;
+        let target_selector =
+            workspace::normalize_explicit_workspace_selector(Some(
+                &input.to_workspace_root,
+            ))
+            .map_err(|error| {
+                McpError::invalid_params(error.to_string(), None)
+            })?;
         let target_workspace_root = workspace::canonicalize_workspace_root_strict(
-            std::path::Path::new(&input.to_workspace_root),
+            &target_selector,
         )
         .map_err(|error| {
             McpError::invalid_params(
@@ -2036,8 +2043,15 @@ impl SessionServer {
                 None,
             )
         })?;
+        let target_selector =
+            workspace::normalize_explicit_workspace_selector(Some(
+                &input.to_workspace_root,
+            ))
+            .map_err(|error| {
+                McpError::invalid_params(error.to_string(), None)
+            })?;
         let target_workspace_root = workspace::canonicalize_workspace_root_strict(
-            std::path::Path::new(&input.to_workspace_root),
+            &target_selector,
         )
         .map_err(|error| {
             McpError::invalid_params(
@@ -2558,10 +2572,12 @@ mod tests {
             .then_some(())
             .expect("git init failed");
 
-        let source_store_root = repo_root.join(".session");
+        let source_store_root = repo_root.join(".workflow-tools/session");
         std::fs::create_dir_all(&source_store_root).unwrap();
         let target_workspace_root = repo_root.join("target-workspace");
-        std::fs::create_dir_all(target_workspace_root.join(".session"))
+        std::fs::create_dir_all(
+            target_workspace_root.join(".workflow-tools/session"),
+        )
             .unwrap();
 
         let session_id = "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71";
@@ -2597,8 +2613,9 @@ mod tests {
         assert_eq!(apply_json["mode"], "apply");
         assert!(apply_json["outcome"]["journal"]["id"].is_string());
 
-        let target_config =
-            SessionStoreConfig::new(target_workspace_root.join(".session"));
+        let target_config = SessionStoreConfig::new(
+            target_workspace_root.join(".workflow-tools/session"),
+        );
         assert!(matches!(
             config.read_session(session_id),
             Err(SessionError::NotFound { .. })
@@ -2607,6 +2624,28 @@ mod tests {
             target_config.read_session(session_id).unwrap().session_id,
             session_id
         );
+    }
+
+    #[tokio::test]
+    async fn move_targets_reject_ambient_aliases_before_source_access() {
+        let temp = tempdir().unwrap();
+        let missing_store = temp.path().join("not-created-store");
+        let server = SessionServer::new(missing_store.clone());
+
+        for selector in ["", "  ", "default", ".."] {
+            let input = SessionMoveInput {
+                id: "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71".to_string(),
+                to_workspace_root: selector.to_string(),
+            };
+            assert!(server.session_move_preflight(Parameters(input)).await.is_err());
+
+            let input = SessionMoveInput {
+                id: "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71".to_string(),
+                to_workspace_root: selector.to_string(),
+            };
+            assert!(server.session_move_apply(Parameters(input)).await.is_err());
+            assert!(!missing_store.exists());
+        }
     }
 
     // ── T-SCHEMA: workflow mutation schemas advertise legal enum values ──────
@@ -2943,5 +2982,71 @@ mod tests {
     fn workspace_validation_accepts_current_directory() {
         workspace::validate_explicit_workspace_selector(Some("."))
             .expect("'.' should resolve to the MCP server's cwd");
+    }
+
+    #[test]
+    fn explicit_dot_workspace_uses_absolute_canonical_session_store() {
+        let server = SessionServer::new(PathBuf::from("."));
+        let config = server.config_for_workspace(".").unwrap();
+        let current_dir = std::env::current_dir().unwrap();
+
+        assert_eq!(
+            config.root,
+            workspace::canonical_store_root(&current_dir, ".session")
+        );
+    }
+
+    #[tokio::test]
+    async fn explicit_dot_workspace_runtime_init_reads_back_from_selected_store() {
+        const CHILD_ENV: &str = "SESSION_MCP_DOT_SELECTOR_CHILD";
+        const SESSION_ID: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+        if std::env::var_os(CHILD_ENV).is_none() {
+            let temp = tempdir().unwrap();
+            let parent = temp.path().join("parent");
+            let selected = parent.join("selected");
+            let sibling = parent.join("sibling");
+            std::fs::create_dir_all(&selected).unwrap();
+            std::fs::create_dir_all(&sibling).unwrap();
+
+            let output = Command::new(std::env::current_exe().unwrap())
+                .arg("explicit_dot_workspace_runtime_init_reads_back_from_selected_store")
+                .arg("--nocapture")
+                .env(CHILD_ENV, "1")
+                .current_dir(&selected)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "child regression failed: {} {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+
+            let store_root = workspace::canonical_store_root(&selected, ".session");
+            let context_path = store_root
+                .join("sessions")
+                .join(SESSION_ID)
+                .join("session.json");
+            let context: Value = serde_json::from_slice(&std::fs::read(context_path).unwrap()).unwrap();
+            assert_eq!(context["session_id"], SESSION_ID);
+            assert!(!parent.join(".workflow-tools/session").exists());
+            assert!(!sibling.join(".workflow-tools/session").exists());
+            return;
+        }
+
+        let selected = std::env::current_dir().unwrap();
+        let server = SessionServer::new(
+            selected.parent().unwrap().join("sibling/.workflow-tools/session"),
+        );
+        let result = server
+            .session_runtime_init(Parameters(RuntimeInitInput {
+                workspace: ".".to_string(),
+                session_id: SESSION_ID.to_string(),
+                predecessor_run_id: None,
+                force_new_run: false,
+            }))
+            .await
+            .expect("initialize selected workspace runtime");
+        assert!(!result.is_error.unwrap_or(false));
     }
 }

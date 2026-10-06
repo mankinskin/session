@@ -242,6 +242,41 @@ fn check_in_and_lookup_roundtrip() {
 }
 
 #[test]
+fn init_with_dot_workspace_reads_back_from_canonical_store() {
+    let dir = tempdir().unwrap();
+    let workspace = dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+    let session_id = "11111111-1111-4111-8111-111111111111";
+
+    let output = Command::new(env!("CARGO_BIN_EXE_session"))
+        .current_dir(&workspace)
+        .args([
+            "--json",
+            "--workspace",
+            ".",
+            "init",
+            "--session-id",
+            session_id,
+        ])
+        .output()
+        .expect("run Session CLI init");
+    assert!(
+        output.status.success(),
+        "Session CLI init failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let store_root = workspace.join(".workflow-tools").join("session");
+    let read_back = SessionStoreConfig::new(store_root.clone())
+        .view_runtime_context(session_id)
+        .expect("read initialized runtime context");
+    assert_eq!(read_back.session_id, session_id);
+    assert!(store_root.is_dir());
+    assert!(!workspace.join(".session").exists());
+    assert!(!dir.path().join(".workflow-tools").join("session").exists());
+}
+
+#[test]
 fn query_returns_seeded_session() {
     let dir = tempdir().unwrap();
     let store_root = dir.path().join(".session");
