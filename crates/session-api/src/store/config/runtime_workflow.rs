@@ -3,10 +3,7 @@ impl SessionStoreConfig {
     /// record. Finished workspaces are immutable: this guarantees a finished
     /// workspace cannot silently drift into an incomplete state while still
     /// returning a stale success from `finish_workflow`.
-    fn ensure_workspace_not_finished(
-        &self,
-        session_id: &str,
-    ) -> Result<(), SessionError> {
+    fn ensure_workspace_not_finished(&self, session_id: &str) -> Result<(), SessionError> {
         let paths = self.runtime_paths_for_workspace(session_id)?;
         if paths.finish_path.exists() {
             return Err(SessionError::WorkspaceFinished {
@@ -47,11 +44,9 @@ impl SessionStoreConfig {
         session_id: &str,
     ) -> Result<RuntimeMutationLock, SessionError> {
         let paths = self.runtime_paths_for_workspace(session_id)?;
-        fs::create_dir_all(&paths.workspace_dir).map_err(|source| {
-            SessionError::Io {
-                path: paths.workspace_dir.clone(),
-                source,
-            }
+        fs::create_dir_all(&paths.workspace_dir).map_err(|source| SessionError::Io {
+            path: paths.workspace_dir.clone(),
+            source,
         })?;
         let lock_path = paths.workspace_dir.join(".context.lock");
 
@@ -67,10 +62,9 @@ impl SessionStoreConfig {
 
         match file.try_lock() {
             Ok(()) => Ok(RuntimeMutationLock { file }),
-            Err(fs::TryLockError::WouldBlock) =>
-                Err(SessionError::RuntimeMutationConflict {
-                    session_id: session_id.to_string(),
-                }),
+            Err(fs::TryLockError::WouldBlock) => Err(SessionError::RuntimeMutationConflict {
+                session_id: session_id.to_string(),
+            }),
             Err(fs::TryLockError::Error(source)) => Err(SessionError::Io {
                 path: lock_path,
                 source,
@@ -85,13 +79,7 @@ impl SessionStoreConfig {
         relation: Option<String>,
         reason: Option<String>,
     ) -> Result<SessionRuntimeContext, SessionError> {
-        self.pin_runtime_entity_with_sink(
-            session_id,
-            entity_urn,
-            relation,
-            reason,
-            None,
-        )
+        self.pin_runtime_entity_with_sink(session_id, entity_urn, relation, reason, None)
     }
 
     pub fn pin_runtime_entity_with_sink(
@@ -133,11 +121,7 @@ impl SessionStoreConfig {
         self.persist_runtime_state(&context)?;
 
         if let Some(sink) = feedback_sink {
-            let _ = sink.record_pin_usage(
-                &context.session_id,
-                &context.active_run_id,
-                entity_urn,
-            );
+            let _ = sink.record_pin_usage(&context.session_id, &context.active_run_id, entity_urn);
         }
 
         Ok(context)
@@ -157,6 +141,77 @@ impl SessionStoreConfig {
             self.persist_runtime_state(&context)?;
         }
         Ok(context)
+    }
+
+    /// Resolve a mission pinned to this session without copying it into the
+    /// session manifest. The returned JSON is the shared accepted mission
+    /// record; each session's workflow graph remains local.
+    pub fn resolve_pinned_mission(
+        &self,
+        session_id: &str,
+        entity_urn: &str,
+    ) -> Result<serde_json::Value, SessionError> {
+        let parsed = parse_entity_urn(entity_urn)?;
+        if parsed.kind != SessionPinnedEntityKind::Mission {
+            return Err(SessionError::InvalidEntityUrn(format!(
+                "'{entity_urn}' is not a mission URN"
+            )));
+        }
+
+        let context = self.read_runtime_context(session_id)?;
+        if !context
+            .pinned_entities
+            .iter()
+            .any(|pin| pin.kind == SessionPinnedEntityKind::Mission && pin.urn == entity_urn)
+        {
+            return Err(SessionError::InvalidHookInput(format!(
+                "mission {entity_urn} is not pinned to session {session_id}"
+            )));
+        }
+
+        let store_root = resolve_workspace_store_root(
+            &self.root,
+            &self.workspace_path,
+            &parsed.workspace_path,
+            "mission",
+        )
+        .map_err(SessionError::InvalidHookInput)?;
+        let accepted_path = store_root
+            .join("missions")
+            .join(&parsed.entity_id)
+            .join("accepted.json");
+        let bytes = fs::read(&accepted_path).map_err(|source| {
+            if source.kind() == ErrorKind::NotFound {
+                SessionError::NotFound {
+                    path: accepted_path.clone(),
+                }
+            } else {
+                SessionError::Io {
+                    path: accepted_path.clone(),
+                    source,
+                }
+            }
+        })?;
+        let accepted: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(|source| SessionError::Deserialize {
+                path: accepted_path,
+                source,
+            })?;
+        let record_id = accepted
+            .get("mission_id")
+            .and_then(serde_json::Value::as_str);
+        let has_manifest = accepted
+            .get("bundle")
+            .and_then(|bundle| bundle.get("manifest"))
+            .is_some();
+        if record_id != Some(parsed.entity_id.as_str()) || !has_manifest {
+            return Err(SessionError::InvalidHookInput(format!(
+                "accepted mission record for {} is malformed or has a mismatched mission id",
+                entity_urn
+            )));
+        }
+
+        Ok(accepted)
     }
 
     pub fn view_runtime_context(
@@ -253,9 +308,8 @@ impl SessionStoreConfig {
         drafts: Vec<SessionWorkflowNodeDraft>,
     ) -> Result<SessionRuntimeContext, SessionError> {
         for (index, draft) in drafts.iter().enumerate() {
-            self.validate_workflow_node_draft(draft).map_err(|error| {
-                indexed_workflow_error("nodes", index, error)
-            })?;
+            self.validate_workflow_node_draft(draft)
+                .map_err(|error| indexed_workflow_error("nodes", index, error))?;
         }
 
         let _lock = self.begin_runtime_mutation(session_id)?;
@@ -339,8 +393,7 @@ impl SessionStoreConfig {
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| {
                     SessionError::InvalidHookInput(
-                        "ticket workflow node requires a non-empty ticket_urn"
-                            .to_string(),
+                        "ticket workflow node requires a non-empty ticket_urn".to_string(),
                     )
                 })?;
             let parsed = parse_entity_urn(ticket_urn)?;
@@ -365,8 +418,7 @@ impl SessionStoreConfig {
                 .filter(|value| !value.is_empty())
                 .ok_or_else(|| {
                     SessionError::InvalidHookInput(
-                        "spec workflow node requires a non-empty spec_urn"
-                            .to_string(),
+                        "spec workflow node requires a non-empty spec_urn".to_string(),
                     )
                 })?;
             let parsed = parse_entity_urn(spec_urn)?;
@@ -405,8 +457,7 @@ impl SessionStoreConfig {
             })?;
         } else if draft.validation_spec_id.is_some() {
             return Err(SessionError::InvalidHookInput(
-                "only validation workflow nodes may set validation_spec_id"
-                    .to_string(),
+                "only validation workflow nodes may set validation_spec_id".to_string(),
             ));
         }
 

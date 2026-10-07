@@ -1,14 +1,167 @@
 #[test]
+fn runtime_pin_accepts_mission_urn() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace = tempdir.path();
+    let config = super::SessionStoreConfig::new(workspace.join(".workflow-tools").join("session"));
+    let session_id = uuid::Uuid::new_v4().to_string();
+    config
+        .init_runtime_context(crate::SessionRuntimeInitRequest {
+            session_id: Some(session_id.clone()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let mission_id = uuid::Uuid::new_v4();
+    let mission_urn = format!("ce://default/mission/{mission_id}");
+    let accepted_path = workspace
+        .join(".workflow-tools/mission/missions")
+        .join(mission_id.to_string())
+        .join("accepted.json");
+    std::fs::create_dir_all(accepted_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &accepted_path,
+        serde_json::json!({
+            "mission_id": mission_id,
+            "bundle": { "manifest": { "title": "Shared mission" } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let context = config
+        .pin_runtime_entity(&session_id, &mission_urn, None, None)
+        .unwrap();
+    assert_eq!(
+        context.pinned_entities[0].kind,
+        crate::SessionPinnedEntityKind::Mission
+    );
+    assert_eq!(
+        config
+            .resolve_pinned_mission(&session_id, &mission_urn)
+            .unwrap()["bundle"]["manifest"]["title"],
+        "Shared mission"
+    );
+}
+
+#[test]
+fn runtime_pin_rejects_invalid_mission_urn() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let config =
+        super::SessionStoreConfig::new(tempdir.path().join(".workflow-tools").join("session"));
+    let session_id = uuid::Uuid::new_v4().to_string();
+    config
+        .init_runtime_context(crate::SessionRuntimeInitRequest {
+            session_id: Some(session_id.clone()),
+            ..Default::default()
+        })
+        .unwrap();
+
+    let error = config
+        .pin_runtime_entity(&session_id, "ce://default/mission/not-a-uuid", None, None)
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("canonical lowercase UUID"),
+        "unexpected error: {error}"
+    );
+    assert!(
+        config
+            .read_runtime_context(&session_id)
+            .unwrap()
+            .pinned_entities
+            .is_empty()
+    );
+}
+
+#[test]
+fn two_sessions_attach_same_mission_without_shared_workflow_graph() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let workspace = tempdir.path();
+    let config = super::SessionStoreConfig::new(workspace.join(".workflow-tools").join("session"));
+    let mission_id = uuid::Uuid::new_v4();
+    let mission_urn = format!("ce://default/mission/{mission_id}");
+    let accepted_path = workspace
+        .join(".workflow-tools/mission/missions")
+        .join(mission_id.to_string())
+        .join("accepted.json");
+    std::fs::create_dir_all(accepted_path.parent().unwrap()).unwrap();
+    std::fs::write(
+        &accepted_path,
+        serde_json::json!({
+            "mission_id": mission_id,
+            "bundle": { "manifest": { "title": "Shared mission" } }
+        })
+        .to_string(),
+    )
+    .unwrap();
+
+    let first_id = uuid::Uuid::new_v4().to_string();
+    let second_id = uuid::Uuid::new_v4().to_string();
+    for session_id in [&first_id, &second_id] {
+        config
+            .init_runtime_context(crate::SessionRuntimeInitRequest {
+                session_id: Some(session_id.clone()),
+                ..Default::default()
+            })
+            .unwrap();
+        config
+            .pin_runtime_entity(session_id, &mission_urn, None, None)
+            .unwrap();
+    }
+
+    for (session_id, node_id, title) in [
+        (&first_id, "first-task", "First session task"),
+        (&second_id, "second-task", "Second session task"),
+    ] {
+        config
+            .workflow_add_node(
+                session_id,
+                crate::SessionWorkflowNodeDraft {
+                    node_id: Some(node_id.into()),
+                    kind: crate::SessionWorkflowNodeKind::Task,
+                    requirement: crate::SessionWorkflowNodeRequirement::Optional,
+                    title: title.into(),
+                    ticket_urn: None,
+                    spec_urn: None,
+                    anchor_urn: None,
+                    category: None,
+                    cached_ticket_title: None,
+                    validation_spec_id: None,
+                },
+            )
+            .unwrap();
+    }
+
+    for session_id in [&first_id, &second_id] {
+        assert_eq!(
+            config
+                .resolve_pinned_mission(session_id, &mission_urn)
+                .unwrap()["mission_id"],
+            mission_id.to_string()
+        );
+    }
+    let first = config.read_runtime_context(&first_id).unwrap();
+    let second = config.read_runtime_context(&second_id).unwrap();
+    assert_eq!(first.pinned_entities[0].urn, mission_urn);
+    assert_eq!(second.pinned_entities[0].urn, mission_urn);
+    assert_eq!(first.workflow.nodes.len(), 1);
+    assert_eq!(second.workflow.nodes.len(), 1);
+    assert_eq!(first.workflow.nodes[0].node_id, "first-task");
+    assert_eq!(second.workflow.nodes[0].node_id, "second-task");
+}
+
+#[test]
 fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
-    let mut rule_store =
-        rule_api::RuleStore::open_or_init(&store_root.join(".rule")).unwrap();
+    let mut rule_store = rule_api::RuleStore::open_or_init(&store_root.join(".rule")).unwrap();
 
     let mut later = rule_api::RuleManifest::new(
         "session/render/later",
@@ -61,8 +214,7 @@ fn pinned_rule_render_contains_only_rule_pins_in_canonical_order() {
     assert!(rendered.contains("Later guidance."));
     assert!(!rendered.contains("11111111-1111-4111-8111-111111111111"));
     assert!(
-        rendered.find("Earlier guidance.").unwrap()
-            < rendered.find("Later guidance.").unwrap()
+        rendered.find("Earlier guidance.").unwrap() < rendered.find("Later guidance.").unwrap()
     );
 }
 
@@ -72,7 +224,10 @@ fn pinned_rule_render_skips_missing_rule() {
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     rule_api::RuleStore::open_or_init(&store_root.join(".rule")).unwrap();
     config
@@ -96,7 +251,10 @@ fn pinned_rule_render_succeeds_when_rule_store_is_absent() {
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     // No `.rule` directory created: the store is absent entirely.
     config
@@ -117,8 +275,7 @@ fn pinned_rule_render_succeeds_when_rule_store_is_absent() {
 #[test]
 fn context_capture_persistence_isolation_is_byte_stable() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     let capture = config
         .persist_capture(sample_request(
@@ -129,11 +286,13 @@ fn context_capture_persistence_isolation_is_byte_stable() {
         ))
         .unwrap();
     let manifest_before = std::fs::read(&capture.paths.manifest_path).unwrap();
-    let transcript_before =
-        std::fs::read(&capture.paths.transcript_path).unwrap();
+    let transcript_before = std::fs::read(&capture.paths.transcript_path).unwrap();
 
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
     config
@@ -146,8 +305,7 @@ fn context_capture_persistence_isolation_is_byte_stable() {
         .unwrap();
 
     let manifest_after = std::fs::read(&capture.paths.manifest_path).unwrap();
-    let transcript_after =
-        std::fs::read(&capture.paths.transcript_path).unwrap();
+    let transcript_after = std::fs::read(&capture.paths.transcript_path).unwrap();
     assert_eq!(manifest_before, manifest_after);
     assert_eq!(transcript_before, transcript_after);
 
@@ -175,10 +333,7 @@ struct MockTicketResolver {
 }
 
 impl SessionTicketStateResolver for MockTicketResolver {
-    fn resolve_ticket_state(
-        &self,
-        ticket_urn: &str,
-    ) -> Result<Option<String>, String> {
+    fn resolve_ticket_state(&self, ticket_urn: &str) -> Result<Option<String>, String> {
         if ticket_urn == self.missing_urn {
             Err("ticket not found".to_string())
         } else {
@@ -190,10 +345,12 @@ impl SessionTicketStateResolver for MockTicketResolver {
 #[test]
 fn workflow_persists_mutation_and_reload() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
 
@@ -206,15 +363,12 @@ fn workflow_persists_mutation_and_reload() {
                 requirement: SessionWorkflowNodeRequirement::Required,
                 title: "Implement runtime model".to_string(),
                 ticket_urn: Some(
-                    "ce://default/tickets/412964a3-e1c3-47da-94ad-268ff20441c0"
-                        .to_string(),
+                    "ce://default/tickets/412964a3-e1c3-47da-94ad-268ff20441c0".to_string(),
                 ),
                 spec_urn: None,
                 anchor_urn: None,
                 category: None,
-                cached_ticket_title: Some(
-                    "Runtime session context".to_string(),
-                ),
+                cached_ticket_title: Some("Runtime session context".to_string()),
                 validation_spec_id: None,
             },
         )
@@ -232,8 +386,7 @@ fn workflow_persists_mutation_and_reload() {
                 ticket_urn: None,
                 spec_urn: None,
                 anchor_urn: Some(
-                    "ce://default/tickets/412964a3-e1c3-47da-94ad-268ff20441c0"
-                        .to_string(),
+                    "ce://default/tickets/412964a3-e1c3-47da-94ad-268ff20441c0".to_string(),
                 ),
                 category: Some("review-criterion".to_string()),
                 cached_ticket_title: None,
@@ -294,10 +447,12 @@ fn workflow_persists_mutation_and_reload() {
 #[test]
 fn workflow_promotion_preserves_node_identity() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
 
@@ -344,10 +499,12 @@ fn workflow_promotion_preserves_node_identity() {
 #[test]
 fn workflow_ticket_node_rejects_non_ticket_urn() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
 
     let error = config
@@ -359,8 +516,7 @@ fn workflow_ticket_node_rejects_non_ticket_urn() {
                 requirement: SessionWorkflowNodeRequirement::Required,
                 title: "bad type".to_string(),
                 ticket_urn: Some(
-                    "ce://default/specs/709f067a-21b6-41b6-8879-3cacef4bacaf"
-                        .to_string(),
+                    "ce://default/specs/709f067a-21b6-41b6-8879-3cacef4bacaf".to_string(),
                 ),
                 spec_urn: None,
                 anchor_urn: None,
@@ -377,10 +533,12 @@ fn workflow_ticket_node_rejects_non_ticket_urn() {
 #[test]
 fn workflow_batches_are_atomic_and_preserve_duplicate_no_ops() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
     let draft = |node_id: &str, title: &str| SessionWorkflowNodeDraft {
@@ -397,10 +555,7 @@ fn workflow_batches_are_atomic_and_preserve_duplicate_no_ops() {
     };
 
     let node_error = config
-        .workflow_add_nodes(
-            &workspace_id,
-            vec![draft("a", "first"), draft("bad", " ")],
-        )
+        .workflow_add_nodes(&workspace_id, vec![draft("a", "first"), draft("bad", " ")])
         .unwrap_err();
     assert!(node_error.to_string().contains("nodes[1]"));
     assert!(
@@ -430,10 +585,7 @@ fn workflow_batches_are_atomic_and_preserve_duplicate_no_ops() {
         kind: SessionWorkflowEdgeKind::DependsOn,
     };
     let edge_error = config
-        .workflow_add_edges(
-            &workspace_id,
-            vec![edge("a", "b"), edge("a", "missing")],
-        )
+        .workflow_add_edges(&workspace_id, vec![edge("a", "b"), edge("a", "missing")])
         .unwrap_err();
     assert!(edge_error.to_string().contains("edges[1]"));
     assert!(
@@ -457,12 +609,14 @@ fn workflow_batches_are_atomic_and_preserve_duplicate_no_ops() {
 #[test]
 fn session_run_lineage_round_trip() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     // Create the initial runtime context (first run).
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let ctx = &init.context;
     let session_id = ctx.canonical_session_id();
@@ -492,9 +646,7 @@ fn session_run_lineage_round_trip() {
     );
 
     // Read back and verify both-direction navigation.
-    let ctx2 = config
-        .read_runtime_context(&ctx.session_id)
-        .unwrap();
+    let ctx2 = config.read_runtime_context(&ctx.session_id).unwrap();
 
     let runs = ctx2.runs_for_session(&session_id);
     let run_ids: Vec<&str> = runs.iter().map(|r| r.run_id.as_str()).collect();
@@ -547,7 +699,10 @@ fn writes_never_target_legacy_runtime_tree() {
     let config = SessionStoreConfig::new(store_root.clone());
 
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id.clone();
 

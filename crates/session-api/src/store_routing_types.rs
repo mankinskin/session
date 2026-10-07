@@ -48,9 +48,23 @@ pub(super) fn parse_entity_urn(entity_urn: &str) -> Result<ParsedEntityUrn, Sess
         "spec" | "specs" => SessionPinnedEntityKind::Spec,
         "rule" | "rules" => SessionPinnedEntityKind::Rule,
         "dossier" | "dossiers" | "transcript" | "transcripts" => SessionPinnedEntityKind::Dossier,
+        "mission" => {
+            if trimmed != entity_urn {
+                return Err(SessionError::InvalidEntityUrn(format!(
+                    "'{trimmed}' must not contain surrounding whitespace"
+                )));
+            }
+            let mission_id = uuid::Uuid::parse_str(&entity_id).ok();
+            if mission_id.map(|id| id.to_string()).as_deref() != Some(entity_id.as_str()) {
+                return Err(SessionError::InvalidEntityUrn(format!(
+                    "'{trimmed}' must use the canonical lowercase UUID form for a mission"
+                )));
+            }
+            SessionPinnedEntityKind::Mission
+        }
         _ => {
             return Err(SessionError::InvalidEntityUrn(format!(
-                "'{trimmed}' has unsupported store '{store}' (expected ticket|spec|rule|dossier)"
+                "'{trimmed}' has unsupported store '{store}' (expected ticket|spec|rule|dossier|mission)"
             )));
         }
     };
