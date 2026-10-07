@@ -1,20 +1,10 @@
 use std::collections::HashMap;
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    SessionRecord,
-    SessionRole,
-    SessionTurn,
-};
+use crate::{SessionRecord, SessionRole, SessionTurn};
 
-use super::{
-    DEFAULT_SKELETON_PREVIEW_CHARS,
-    preview_line,
-};
+use super::{DEFAULT_SKELETON_PREVIEW_CHARS, preview_line};
 
 /// Default content length after which turns are summarized.
 pub const DEFAULT_PROMPT_SUMMARIZE_THRESHOLD_CHARS: usize = 600;
@@ -69,10 +59,7 @@ impl Default for PromptPackOptions {
     }
 }
 
-pub fn peek_prompt_pack(
-    record: &SessionRecord,
-    options: PromptPackOptions,
-) -> SessionPromptPack {
+pub fn peek_prompt_pack(record: &SessionRecord, options: PromptPackOptions) -> SessionPromptPack {
     let mut entries = Vec::new();
     let mut retain = 0;
     let mut summarize = 0;
@@ -175,10 +162,7 @@ fn is_repeated_state_check(turn: &SessionTurn) -> bool {
     )
 }
 
-fn is_routine_retry_narration(
-    turn: &SessionTurn,
-    normalized_content: &str,
-) -> bool {
+fn is_routine_retry_narration(turn: &SessionTurn, normalized_content: &str) -> bool {
     turn.role == SessionRole::Assistant
         && normalized_content.len() <= 220
         && [

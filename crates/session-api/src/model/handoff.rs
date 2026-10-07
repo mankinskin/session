@@ -1,17 +1,7 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
-use super::{
-    SessionPinnedEntityHeader,
-    SessionValidationGate,
-    SessionWorkflowSnapshot,
-};
+use super::{SessionPinnedEntityHeader, SessionValidationGate, SessionWorkflowSnapshot};
 
 /// Role of an entry in the ordered program context above a handoff's leaf work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

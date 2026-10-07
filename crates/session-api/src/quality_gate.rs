@@ -4,10 +4,7 @@
 //! with pass/fail/blocked outcomes. Quality gate outcomes are recorded as
 //! test-api validation executions linked to the delegated session id.
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
 /// When a quality gate is evaluated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -78,19 +75,13 @@ impl QualityGate {
     }
 
     /// Set the validation spec id for this gate.
-    pub fn with_validation_spec_id(
-        mut self,
-        spec_id: impl Into<String>,
-    ) -> Self {
+    pub fn with_validation_spec_id(mut self, spec_id: impl Into<String>) -> Self {
         self.validation_spec_id = Some(spec_id.into());
         self
     }
 
     /// Set the detail for this gate.
-    pub fn with_detail(
-        mut self,
-        detail: impl Into<String>,
-    ) -> Self {
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
         self.detail = Some(detail.into());
         self
     }
@@ -145,8 +136,7 @@ mod tests {
         .with_detail("Prompt is clear and testable");
 
         let json = serde_json::to_string(&gate).expect("serialize");
-        let parsed: QualityGate =
-            serde_json::from_str(&json).expect("deserialize");
+        let parsed: QualityGate = serde_json::from_str(&json).expect("deserialize");
 
         assert_eq!(parsed, gate);
         assert_eq!(parsed.phase, QualityGatePhase::PreDelegation);

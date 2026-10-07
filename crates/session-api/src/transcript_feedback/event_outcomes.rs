@@ -12,9 +12,7 @@ pub(super) fn is_tool_execution_outcome(event_type: Option<&str>) -> bool {
     )
 }
 
-pub(super) fn canonicalize_outcome_events(
-    events: &[CopilotHookEvent]
-) -> Vec<CopilotHookEvent> {
+pub(super) fn canonicalize_outcome_events(events: &[CopilotHookEvent]) -> Vec<CopilotHookEvent> {
     let mut complete_tool_calls = BTreeSet::<String>::new();
     for event in events {
         if is_tool_execution_complete(event.event_type.as_deref()) {

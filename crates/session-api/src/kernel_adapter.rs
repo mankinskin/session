@@ -14,10 +14,7 @@ use chrono::{DateTime, Utc};
 use memory_kernel::model::{
     domain::{DomainId, DomainSchemaVersion, EntityTypeId, EntityTypeSchemaVersion},
     domain_manifest::{
-        DomainManifest,
-        DomainManifestError,
-        EntityTypeMembership,
-        EntityTypeStatus,
+        DomainManifest, DomainManifestError, EntityTypeMembership, EntityTypeStatus,
     },
     entity::EntityId,
     event::{EventEnvelope, MutationOperation},

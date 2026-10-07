@@ -4,20 +4,13 @@
 //! type. Moved out of `mcp-toolmon`'s `main.rs` unchanged in semantics — the
 //! variable names, defaults, and log lines are identical to before the split.
 
-use std::{
-    io::Write as _,
-    path::PathBuf,
-    sync::Arc,
-};
+use std::{io::Write as _, path::PathBuf, sync::Arc};
 
 use serde::Serialize;
 use toolmon_policy_api::Policy;
 
 use crate::{
-    gate::{
-        Gate,
-        ModelBudgetCalibration,
-    },
+    gate::{Gate, ModelBudgetCalibration},
     policy_impl::CostGatePolicy,
 };
 
@@ -59,11 +52,11 @@ pub fn load_gate() -> Option<Gate> {
                 budget_zero_price
             ));
             Some(g)
-        },
+        }
         Err(e) => {
             log(&format!("disabled (fail-open): {e}"));
             None
-        },
+        }
     }
 }
 
@@ -85,10 +78,7 @@ pub fn telemetry_log_path_from_env() -> Option<PathBuf> {
 /// Append any `Serialize` telemetry record as a JSONL line to `path`. Generic
 /// over the record type so this crate stays unaware of the transport's
 /// concrete telemetry shape (`proxy::CallTelemetry`).
-pub fn emit_telemetry_jsonl<T: Serialize>(
-    path: Option<&PathBuf>,
-    telemetry: &T,
-) {
+pub fn emit_telemetry_jsonl<T: Serialize>(path: Option<&PathBuf>, telemetry: &T) {
     let Some(path) = path else { return };
     let Ok(line) = serde_json::to_string(telemetry) else {
         return;

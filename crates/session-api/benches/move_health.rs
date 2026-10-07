@@ -104,17 +104,14 @@ fn bench_session_move_preflight_by_entity_count(c: &mut Criterion) {
         let workspace = MoveBenchmarkWorkspace::new();
         let (store, target_workspace, ids) = build_session_fixture(&workspace, entity_count);
         let id = ids[0];
-        c.bench_function(
-            &name,
-            |b| {
-                b.iter(|| {
-                    let plan = store
-                        .plan_move_preflight(&id, &target_workspace)
-                        .expect("plan preflight");
-                    criterion::black_box(plan);
-                });
-            },
-        );
+        c.bench_function(&name, |b| {
+            b.iter(|| {
+                let plan = store
+                    .plan_move_preflight(&id, &target_workspace)
+                    .expect("plan preflight");
+                criterion::black_box(plan);
+            });
+        });
     }
 }
 

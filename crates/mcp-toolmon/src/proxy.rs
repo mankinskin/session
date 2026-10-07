@@ -10,43 +10,20 @@ mod telemetry;
 mod workspace_resolution;
 
 use std::{
-    collections::{
-        HashMap,
-        HashSet,
-    },
+    collections::{HashMap, HashSet},
     path::Path,
 };
 
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 
 use toolmon_policy_api::{
-    CALLER_MODEL_ARG,
-    Decision,
-    Policy,
-    SESSION_ID_ARG,
-    inject_caller_model_schema,
+    CALLER_MODEL_ARG, Decision, Policy, SESSION_ID_ARG, inject_caller_model_schema,
 };
 
-use path_arguments::{
-    PathArgument,
-    PathArgumentKind,
-    registered_path_argument,
-};
-pub use telemetry::{
-    CallTelemetry,
-    PendingCall,
-    PendingCalls,
-};
-use telemetry::{
-    compute_payload_telemetry,
-    id_key,
-    normalize_caller_model,
-    now_rfc3339,
-};
 use gating::{ToolAccess, tool_access};
+use path_arguments::{PathArgument, PathArgumentKind, registered_path_argument};
+pub use telemetry::{CallTelemetry, PendingCall, PendingCalls};
+use telemetry::{compute_payload_telemetry, id_key, normalize_caller_model, now_rfc3339};
 use workspace_resolution::{canonicalize_tool_path, resolve_workspace_for_tool};
 
 /// Optional grant id argument for budget offset.
@@ -70,24 +47,15 @@ pub struct PendingList {
 }
 
 impl PendingList {
-    pub fn record(
-        &mut self,
-        id: &Value,
-    ) {
+    pub fn record(&mut self, id: &Value) {
         self.ids.insert(id_key(id));
     }
 
-    pub fn take(
-        &mut self,
-        id: &Value,
-    ) -> bool {
+    pub fn take(&mut self, id: &Value) -> bool {
         self.ids.remove(&id_key(id))
     }
 
-    fn record_path_arguments(
-        &mut self,
-        tool: &Value,
-    ) {
+    fn record_path_arguments(&mut self, tool: &Value) {
         let Some(name) = tool.get("name").and_then(Value::as_str) else {
             return;
         };
@@ -110,19 +78,13 @@ impl PendingList {
         }
     }
 
-    fn path_arguments(
-        &self,
-        tool: &str,
-    ) -> Vec<PathArgument> {
+    fn path_arguments(&self, tool: &str) -> Vec<PathArgument> {
         self.path_arguments.get(tool).cloned().unwrap_or_default()
     }
 }
 
 /// Build a `tools/call` result carrying an error message (isError=true).
-fn error_result(
-    id: &Value,
-    text: &str,
-) -> Value {
+fn error_result(id: &Value, text: &str) -> Value {
     json!({
         "jsonrpc": "2.0",
         "id": id,
@@ -165,7 +127,7 @@ pub fn handle_client_message(
                 pending.record(id);
             }
             (ClientAction::Forward(msg), None)
-        },
+        }
         "tools/call" => {
             let id = msg.get("id").cloned().unwrap_or(Value::Null);
             let params = msg.get("params").cloned().unwrap_or(Value::Null);
@@ -193,8 +155,7 @@ pub fn handle_client_message(
                 .and_then(|a| a.get(GRANT_ID_ARG))
                 .and_then(Value::as_str)
                 .map(|s| s.trim().to_string());
-            let (request_bytes, request_chars, _) =
-                compute_payload_telemetry(&msg);
+            let (request_bytes, request_chars, _) = compute_payload_telemetry(&msg);
 
             // Build an immediate (non-forwarded) telemetry record: nothing was
             // sent to the server, so response counts are zero and duration_ms
@@ -215,8 +176,7 @@ pub fn handle_client_message(
                 };
 
             if caller_model.is_empty() {
-                let telemetry =
-                    immediate_telemetry("reject-missing-model", None);
+                let telemetry = immediate_telemetry("reject-missing-model", None);
                 return (
                     ClientAction::Respond(error_result(
                         &id,
@@ -231,10 +191,7 @@ pub fn handle_client_message(
             }
 
             if session_id.is_empty() {
-                let telemetry = immediate_telemetry(
-                    "reject-missing-session",
-                    Some(caller_model),
-                );
+                let telemetry = immediate_telemetry("reject-missing-session", Some(caller_model));
                 return (
                     ClientAction::Respond(error_result(
                         &id,
@@ -268,49 +225,45 @@ pub fn handle_client_message(
                 }
             }
 
-            match policy.evaluate(&effective_model, &tool, grant_id.as_deref())
-            {
+            match policy.evaluate(&effective_model, &tool, grant_id.as_deref()) {
                 Decision::Reject { guidance } => {
-                    let telemetry =
-                        immediate_telemetry("reject", Some(caller_model));
+                    let telemetry = immediate_telemetry("reject", Some(caller_model));
                     (
                         ClientAction::Respond(error_result(&id, &guidance)),
                         Some(telemetry),
                     )
-                },
+                }
                 Decision::Delegate { guidance } => {
-                    let telemetry =
-                        immediate_telemetry("delegate", Some(caller_model));
+                    let telemetry = immediate_telemetry("delegate", Some(caller_model));
                     (
                         ClientAction::Respond(error_result(&id, &guidance)),
                         Some(telemetry),
                     )
-                },
+                }
                 Decision::Allow => {
                     let path_arguments = pending.path_arguments(&tool);
-                    let workspace = path_arguments.iter()
+                    let workspace = path_arguments
+                        .iter()
                         .find(|argument| argument.kind == PathArgumentKind::Workspace)
                         .and_then(|argument| msg["params"]["arguments"][argument.name].as_str())
-                        .map(|value| if value.is_empty() || value == "default" { "." } else { value });
+                        .map(|value| {
+                            if value.is_empty() || value == "default" {
+                                "."
+                            } else {
+                                value
+                            }
+                        });
                     let (_, store_root) =
-                        match resolve_workspace_for_tool(
-                            &tool,
-                            &session_id,
-                            workspace,
-                        ) {
+                        match resolve_workspace_for_tool(&tool, &session_id, workspace) {
                             Ok(resolved) => resolved,
                             Err(error) => {
-                                let telemetry = immediate_telemetry(
-                                    "reject-workspace",
-                                    Some(caller_model),
-                                );
+                                let telemetry =
+                                    immediate_telemetry("reject-workspace", Some(caller_model));
                                 return (
-                                    ClientAction::Respond(error_result(
-                                        &id, &error,
-                                    )),
+                                    ClientAction::Respond(error_result(&id, &error)),
                                     Some(telemetry),
                                 );
-                            },
+                            }
                         };
                     for argument in &path_arguments {
                         let value = msg
@@ -338,35 +291,34 @@ pub fn handle_client_message(
                         {
                             let from = msg["params"]["arguments"]["from"].as_str();
                             match from {
-                                Some(from) => canonicalize_tool_path(Path::new(from))
-                                    .and_then(|source| {
+                                Some(from) => {
+                                    canonicalize_tool_path(Path::new(from)).and_then(|source| {
                                         let parent = source.parent().ok_or_else(|| {
                                             format!("cannot determine rename parent for '{from}'")
                                         })?;
                                         let destination = parent.join(value);
                                         resolve_workspace_for_tool(
-                                            &tool, &session_id, Some(&destination.to_string_lossy()),
+                                            &tool,
+                                            &session_id,
+                                            Some(&destination.to_string_lossy()),
                                         )
-                                    }),
+                                    })
+                                }
                                 None => continue,
                             }
                         } else {
                             resolve_workspace_for_tool(&tool, &session_id, Some(value))
                         };
                         match validation {
-                            Ok(_) => {},
+                            Ok(_) => {}
                             Err(error) => {
-                                let telemetry = immediate_telemetry(
-                                    "reject-workspace",
-                                    Some(caller_model),
-                                );
+                                let telemetry =
+                                    immediate_telemetry("reject-workspace", Some(caller_model));
                                 return (
-                                    ClientAction::Respond(error_result(
-                                        &id, &error,
-                                    )),
+                                    ClientAction::Respond(error_result(&id, &error)),
                                     Some(telemetry),
                                 );
-                            },
+                            }
                         }
                     }
                     eprintln!(
@@ -401,9 +353,9 @@ pub fn handle_client_message(
                         },
                     );
                     (ClientAction::Forward(msg), None)
-                },
+                }
             }
-        },
+        }
         _ => (ClientAction::Forward(msg), None),
     }
 }
@@ -418,46 +370,41 @@ pub fn handle_server_message(
     pending_calls: &mut PendingCalls,
 ) -> (Value, Option<CallTelemetry>) {
     let mut warning_to_inject: Option<String> = None;
-    let telemetry =
-        msg.get("id")
-            .and_then(|id| pending_calls.take(id))
-            .map(|call| {
-                let (response_bytes, response_chars, _) =
-                    compute_payload_telemetry(&msg);
-                let duration_ms = call.started_at.elapsed().as_millis() as u64;
-                let tokens_estimated =
-                    (call.request_chars + response_chars) / 4;
-                warning_to_inject = call.warning.clone();
-                CallTelemetry {
-                    timestamp: now_rfc3339(),
-                    tool_name: call.tool_name,
-                    caller_model: call.caller_model,
-                    grant_id: call.grant_id,
-                    decision: call.decision,
-                    request_bytes: Some(call.request_bytes),
-                    request_chars: Some(call.request_chars),
-                    response_bytes: Some(response_bytes),
-                    response_chars: Some(response_chars),
-                    duration_ms,
-                    tokens_estimated: Some(tokens_estimated),
-                }
-            });
+    let telemetry = msg
+        .get("id")
+        .and_then(|id| pending_calls.take(id))
+        .map(|call| {
+            let (response_bytes, response_chars, _) = compute_payload_telemetry(&msg);
+            let duration_ms = call.started_at.elapsed().as_millis() as u64;
+            let tokens_estimated = (call.request_chars + response_chars) / 4;
+            warning_to_inject = call.warning.clone();
+            CallTelemetry {
+                timestamp: now_rfc3339(),
+                tool_name: call.tool_name,
+                caller_model: call.caller_model,
+                grant_id: call.grant_id,
+                decision: call.decision,
+                request_bytes: Some(call.request_bytes),
+                request_chars: Some(call.request_chars),
+                response_bytes: Some(response_bytes),
+                response_chars: Some(response_chars),
+                duration_ms,
+                tokens_estimated: Some(tokens_estimated),
+            }
+        });
 
     if let Some(warning) = warning_to_inject {
-        if let Some(result) =
-            msg.get_mut("result").and_then(Value::as_object_mut)
-        {
+        if let Some(result) = msg.get_mut("result").and_then(Value::as_object_mut) {
             result.insert("costGateWarning".to_string(), json!(warning));
         }
     }
 
-    let is_list_response =
-        msg.get("id").map(|id| pending.take(id)).unwrap_or(false)
-            && msg
-                .get("result")
-                .and_then(|r| r.get("tools"))
-                .map(Value::is_array)
-                .unwrap_or(false);
+    let is_list_response = msg.get("id").map(|id| pending.take(id)).unwrap_or(false)
+        && msg
+            .get("result")
+            .and_then(|r| r.get("tools"))
+            .map(Value::is_array)
+            .unwrap_or(false);
 
     if !is_list_response {
         return (msg, telemetry);
@@ -481,54 +428,30 @@ pub fn handle_server_message(
 
 #[cfg(test)]
 mod tests {
+    use super::workspace_resolution::{DEFAULT_STORE_DIR, MAIN_CHECKOUT_ENV, anchored_resolver};
     use super::*;
-    use super::workspace_resolution::{
-        DEFAULT_STORE_DIR,
-        MAIN_CHECKOUT_ENV,
-        anchored_resolver,
-    };
 
     const TEST_SESSION_ID: &str = "66666666-6666-4666-8666-666666666666";
-    use session_api::{
-        SessionStoreConfig,
-        SessionWorktreeCheckInRequest,
-        SessionWorktreeStatus,
-    };
-    use session_workspace_resolver::{
-        ResolverConfig,
-        SessionWorkspaceResolver,
-    };
+    use session_api::{SessionStoreConfig, SessionWorktreeCheckInRequest, SessionWorktreeStatus};
+    use session_workspace_resolver::{ResolverConfig, SessionWorkspaceResolver};
     use std::{
-        path::{
-            Path,
-            PathBuf,
-        },
+        path::{Path, PathBuf},
         process::Command,
         sync::Mutex,
     };
     use tempfile::TempDir;
-    use toolmon_costgate::{
-        CostGatePolicy,
-        Gate,
-    };
+    use toolmon_costgate::{CostGatePolicy, Gate};
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     fn test_gate() -> CostGatePolicy {
         // Write a tiny fixture table to a unique temp file and load it. A
         // per-call counter avoids collisions between parallel tests (same pid).
-        use std::sync::atomic::{
-            AtomicU64,
-            Ordering,
-        };
+        use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir();
-        let path = dir.join(format!(
-            "mcpcg-fixture-{}-{}.json",
-            std::process::id(),
-            n
-        ));
+        let path = dir.join(format!("mcpcg-fixture-{}-{}.json", std::process::id(), n));
         std::fs::write(
             &path,
             r#"{"models":[
@@ -548,10 +471,7 @@ mod tests {
         CostGatePolicy::new(g)
     }
 
-    fn call(
-        tool: &str,
-        model: Option<&str>,
-    ) -> Value {
+    fn call(tool: &str, model: Option<&str>) -> Value {
         let mut args = serde_json::Map::new();
         if let Some(m) = model {
             args.insert(CALLER_MODEL_ARG.into(), json!(m));
@@ -630,8 +550,7 @@ mod tests {
         .unwrap();
         // The anchor store is the worktree registry: assignments always live
         // beneath the checkout the servers were launched in.
-        let store =
-            SessionStoreConfig::new(main_checkout.join(".session"));
+        let store = SessionStoreConfig::new(main_checkout.join(".session"));
         store
             .check_in_worktree(SessionWorktreeCheckInRequest {
                 session_id: TEST_SESSION_ID.to_string(),
@@ -647,22 +566,14 @@ mod tests {
                 .join(".session/local/worktrees")
                 .join(format!("{TEST_SESSION_ID}.json"));
             let mut registry: Value =
-                serde_json::from_slice(&std::fs::read(&registry_path).unwrap())
-                    .unwrap();
-            registry["assignment"]["path"] =
-                json!(main_checkout.to_string_lossy());
-            std::fs::write(
-                registry_path,
-                serde_json::to_vec_pretty(&registry).unwrap(),
-            )
-            .unwrap();
+                serde_json::from_slice(&std::fs::read(&registry_path).unwrap()).unwrap();
+            registry["assignment"]["path"] = json!(main_checkout.to_string_lossy());
+            std::fs::write(registry_path, serde_json::to_vec_pretty(&registry).unwrap()).unwrap();
         }
-        let path = main_checkout
-            .join(format!(".session/sessions/{TEST_SESSION_ID}/session.json"));
+        let path = main_checkout.join(format!(".session/sessions/{TEST_SESSION_ID}/session.json"));
         let mut record = store.read_session(TEST_SESSION_ID).unwrap();
         record.metadata.worktree.as_mut().unwrap().status = status;
-        std::fs::write(path, serde_json::to_vec_pretty(&record).unwrap())
-            .unwrap();
+        std::fs::write(path, serde_json::to_vec_pretty(&record).unwrap()).unwrap();
         (temp, main_checkout, worktree)
     }
 
@@ -701,18 +612,10 @@ mod tests {
         call("read_file", Some("gpt-5-mini"))
     }
 
-    fn route(
-        request: Value,
-        gate: &CostGatePolicy,
-    ) -> (ClientAction, Option<CallTelemetry>) {
+    fn route(request: Value, gate: &CostGatePolicy) -> (ClientAction, Option<CallTelemetry>) {
         let mut pending = PendingList::default();
         let mut pending_calls = PendingCalls::default();
-        handle_client_message(
-            request,
-            Some(gate),
-            &mut pending,
-            &mut pending_calls,
-        )
+        handle_client_message(request, Some(gate), &mut pending, &mut pending_calls)
     }
 
     fn route_with_schema(
@@ -742,12 +645,7 @@ mod tests {
             &mut pending,
             &mut pending_calls,
         );
-        handle_client_message(
-            request,
-            Some(gate),
-            &mut pending,
-            &mut pending_calls,
-        )
+        handle_client_message(request, Some(gate), &mut pending, &mut pending_calls)
     }
 
     fn normalized(path: &Path) -> String {
@@ -848,8 +746,7 @@ mod tests {
         let temp = tempfile::tempdir().unwrap();
         let main_checkout = temp.path().join("repository");
         std::fs::create_dir_all(main_checkout.join(".git")).unwrap();
-        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session"))
-            .unwrap();
+        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session")).unwrap();
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
         let mut request = call("update_ticket", Some("gpt-5-mini"));
@@ -878,8 +775,7 @@ mod tests {
         let target = main_checkout.join("context-engine").join(".ticket");
         std::fs::create_dir_all(&target).unwrap();
         std::fs::create_dir_all(main_checkout.join(".git")).unwrap();
-        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session"))
-            .unwrap();
+        std::fs::create_dir_all(main_checkout.join(".workflow-tools/session")).unwrap();
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
         let mut request = call("fs_delete_dir", Some("gpt-5-mini"));
@@ -907,8 +803,7 @@ mod tests {
     }
 
     #[test]
-    fn workspace_defaults_are_validated_against_actual_working_directory()
-     {
+    fn workspace_defaults_are_validated_against_actual_working_directory() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout) = main_checkout_fixture();
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
@@ -933,7 +828,10 @@ mod tests {
                 let ClientAction::Forward(forwarded) = action else {
                     panic!("explicit checkout path should forward");
                 };
-                assert_eq!(forwarded["params"]["arguments"]["workspace"], json!(workspace));
+                assert_eq!(
+                    forwarded["params"]["arguments"]["workspace"],
+                    json!(workspace)
+                );
             } else {
                 assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
             }
@@ -942,8 +840,7 @@ mod tests {
     }
 
     #[test]
-    fn assigned_session_with_vanished_worktree_blocks_mutation()
-     {
+    fn assigned_session_with_vanished_worktree_blocks_mutation() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, worktree) =
             routing_fixture(SessionWorktreeStatus::Active, false);
@@ -961,8 +858,7 @@ mod tests {
     }
 
     #[test]
-    fn unassigned_session_check_in_with_direct_worktree_workspace_is_forwarded()
-    {
+    fn unassigned_session_check_in_with_direct_worktree_workspace_is_forwarded() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let temp = tempfile::tempdir().unwrap();
         let main_checkout = temp.path().join("repository");
@@ -978,8 +874,7 @@ mod tests {
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
         let mut request = call("session_check_in", Some("gpt-5-mini"));
-        request["params"]["arguments"]["workspace"] =
-            json!(normalized(&worktree));
+        request["params"]["arguments"]["workspace"] = json!(normalized(&worktree));
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
             request,
             &test_gate(),
@@ -996,8 +891,7 @@ mod tests {
     }
 
     #[test]
-    fn unassigned_session_check_in_with_nested_worktree_workspace_is_forwarded()
-    {
+    fn unassigned_session_check_in_with_nested_worktree_workspace_is_forwarded() {
         // The nested layout (`.worktrees/<session-uuid>/<slug>`) is the
         // documented default; the bootstrap escape hatch must accept it, not
         // just the legacy flat `.worktrees/<slug>` layout.
@@ -1019,8 +913,7 @@ mod tests {
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
         let mut request = call("session_check_in", Some("gpt-5-mini"));
-        request["params"]["arguments"]["workspace"] =
-            json!(normalized(&worktree));
+        request["params"]["arguments"]["workspace"] = json!(normalized(&worktree));
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
             request,
             &test_gate(),
@@ -1051,13 +944,11 @@ mod tests {
             "gitdir: ../../.git/worktrees/bootstrap\n",
         )
         .unwrap();
-        std::fs::write(nested.join(".git"), "gitdir: ../../.git/fake\n")
-            .unwrap();
+        std::fs::write(nested.join(".git"), "gitdir: ../../.git/fake\n").unwrap();
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
 
         let mut request = call("session_check_in", Some("gpt-5-mini"));
-        request["params"]["arguments"]["workspace"] =
-            json!(nested.to_string_lossy());
+        request["params"]["arguments"]["workspace"] = json!(nested.to_string_lossy());
         let text = response_text(
             route_with_schema(
                 request,
@@ -1076,30 +967,26 @@ mod tests {
     fn anchor_falls_back_to_the_process_working_directory() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
-        let resolver = anchored_resolver()
-            .expect("working directory should anchor the resolver");
+        let resolver = anchored_resolver().expect("working directory should anchor the resolver");
         let candidates = resolver
             .refused_candidates(DEFAULT_STORE_DIR)
             .expect("candidates should enumerate");
-        let working_dir =
-            canonicalized_normalized(&std::env::current_dir().unwrap());
+        let working_dir = canonicalized_normalized(&std::env::current_dir().unwrap());
         assert!(
-            candidates.iter().any(
-                |candidate| normalized(candidate).starts_with(&working_dir)
-            ),
+            candidates
+                .iter()
+                .any(|candidate| normalized(candidate).starts_with(&working_dir)),
             "expected a candidate anchored on {working_dir}, got {candidates:?}"
         );
     }
 
     #[test]
-    fn positional_worktree_discovery_overrides_legacy_main_checkout_assignment()
-    {
+    fn positional_worktree_discovery_overrides_legacy_main_checkout_assignment() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, _worktree) =
             routing_fixture(SessionWorktreeStatus::Active, true);
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", main_checkout) };
-        let (ClientAction::Forward(_), _) = route(allowed_call(), &test_gate())
-        else {
+        let (ClientAction::Forward(_), _) = route(allowed_call(), &test_gate()) else {
             panic!("positional UUID worktree should be forwarded");
         };
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
@@ -1111,8 +998,7 @@ mod tests {
         let (_temp, main_checkout, _worktree) =
             routing_fixture(SessionWorktreeStatus::Superseded, false);
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", main_checkout) };
-        let (ClientAction::Forward(_), _) = route(allowed_call(), &test_gate())
-        else {
+        let (ClientAction::Forward(_), _) = route(allowed_call(), &test_gate()) else {
             panic!("positional UUID worktree should be forwarded");
         };
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
@@ -1128,8 +1014,7 @@ mod tests {
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
 
         let mut request = allowed_call();
-        request["params"]["arguments"]["workspace"] =
-            json!(inside.to_string_lossy());
+        request["params"]["arguments"]["workspace"] = json!(inside.to_string_lossy());
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
             request,
             &test_gate(),
@@ -1138,16 +1023,12 @@ mod tests {
         ) else {
             panic!("expected forwarded request");
         };
-        assert_eq!(
-            forwarded["params"]["arguments"]["workspace"],
-            json!(inside)
-        );
+        assert_eq!(forwarded["params"]["arguments"]["workspace"], json!(inside));
 
         let outside = main_checkout.join("outside");
         std::fs::create_dir_all(&outside).unwrap();
         let mut request = allowed_call();
-        request["params"]["arguments"]["workspace"] =
-            json!(outside.to_string_lossy());
+        request["params"]["arguments"]["workspace"] = json!(outside.to_string_lossy());
         let text = response_text(
             route_with_schema(
                 request,
@@ -1161,8 +1042,7 @@ mod tests {
         assert!(text.contains("resolved session worktree"));
 
         let mut request = allowed_call();
-        request["params"]["arguments"]["workspace"] =
-            json!(main_checkout.to_string_lossy());
+        request["params"]["arguments"]["workspace"] = json!(main_checkout.to_string_lossy());
         let text = response_text(
             route_with_schema(
                 request,
@@ -1308,7 +1188,9 @@ mod tests {
         let mut expected = request["params"]["arguments"].clone();
         expected.as_object_mut().unwrap().remove(CALLER_MODEL_ARG);
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
-            request, &test_gate(), "fs_rename_file",
+            request,
+            &test_gate(),
+            "fs_rename_file",
             json!({"from": {}, "to": {}, "root": {}}),
         ) else {
             panic!("relative rename inside actual checkout should forward");
@@ -1334,7 +1216,9 @@ mod tests {
         let mut expected = request["params"]["arguments"].clone();
         expected.as_object_mut().unwrap().remove(CALLER_MODEL_ARG);
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
-            request, &test_gate(), "fs_rename_file",
+            request,
+            &test_gate(),
+            "fs_rename_file",
             json!({"from": {}, "to": {}, "root": {}}),
         ) else {
             panic!("rename to a new sibling in the worktree should forward");
@@ -1350,7 +1234,10 @@ mod tests {
             routing_fixture(SessionWorktreeStatus::Active, false);
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
         for (tool, destination) in [
-            ("fs_move_file", json!(main_checkout.join("missing").join("new.md"))),
+            (
+                "fs_move_file",
+                json!(main_checkout.join("missing").join("new.md")),
+            ),
             ("fs_copy_file", json!(main_checkout.join("README.md"))),
             ("fs_rename_file", json!(main_checkout.join("new.md"))),
             ("fs_rename_file", json!("../outside.md")),
@@ -1360,11 +1247,16 @@ mod tests {
             request["params"]["arguments"]["to"] = destination;
             request["params"]["arguments"]["root"] = json!(worktree);
             let (action, _) = route_with_schema(
-                request, &test_gate(), tool,
+                request,
+                &test_gate(),
+                tool,
                 json!({"from": {}, "to": {}, "root": {}}),
             );
             let text = response_text(action);
-            assert!(text.contains("PATH_OUTSIDE_SESSION_WORKTREE"), "{tool}: {text}");
+            assert!(
+                text.contains("PATH_OUTSIDE_SESSION_WORKTREE"),
+                "{tool}: {text}"
+            );
         }
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
@@ -1381,7 +1273,9 @@ mod tests {
         request["params"]["arguments"]["to"] = json!(destination);
         request["params"]["arguments"]["root"] = json!(worktree);
         let (ClientAction::Forward(forwarded), _) = route_with_schema(
-            request, &test_gate(), "fs_move_file",
+            request,
+            &test_gate(),
+            "fs_move_file",
             json!({"from": {}, "to": {}, "root": {}}),
         ) else {
             panic!("missing destination inside assigned worktree should forward");
@@ -1398,9 +1292,8 @@ mod tests {
         unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
         let mut request = call("fs_delete_file", Some("gpt-5-mini"));
         request["params"]["arguments"]["path"] = json!("README.md");
-        let (action, _) = route_with_schema(
-            request, &test_gate(), "fs_delete_file", json!({"path": {}}),
-        );
+        let (action, _) =
+            route_with_schema(request, &test_gate(), "fs_delete_file", json!({"path": {}}));
         assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
@@ -1431,7 +1324,9 @@ mod tests {
         request["params"]["arguments"]["to"] = json!(link.join("missing").join("new.md"));
         request["params"]["arguments"]["root"] = json!(worktree);
         let (action, _) = route_with_schema(
-            request, &test_gate(), "fs_move_file",
+            request,
+            &test_gate(),
+            "fs_move_file",
             json!({"from": {}, "to": {}, "root": {}}),
         );
         assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
@@ -1443,22 +1338,16 @@ mod tests {
         let g = test_gate();
         let mut p = PendingList::default();
         let mut pc = PendingCalls::default();
-        match handle_client_message(
-            call("read_file", None),
-            Some(&g),
-            &mut p,
-            &mut pc,
-        ) {
+        match handle_client_message(call("read_file", None), Some(&g), &mut p, &mut pc) {
             (ClientAction::Respond(v), telemetry) => {
                 assert_eq!(v["result"]["isError"], json!(true));
                 let text = v["result"]["content"][0]["text"].as_str().unwrap();
                 assert!(text.contains(CALLER_MODEL_ARG));
-                let telemetry =
-                    telemetry.expect("expected telemetry for refused call");
+                let telemetry = telemetry.expect("expected telemetry for refused call");
                 assert_eq!(telemetry.decision, "reject-missing-model");
                 assert_eq!(telemetry.duration_ms, 0);
                 assert_eq!(telemetry.response_bytes, Some(0));
-            },
+            }
             other => panic!("expected Respond, got {other:?}"),
         }
     }
@@ -1483,7 +1372,7 @@ mod tests {
                     telemetry.expect("expected telemetry").decision,
                     "reject-missing-session"
                 );
-            },
+            }
             other => panic!("expected Respond, got {other:?}"),
         }
     }
@@ -1491,10 +1380,7 @@ mod tests {
     #[test]
     fn expensive_measured_tool_is_refused() {
         // Build a gate with a rollup that measures read_file with cost 75
-        use std::sync::atomic::{
-            AtomicU64,
-            Ordering,
-        };
+        use std::sync::atomic::{AtomicU64, Ordering};
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir = std::env::temp_dir();
@@ -1556,11 +1442,8 @@ mod tests {
                         .to_lowercase()
                         .contains("delegate")
                 );
-                assert_eq!(
-                    telemetry.expect("expected telemetry").decision,
-                    "delegate"
-                );
-            },
+                assert_eq!(telemetry.expect("expected telemetry").decision, "delegate");
+            }
             other => panic!("expected Respond, got {other:?}"),
         }
     }
@@ -1588,7 +1471,7 @@ mod tests {
                     telemetry.is_none(),
                     "forwarded calls emit telemetry on response, not on forward"
                 );
-            },
+            }
             other => panic!("expected Forward (fail open), got {other:?}"),
         }
     }
@@ -1620,7 +1503,7 @@ mod tests {
                     args.get(GRANT_ID_ARG).is_none(),
                     "grant_id must be stripped"
                 );
-            },
+            }
             other => panic!("expected Forward, got {other:?}"),
         }
     }
@@ -1643,7 +1526,7 @@ mod tests {
                 assert_eq!(args[SESSION_ID_ARG], json!(TEST_SESSION_ID));
                 assert!(args.get(CALLER_MODEL_ARG).is_none());
                 assert!(args.get(GRANT_ID_ARG).is_none());
-            },
+            }
             other => panic!("expected Forward, got {other:?}"),
         }
     }
@@ -1660,7 +1543,7 @@ mod tests {
             &mut p,
             &mut pc,
         ) {
-            (ClientAction::Forward(_), _) => {},
+            (ClientAction::Forward(_), _) => {}
             other => panic!("expected Forward, got {other:?}"),
         }
     }
@@ -1680,11 +1563,8 @@ mod tests {
                 assert_eq!(v["result"]["isError"], json!(true));
                 let text = v["result"]["content"][0]["text"].as_str().unwrap();
                 assert!(text.to_lowercase().contains("unknown caller_model"));
-                assert_eq!(
-                    telemetry.expect("expected telemetry").decision,
-                    "reject"
-                );
-            },
+                assert_eq!(telemetry.expect("expected telemetry").decision, "reject");
+            }
             other => panic!("expected Respond, got {other:?}"),
         }
     }
@@ -1709,10 +1589,8 @@ mod tests {
                     args.get(CALLER_MODEL_ARG).is_none(),
                     "caller_model must be stripped"
                 );
-            },
-            other => panic!(
-                "expected Forward (allow after normalization), got {other:?}"
-            ),
+            }
+            other => panic!("expected Forward (allow after normalization), got {other:?}"),
         }
 
         // The soft warning surfaces on the eventual server response.
@@ -1721,8 +1599,7 @@ mod tests {
             "id": 1,
             "result": { "content": [{ "type": "text", "text": "ok" }] }
         });
-        let (out, telemetry) =
-            handle_server_message(resp, Some(&g), &mut p, &mut pc);
+        let (out, telemetry) = handle_server_message(resp, Some(&g), &mut p, &mut pc);
         assert!(
             out["result"]["costGateWarning"]
                 .as_str()
@@ -1752,10 +1629,8 @@ mod tests {
                     args.get(CALLER_MODEL_ARG).is_none(),
                     "caller_model must be stripped"
                 );
-            },
-            other => panic!(
-                "expected Forward (allow after normalization), got {other:?}"
-            ),
+            }
+            other => panic!("expected Forward (allow after normalization), got {other:?}"),
         }
         let resp = json!({
             "jsonrpc": "2.0",
@@ -1783,11 +1658,8 @@ mod tests {
                 assert_eq!(v["result"]["isError"], json!(true));
                 let text = v["result"]["content"][0]["text"].as_str().unwrap();
                 assert!(text.to_lowercase().contains("unknown caller_model"));
-                assert_eq!(
-                    telemetry.expect("expected telemetry").decision,
-                    "reject"
-                );
-            },
+                assert_eq!(telemetry.expect("expected telemetry").decision, "reject");
+            }
             other => panic!("expected Respond, got {other:?}"),
         }
     }
@@ -1796,15 +1668,9 @@ mod tests {
     fn no_gate_is_passthrough() {
         let mut p = PendingList::default();
         let mut pc = PendingCalls::default();
-        match handle_client_message(
-            call("read_file", None),
-            None,
-            &mut p,
-            &mut pc,
-        ) {
-            (ClientAction::Forward(_), None) => {},
-            other =>
-                panic!("expected Forward with no telemetry, got {other:?}"),
+        match handle_client_message(call("read_file", None), None, &mut p, &mut pc) {
+            (ClientAction::Forward(_), None) => {}
+            other => panic!("expected Forward with no telemetry, got {other:?}"),
         }
     }
 
@@ -1813,8 +1679,7 @@ mod tests {
         let mut p = PendingList::default();
         let mut pc = PendingCalls::default();
         // Record the list request id.
-        let req =
-            json!({"jsonrpc":"2.0","id":7,"method":"tools/list","params":{}});
+        let req = json!({"jsonrpc":"2.0","id":7,"method":"tools/list","params":{}});
         let g = test_gate();
         let _ = handle_client_message(req, Some(&g), &mut p, &mut pc);
 
@@ -1826,8 +1691,7 @@ mod tests {
                 { "name": "write_file" }
             ] }
         });
-        let (out, telemetry) =
-            handle_server_message(resp, Some(&g), &mut p, &mut pc);
+        let (out, telemetry) = handle_server_message(resp, Some(&g), &mut p, &mut pc);
         for tool in out["result"]["tools"].as_array().unwrap() {
             assert_eq!(
                 tool["inputSchema"]["properties"][CALLER_MODEL_ARG]["type"],
@@ -1870,8 +1734,7 @@ mod tests {
         let mut p = PendingList::default();
         let mut pc = PendingCalls::default();
         let req = call("some_unknown_tool", Some("gpt-5-mini"));
-        let (action, telemetry) =
-            handle_client_message(req, Some(&g), &mut p, &mut pc);
+        let (action, telemetry) = handle_client_message(req, Some(&g), &mut p, &mut pc);
         assert!(
             telemetry.is_none(),
             "no telemetry until the response arrives"
@@ -1887,10 +1750,8 @@ mod tests {
             "id": id,
             "result": { "content": [{ "type": "text", "text": "some tool output" }] }
         });
-        let (_, telemetry) =
-            handle_server_message(resp, Some(&g), &mut p, &mut pc);
-        let telemetry = telemetry
-            .expect("expected telemetry once the response is correlated");
+        let (_, telemetry) = handle_server_message(resp, Some(&g), &mut p, &mut pc);
+        let telemetry = telemetry.expect("expected telemetry once the response is correlated");
         assert_eq!(telemetry.decision, "allow");
         assert_eq!(telemetry.tool_name, "some_unknown_tool");
         assert!(
@@ -1908,9 +1769,7 @@ mod tests {
         assert_eq!(
             telemetry.tokens_estimated,
             Some(
-                (telemetry.request_chars.unwrap_or(0)
-                    + telemetry.response_chars.unwrap_or(0))
-                    / 4
+                (telemetry.request_chars.unwrap_or(0) + telemetry.response_chars.unwrap_or(0)) / 4
             )
         );
     }
@@ -1933,10 +1792,8 @@ mod tests {
         // Sleep a measurable span so duration_ms is guaranteed nonzero.
         std::thread::sleep(std::time::Duration::from_millis(5));
 
-        let resp =
-            json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [] } });
-        let (_, telemetry) =
-            handle_server_message(resp, Some(&g), &mut p, &mut pc);
+        let resp = json!({ "jsonrpc": "2.0", "id": id, "result": { "content": [] } });
+        let (_, telemetry) = handle_server_message(resp, Some(&g), &mut p, &mut pc);
         let telemetry = telemetry.expect("expected telemetry");
         assert!(
             telemetry.duration_ms >= 5,
@@ -1953,14 +1810,9 @@ mod tests {
         let g = test_gate();
         let mut p = PendingList::default();
         let mut pc = PendingCalls::default();
-        let (_, telemetry) = handle_client_message(
-            call("read_file", None),
-            Some(&g),
-            &mut p,
-            &mut pc,
-        );
-        let telemetry =
-            telemetry.expect("expected telemetry for the refused call");
+        let (_, telemetry) =
+            handle_client_message(call("read_file", None), Some(&g), &mut p, &mut pc);
+        let telemetry = telemetry.expect("expected telemetry for the refused call");
         assert_eq!(telemetry.response_bytes, Some(0));
         assert_eq!(telemetry.response_chars, Some(0));
         assert_eq!(telemetry.duration_ms, 0);

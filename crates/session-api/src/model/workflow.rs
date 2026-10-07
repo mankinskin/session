@@ -1,11 +1,5 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Behavioral role of a workflow node.
 ///
@@ -204,7 +198,7 @@ pub struct SessionWorkflowValidationIssue {
 /// Structurally validate a workflow graph: every edge endpoint must
 /// reference an existing node, and node ids must be unique.
 pub fn validate_workflow_graph(
-    graph: &SessionWorkflowGraph
+    graph: &SessionWorkflowGraph,
 ) -> Vec<SessionWorkflowValidationIssue> {
     use std::collections::HashSet;
 
@@ -257,10 +251,7 @@ pub fn validate_workflow_graph(
 }
 
 pub trait SessionTicketStateResolver {
-    fn resolve_ticket_state(
-        &self,
-        ticket_urn: &str,
-    ) -> Result<Option<String>, String>;
+    fn resolve_ticket_state(&self, ticket_urn: &str) -> Result<Option<String>, String>;
 
     /// Resolve the authoritative live state for a spec-backed workflow node.
     ///
@@ -268,10 +259,7 @@ pub trait SessionTicketStateResolver {
     /// finish symmetrically to a `Ticket` node. The default implementation
     /// reports the capability as unavailable, which fails a required `Spec` node
     /// closed rather than silently passing it.
-    fn resolve_spec_state(
-        &self,
-        spec_urn: &str,
-    ) -> Result<Option<String>, String> {
+    fn resolve_spec_state(&self, spec_urn: &str) -> Result<Option<String>, String> {
         Err(format!(
             "spec state resolution not supported by this resolver ({spec_urn})"
         ))

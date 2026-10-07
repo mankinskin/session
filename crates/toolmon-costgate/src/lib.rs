@@ -9,8 +9,5 @@ pub mod gate;
 pub mod policy_impl;
 pub mod verdict;
 
-pub use gate::{
-    Gate,
-    ModelBudgetCalibration,
-};
+pub use gate::{Gate, ModelBudgetCalibration};
 pub use policy_impl::CostGatePolicy;

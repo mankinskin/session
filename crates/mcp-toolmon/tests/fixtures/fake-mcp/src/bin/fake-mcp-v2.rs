@@ -5,16 +5,9 @@
 //! byte-different by construction, letting shadow-copy/reload tests detect a
 //! swap by content hash.
 
-use std::io::{
-    self,
-    BufRead,
-    Write,
-};
+use std::io::{self, BufRead, Write};
 
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 
 const GENERATION: &str = "v2";
 
@@ -45,7 +38,7 @@ fn main() {
                         "serverInfo": { "name": "fake-mcp-v2", "version": GENERATION }
                     }
                 }))
-            },
+            }
             "notifications/initialized" => None,
             "tools/list" => Some(json!({
                 "jsonrpc": "2.0",

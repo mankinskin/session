@@ -1,36 +1,19 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    SessionError,
-    SessionLinks,
-    SessionMetadata,
-    SessionProvisioningDiagnostic,
-    SessionRecord,
-    SessionRole,
-    SessionTurn,
-    SessionTurnEventMeta,
+    SessionError, SessionLinks, SessionMetadata, SessionProvisioningDiagnostic, SessionRecord,
+    SessionRole, SessionTurn, SessionTurnEventMeta,
 };
 
 mod tool_execution;
 mod transcript;
 
-use parser::{
-    deserialize_transcript_event,
-    json_string,
-    json_timestamp,
-};
+use parser::{deserialize_transcript_event, json_string, json_timestamp};
 
 pub use transcript::{
-    ToolResponseOverride,
-    copilot_payload_from_transcript_path,
+    ToolResponseOverride, copilot_payload_from_transcript_path,
     copilot_payload_from_transcript_path_with_tool_response_override,
     copilot_payload_from_transcript_reader,
 };
@@ -39,9 +22,7 @@ pub use transcript::{
 mod parser;
 
 use tool_execution::{
-    ToolExecutionContext,
-    build_tool_execution_result_event,
-    capture_tool_execution_context,
+    ToolExecutionContext, build_tool_execution_result_event, capture_tool_execution_context,
     hydrate_tool_execution_complete,
 };
 
@@ -149,7 +130,7 @@ impl SessionCaptureRequest {
     }
 
     pub fn into_record_and_events(
-        self
+        self,
     ) -> Result<(SessionRecord, Vec<CopilotHookEvent>), SessionError> {
         let payload = self.payload;
         if payload.session_id.trim().is_empty() {
@@ -267,60 +248,54 @@ struct TranscriptEventEnvelope {
 impl TranscriptEventEnvelope {
     fn event_meta(&self) -> Option<SessionTurnEventMeta> {
         // Extract token and model attribution from data_json (ticket 6549b6a7)
-        let (
-            input_tokens,
-            output_tokens,
-            cache_read_tokens,
-            cache_write_tokens,
-            model_id,
-        ) = if let Some(data) = &self.data_json {
-            let usage = data.get("usage");
-            let input_tokens = usage
-                .and_then(|u| u.get("input_tokens"))
-                .and_then(|v| v.as_u64());
-            let output_tokens = usage
-                .and_then(|u| u.get("output_tokens"))
-                .and_then(|v| v.as_u64());
-            let cache_read_tokens = usage
-                .and_then(|u| u.get("cache_read_tokens"))
-                .and_then(|v| v.as_u64());
-            let cache_write_tokens = usage
-                .and_then(|u| u.get("cache_write_tokens"))
-                .and_then(|v| v.as_u64());
-            let model_id = data
-                .get("model")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            (
-                input_tokens,
-                output_tokens,
-                cache_read_tokens,
-                cache_write_tokens,
-                model_id,
-            )
-        } else {
-            (None, None, None, None, None)
-        };
+        let (input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, model_id) =
+            if let Some(data) = &self.data_json {
+                let usage = data.get("usage");
+                let input_tokens = usage
+                    .and_then(|u| u.get("input_tokens"))
+                    .and_then(|v| v.as_u64());
+                let output_tokens = usage
+                    .and_then(|u| u.get("output_tokens"))
+                    .and_then(|v| v.as_u64());
+                let cache_read_tokens = usage
+                    .and_then(|u| u.get("cache_read_tokens"))
+                    .and_then(|v| v.as_u64());
+                let cache_write_tokens = usage
+                    .and_then(|u| u.get("cache_write_tokens"))
+                    .and_then(|v| v.as_u64());
+                let model_id = data
+                    .get("model")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                (
+                    input_tokens,
+                    output_tokens,
+                    cache_read_tokens,
+                    cache_write_tokens,
+                    model_id,
+                )
+            } else {
+                (None, None, None, None, None)
+            };
 
         // Extract error/exit/result_code from data_json (ticket 84c7757d)
-        let (error_message, exit_code, result_code) =
-            if let Some(data) = &self.data_json {
-                let error_message = data
-                    .get("error_message")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                let exit_code = data
-                    .get("exit_code")
-                    .and_then(|v| v.as_i64())
-                    .map(|v| v as i32);
-                let result_code = data
-                    .get("result_code")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string());
-                (error_message, exit_code, result_code)
-            } else {
-                (None, None, None)
-            };
+        let (error_message, exit_code, result_code) = if let Some(data) = &self.data_json {
+            let error_message = data
+                .get("error_message")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            let exit_code = data
+                .get("exit_code")
+                .and_then(|v| v.as_i64())
+                .map(|v| v as i32);
+            let result_code = data
+                .get("result_code")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string());
+            (error_message, exit_code, result_code)
+        } else {
+            (None, None, None)
+        };
 
         let meta = SessionTurnEventMeta {
             event_id: self.event_id.clone(),

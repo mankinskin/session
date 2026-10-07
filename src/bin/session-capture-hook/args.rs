@@ -1,10 +1,7 @@
 use std::{
     env,
     io::Read,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
 };
 
 use serde_json::Value;
@@ -51,25 +48,23 @@ pub(super) fn parse_args() -> Result<Args, SessionError> {
 
     while let Some(argument) = arguments.next() {
         match argument.as_str() {
-            "-h" | "--help" =>
-                return Err(SessionError::InvalidHookInput("help".to_string())),
-            "--transcript-path" =>
+            "-h" | "--help" => return Err(SessionError::InvalidHookInput("help".to_string())),
+            "--transcript-path" => {
                 transcript_path = Some(PathBuf::from(next_value(
                     &mut arguments,
                     "--transcript-path",
-                )?)),
-            "--store-root" =>
-                store_root = Some(PathBuf::from(next_value(
-                    &mut arguments,
-                    "--store-root",
-                )?)),
-            "--trigger" =>
-                trigger = Some(next_value(&mut arguments, "--trigger")?),
+                )?))
+            }
+            "--store-root" => {
+                store_root = Some(PathBuf::from(next_value(&mut arguments, "--store-root")?))
+            }
+            "--trigger" => trigger = Some(next_value(&mut arguments, "--trigger")?),
             "--from-hook-stdin" => from_hook_stdin = true,
-            _ =>
+            _ => {
                 return Err(SessionError::InvalidHookInput(format!(
                     "unknown argument: {argument}"
-                ))),
+                )));
+            }
         }
     }
 
@@ -77,9 +72,7 @@ pub(super) fn parse_args() -> Result<Args, SessionError> {
         transcript_path.unwrap_or_default()
     } else {
         transcript_path.ok_or_else(|| {
-            SessionError::InvalidHookInput(
-                "missing --transcript-path".to_string(),
-            )
+            SessionError::InvalidHookInput("missing --transcript-path".to_string())
         })?
     };
     Ok(Args {
@@ -99,16 +92,12 @@ pub(super) fn parse_args() -> Result<Args, SessionError> {
     })
 }
 
-pub(super) fn args_from_hook_stdin(
-    mut args: Args
-) -> Result<Args, SessionError> {
+pub(super) fn args_from_hook_stdin(mut args: Args) -> Result<Args, SessionError> {
     let mut stdin = String::new();
     std::io::stdin()
         .read_to_string(&mut stdin)
         .map_err(|error| {
-            SessionError::InvalidHookInput(format!(
-                "failed reading hook stdin: {error}"
-            ))
+            SessionError::InvalidHookInput(format!("failed reading hook stdin: {error}"))
         })?;
     if stdin.trim().is_empty() {
         tracing::warn!("hook stdin was empty");
@@ -116,13 +105,9 @@ pub(super) fn args_from_hook_stdin(
     }
     tracing::debug!(stdin_len = stdin.len(), "read hook stdin");
     let payload: Value = serde_json::from_str(&stdin).map_err(|error| {
-        SessionError::InvalidHookInput(format!(
-            "invalid hook stdin json: {error}"
-        ))
+        SessionError::InvalidHookInput(format!("invalid hook stdin json: {error}"))
     })?;
-    if let Some(path) =
-        get_field(&payload, &["transcript_path", "transcriptPath"])
-    {
+    if let Some(path) = get_field(&payload, &["transcript_path", "transcriptPath"]) {
         args.transcript_path = PathBuf::from(path);
     }
     if let Some(prompt) = get_field(&payload, &["prompt"]) {
@@ -135,20 +120,16 @@ pub(super) fn args_from_hook_stdin(
         args.trigger = normalize_trigger(hook_event_name);
         args.hook_event_name = Some(hook_event_name.to_string());
     }
-    if let Some(tool_call_id) =
-        get_field(&payload, &["tool_use_id", "toolUseId"])
-    {
+    if let Some(tool_call_id) = get_field(&payload, &["tool_use_id", "toolUseId"]) {
         args.tool_call_id = Some(tool_call_id);
     }
-    if let Some(session_id) = get_field(&payload, &["session_id", "sessionId"])
-    {
+    if let Some(session_id) = get_field(&payload, &["session_id", "sessionId"]) {
         args.session_id = Some(session_id);
     }
     if let Some(agent_id) = get_field(&payload, &["agent_id", "agentId"]) {
         args.agent_id = Some(agent_id);
     }
-    if let Some(agent_type) = get_field(&payload, &["agent_type", "agentType"])
-    {
+    if let Some(agent_type) = get_field(&payload, &["agent_type", "agentType"]) {
         args.agent_type = Some(agent_type);
     }
     if let Some(stop_hook_active) = ["stop_hook_active", "stopHookActive"]
@@ -184,10 +165,7 @@ pub(super) fn normalize_transcript_path(path: &Path) -> PathBuf {
     PathBuf::from(raw)
 }
 
-fn get_field(
-    payload: &Value,
-    keys: &[&str],
-) -> Option<String> {
+fn get_field(payload: &Value, keys: &[&str]) -> Option<String> {
     keys.iter().find_map(|key| {
         payload
             .get(*key)?
@@ -230,9 +208,9 @@ fn next_value(
     arguments: &mut impl Iterator<Item = String>,
     flag: &str,
 ) -> Result<String, SessionError> {
-    arguments.next().ok_or_else(|| {
-        SessionError::InvalidHookInput(format!("missing value for {flag}"))
-    })
+    arguments
+        .next()
+        .ok_or_else(|| SessionError::InvalidHookInput(format!("missing value for {flag}")))
 }
 
 pub(super) fn print_usage() {

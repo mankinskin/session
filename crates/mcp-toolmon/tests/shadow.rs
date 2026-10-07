@@ -21,9 +21,7 @@ async fn shadow_copy_spawns_from_shadow_path() {
     let canonical = fake_v1_path();
     let command = vec![canonical.to_string_lossy().to_string()];
 
-    let supervisor =
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap();
+    let supervisor = Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap();
 
     let shadow_path = supervisor
         .shadow_path()
@@ -128,9 +126,7 @@ async fn windows_lock_freedom() {
     std::fs::copy(fake_v1_path(), &canonical).unwrap();
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor =
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap();
+    let supervisor = Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap();
 
     assert!(
         supervisor.shadow_path().is_some(),

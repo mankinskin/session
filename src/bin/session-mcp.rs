@@ -26,14 +26,11 @@ fn resolve_store_root() -> PathBuf {
     if let Ok(path) = std::env::var("SESSION_STORE_ROOT") {
         return PathBuf::from(path);
     }
-    match memory_kernel::workspace::resolve_consumer_store_root(
-        None, None, None, ".session",
-    ) {
+    match memory_kernel::workspace::resolve_consumer_store_root(None, None, None, ".session") {
         Ok(store_root) => store_root,
         Err(error) => {
             eprintln!("Fatal error: {error}");
             std::process::exit(1);
-        },
+        }
     }
 }
-

@@ -1,7 +1,4 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::CopilotHookEvent;
@@ -16,7 +13,7 @@ pub(super) struct ToolExecutionContext {
 }
 
 pub(super) fn capture_tool_execution_context(
-    event: &TranscriptEventEnvelope
+    event: &TranscriptEventEnvelope,
 ) -> Option<ToolExecutionContext> {
     let is_start = matches!(
         event.event_type.as_deref(),
@@ -50,8 +47,7 @@ pub(super) fn hydrate_tool_execution_complete(
         event.tool_name = context.and_then(|ctx| ctx.tool_name.clone());
     }
     if event.tool_arguments_json.is_none() {
-        event.tool_arguments_json =
-            context.and_then(|ctx| ctx.tool_arguments_json.clone());
+        event.tool_arguments_json = context.and_then(|ctx| ctx.tool_arguments_json.clone());
     }
 }
 
@@ -126,13 +122,12 @@ pub(super) fn build_tool_execution_result_event(
         .map(|v| v as i32);
 
     // Check for sync terminal ambiguous state (potential hang)
-    let has_ambiguous_state =
-        event.data.get("blocker").and_then(Value::as_str).is_some()
-            || event
-                .data
-                .get("lifecycle_state")
-                .and_then(Value::as_str)
-                .is_some();
+    let has_ambiguous_state = event.data.get("blocker").and_then(Value::as_str).is_some()
+        || event
+            .data
+            .get("lifecycle_state")
+            .and_then(Value::as_str)
+            .is_some();
 
     // Classify result_code
     let result_code = if has_ambiguous_state {
@@ -205,10 +200,7 @@ pub(super) fn build_tool_execution_result_event(
         normalized.insert("arguments".to_string(), arguments);
     }
     if let Some(duration_ms) = duration_ms {
-        normalized.insert(
-            "duration_ms".to_string(),
-            Value::Number(duration_ms.into()),
-        );
+        normalized.insert("duration_ms".to_string(), Value::Number(duration_ms.into()));
     }
     if let Some(summary) = summary.clone() {
         normalized.insert("summary".to_string(), Value::String(summary));
@@ -240,8 +232,7 @@ pub(super) fn build_tool_execution_result_event(
         );
     }
     if let Some(exit_code) = exit_code {
-        normalized
-            .insert("exit_code".to_string(), Value::Number(exit_code.into()));
+        normalized.insert("exit_code".to_string(), Value::Number(exit_code.into()));
     }
     if sync_terminal_ambiguous {
         normalized.insert(
@@ -254,9 +245,7 @@ pub(super) fn build_tool_execution_result_event(
         );
         normalized.insert(
             "lifecycle_reason".to_string(),
-            Value::String(
-                "missing-deterministic-sync-completion-metadata".to_string(),
-            ),
+            Value::String("missing-deterministic-sync-completion-metadata".to_string()),
         );
     }
 
@@ -292,10 +281,7 @@ fn extract_tool_result_summary(data: &Value) -> Option<String> {
     Some(value.chars().take(240).collect())
 }
 
-fn find_spill_pointer(
-    data: &Value,
-    summary: Option<&str>,
-) -> Option<String> {
+fn find_spill_pointer(data: &Value, summary: Option<&str>) -> Option<String> {
     if let Some(pointer) = data
         .get("spillPointer")
         .and_then(Value::as_str)

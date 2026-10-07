@@ -31,20 +31,12 @@ mod failed_tool_calls;
 mod ingestion;
 mod turn_signals;
 
-pub use entity_discovery::{
-    EntityDiscoveryQueue,
-    discover_entities_from_signals,
-};
+pub use entity_discovery::{EntityDiscoveryQueue, discover_entities_from_signals};
 pub use failed_tool_calls::{
-    FailedToolCallMapping,
-    UnmappedReason,
-    map_failed_tool_call_to_entity,
+    FailedToolCallMapping, UnmappedReason, map_failed_tool_call_to_entity,
     mine_failed_tool_call_signals,
 };
-pub use ingestion::{
-    mine_explicit_ingestion_signals,
-    recover_feedback_entry_from_signal,
-};
+pub use ingestion::{mine_explicit_ingestion_signals, recover_feedback_entry_from_signal};
 pub use turn_signals::mine_structured_feedback_signals;
 
 /// Classification of a structured feedback signal detected in a captured
@@ -52,9 +44,7 @@ pub use turn_signals::mine_structured_feedback_signals;
 ///
 /// Only signals that can be derived unambiguously from captured structured
 /// metadata are represented here.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FeedbackSignalKind {
     /// A tool invocation whose captured `tool_success` flag was `false`.
@@ -136,24 +126,13 @@ mod tests {
     mod turn_signals;
 
     use chrono::Utc;
-    use feedback_api::{
-        EntityUrn,
-        FeedbackRating,
-    };
+    use feedback_api::{EntityUrn, FeedbackRating};
     use serde_json::Value;
 
     use super::*;
-    use crate::{
-        CopilotHookEvent,
-        SessionRole,
-        SessionTurn,
-        SessionTurnEventMeta,
-    };
+    use crate::{CopilotHookEvent, SessionRole, SessionTurn, SessionTurnEventMeta};
 
-    fn failed_tool_call_event(
-        tool_name: Option<&str>,
-        arguments: Value,
-    ) -> CopilotHookEvent {
+    fn failed_tool_call_event(tool_name: Option<&str>, arguments: Value) -> CopilotHookEvent {
         CopilotHookEvent {
             event_id: Some("evt-fail-1".to_string()),
             parent_event_id: None,
@@ -216,8 +195,7 @@ mod tests {
         result.event_id = Some("evt-fail-2".to_string());
         result.event_type = Some("tool.execution_result".to_string());
 
-        let signals =
-            mine_failed_tool_call_signals(&[complete, result], "memory-api");
+        let signals = mine_failed_tool_call_signals(&[complete, result], "memory-api");
 
         assert_eq!(signals.len(), 1);
         assert_eq!(signals[0].kind, FeedbackSignalKind::FailedToolCall);

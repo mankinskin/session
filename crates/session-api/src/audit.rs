@@ -1,15 +1,9 @@
 use std::collections::BTreeMap;
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{
-    PersistedSessionEvents,
-    SessionRecord,
-};
+use crate::{PersistedSessionEvents, SessionRecord};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionAuditSelector {
@@ -74,10 +68,7 @@ pub fn build_session_audit_report(
     let empty_assistant_turn_count = record
         .turns
         .iter()
-        .filter(|turn| {
-            turn.role == crate::SessionRole::Assistant
-                && turn.content.trim().is_empty()
-        })
+        .filter(|turn| turn.role == crate::SessionRole::Assistant && turn.content.trim().is_empty())
         .count();
 
     let mut assistant_tool_plan_count = 0usize;
@@ -155,7 +146,8 @@ pub fn build_session_audit_report(
         findings.push(SessionAuditFinding {
             code: "sync-terminal-ambiguous-lifecycle".to_string(),
             severity: SessionAuditSeverity::High,
-            summary: "Session events include ambiguous sync terminal lifecycle markers.".to_string(),
+            summary: "Session events include ambiguous sync terminal lifecycle markers."
+                .to_string(),
             evidence: serde_json::json!({
                 "ambiguous_sync_terminal_count": ambiguous_sync_terminal_count,
                 "expected_blocker": "sync-terminal-state-ambiguous",
@@ -173,9 +165,7 @@ pub fn build_session_audit_report(
             turn_count: record.turns.len(),
             assistant_turn_count,
             empty_assistant_turn_count,
-            event_count: events
-                .map(|value| value.events.len())
-                .unwrap_or_default(),
+            event_count: events.map(|value| value.events.len()).unwrap_or_default(),
             assistant_tool_plan_count,
             tool_execution_result_count,
             ambiguous_sync_terminal_count,

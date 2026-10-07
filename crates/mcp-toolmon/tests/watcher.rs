@@ -6,24 +6,15 @@
 use std::{
     collections::HashMap,
     path::Path,
-    sync::{
-        Arc,
-        Mutex as StdMutex,
-    },
+    sync::{Arc, Mutex as StdMutex},
     time::Duration,
 };
 
 use mcp_toolmon::{
     supervisor::Supervisor,
-    watcher::{
-        self,
-        WatcherConfig,
-    },
+    watcher::{self, WatcherConfig},
 };
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 use tokio::sync::Mutex as TokioMutex;
 
@@ -35,10 +26,7 @@ fn fake_v2_bytes() -> Vec<u8> {
     std::fs::read(env!("CARGO_BIN_EXE_fake-mcp-v2")).unwrap()
 }
 
-fn write_exe(
-    path: &Path,
-    bytes: &[u8],
-) {
+fn write_exe(path: &Path, bytes: &[u8]) {
     std::fs::write(path, bytes).unwrap();
     #[cfg(unix)]
     {
@@ -58,11 +46,7 @@ fn canonical_exe_name() -> &'static str {
 }
 
 /// Bounded-wait helper (no bare `sleep` as the synchronization mechanism).
-async fn wait_until<F: Fn() -> bool>(
-    condition: F,
-    timeout: Duration,
-    msg: &str,
-) {
+async fn wait_until<F: Fn() -> bool>(condition: F, timeout: Duration, msg: &str) {
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
         if condition() {
@@ -76,8 +60,7 @@ async fn wait_until<F: Fn() -> bool>(
 }
 
 async fn perform_handshake(supervisor: &Supervisor) {
-    let init =
-        json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{}});
+    let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{}});
     assert!(
         supervisor.write_line(&init.to_string()).await,
         "write initialize failed"
@@ -127,10 +110,8 @@ async fn watcher_disabled_by_env() {
     let canonical = canonical_dir.path().join(canonical_exe_name());
     write_exe(&canonical, &fake_v1_bytes());
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor = Arc::new(
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap(),
-    );
+    let supervisor =
+        Arc::new(Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap());
 
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
     let handle = watcher::spawn(
@@ -165,10 +146,7 @@ async fn watcher_disabled_by_env() {
     let _ = supervisor.shutdown().await;
 }
 
-async fn call_generation(
-    supervisor: &Supervisor,
-    id: i64,
-) -> Value {
+async fn call_generation(supervisor: &Supervisor, id: i64) -> Value {
     let req = json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"generation","arguments":{}}});
     assert!(
         supervisor.write_line(&req.to_string()).await,
@@ -200,15 +178,12 @@ async fn integration_watcher_real_poll() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor = Arc::new(
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap(),
-    );
+    let supervisor =
+        Arc::new(Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap());
     perform_handshake(&supervisor).await;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
-    let received: Arc<TokioMutex<Vec<String>>> =
-        Arc::new(TokioMutex::new(Vec::new()));
+    let received: Arc<TokioMutex<Vec<String>>> = Arc::new(TokioMutex::new(Vec::new()));
     let collector_received = Arc::clone(&received);
     let collector = tokio::spawn(async move {
         while let Some(line) = rx.recv().await {
@@ -291,10 +266,8 @@ async fn list_changed_emitted_after_successful_swap() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor = Arc::new(
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap(),
-    );
+    let supervisor =
+        Arc::new(Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap());
     perform_handshake(&supervisor).await;
 
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -307,8 +280,7 @@ async fn list_changed_emitted_after_successful_swap() {
     for err in &synthesized {
         let _ = tx.send(err.to_string());
     }
-    let notif =
-        json!({"jsonrpc":"2.0","method":"notifications/tools/list_changed"});
+    let notif = json!({"jsonrpc":"2.0","method":"notifications/tools/list_changed"});
     tx.send(notif.to_string()).unwrap();
     drop(tx);
 
@@ -345,14 +317,11 @@ async fn crash_auto_recovery_respawns_and_serves_again() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor = Arc::new(
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap(),
-    );
+    let supervisor =
+        Arc::new(Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap());
     perform_handshake(&supervisor).await;
 
-    let responses: Arc<TokioMutex<HashMap<i64, Value>>> =
-        Arc::new(TokioMutex::new(HashMap::new()));
+    let responses: Arc<TokioMutex<HashMap<i64, Value>>> = Arc::new(TokioMutex::new(HashMap::new()));
     let pump_responses = Arc::clone(&responses);
     let pump_sup = Arc::clone(&supervisor);
     let pump = tokio::spawn(async move {
@@ -364,7 +333,7 @@ async fn crash_auto_recovery_respawns_and_serves_again() {
                             pump_responses.lock().await.insert(id, v);
                         }
                     }
-                },
+                }
                 None => break,
             }
         }
@@ -408,17 +377,13 @@ async fn crash_auto_recovery_respawns_and_serves_again() {
     // routes around a request silently swallowed that way.
     let mut recovered = None;
     let mut attempt_id = 2i64;
-    let overall_deadline =
-        tokio::time::Instant::now() + Duration::from_secs(10);
+    let overall_deadline = tokio::time::Instant::now() + Duration::from_secs(10);
     while recovered.is_none() {
         let req = json!({"jsonrpc":"2.0","id":attempt_id,"method":"tools/call","params":{"name":"generation","arguments":{}}});
         if supervisor.write_line(&req.to_string()).await {
-            let short_deadline =
-                tokio::time::Instant::now() + Duration::from_millis(300);
+            let short_deadline = tokio::time::Instant::now() + Duration::from_millis(300);
             loop {
-                if let Some(v) =
-                    responses.lock().await.get(&attempt_id).cloned()
-                {
+                if let Some(v) = responses.lock().await.get(&attempt_id).cloned() {
                     recovered = Some(v);
                     break;
                 }

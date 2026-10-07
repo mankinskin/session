@@ -1,19 +1,8 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use crate::{
-    PersistedSessionEvents,
-    SessionRecord,
-    SessionRole,
-    SessionRuntimeContext,
-};
+use crate::{PersistedSessionEvents, SessionRecord, SessionRole, SessionRuntimeContext};
 
 /// Per-sub-agent cost and usage rollup.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -140,31 +129,30 @@ fn compute_rollup_metrics(
                 .unwrap_or_else(|| record.session_id.clone());
             let is_inline_subagent_span = rollup_key != record.session_id;
 
-            let rollup =
-                rollups.entry(rollup_key.clone()).or_insert_with(|| {
-                    SubAgentRollup {
-                        run_id: rollup_key.clone(),
-                        session_id: record.session_id.clone(),
-                        parent_session_id: if is_inline_subagent_span {
-                            Some(record.session_id.clone())
-                        } else {
-                            None
-                        },
-                        model: None,
-                        agent_type: None,
-                        dispatched_at: None,
-                        stopped_at: None,
-                        turn_count: 0,
-                        tool_call_count: 0,
-                        input_tokens: 0,
-                        output_tokens: 0,
-                        cache_read_tokens: 0,
-                        cache_write_tokens: 0,
-                        cost_usd: None,
-                        tokens_estimated: None,
-                        outcome: None,
-                        wall_time_secs: None,
-                    }
+            let rollup = rollups
+                .entry(rollup_key.clone())
+                .or_insert_with(|| SubAgentRollup {
+                    run_id: rollup_key.clone(),
+                    session_id: record.session_id.clone(),
+                    parent_session_id: if is_inline_subagent_span {
+                        Some(record.session_id.clone())
+                    } else {
+                        None
+                    },
+                    model: None,
+                    agent_type: None,
+                    dispatched_at: None,
+                    stopped_at: None,
+                    turn_count: 0,
+                    tool_call_count: 0,
+                    input_tokens: 0,
+                    output_tokens: 0,
+                    cache_read_tokens: 0,
+                    cache_write_tokens: 0,
+                    cost_usd: None,
+                    tokens_estimated: None,
+                    outcome: None,
+                    wall_time_secs: None,
                 });
 
             if is_assistant {
@@ -192,8 +180,7 @@ fn compute_rollup_metrics(
 
             // Aggregate estimated tokens from payload sizes (ticket 9d527ad1)
             if let Some(est) = meta.tokens_estimated {
-                rollup.tokens_estimated =
-                    Some(rollup.tokens_estimated.unwrap_or(0) + est);
+                rollup.tokens_estimated = Some(rollup.tokens_estimated.unwrap_or(0) + est);
             }
         }
     }
@@ -227,9 +214,7 @@ fn add_hook_lifecycle_rollups(
         let Some(data) = event.data_json.as_ref() else {
             continue;
         };
-        let Some(agent_id) =
-            data.get("agent_id").and_then(|value| value.as_str())
-        else {
+        let Some(agent_id) = data.get("agent_id").and_then(|value| value.as_str()) else {
             continue;
         };
         let timestamp = event.captured_at.clone().or_else(|| {
@@ -238,8 +223,9 @@ fn add_hook_lifecycle_rollups(
                 .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
                 .map(|value| value.with_timezone(&Utc))
         });
-        let rollup = rollups.entry(agent_id.to_string()).or_insert_with(|| {
-            SubAgentRollup {
+        let rollup = rollups
+            .entry(agent_id.to_string())
+            .or_insert_with(|| SubAgentRollup {
                 run_id: agent_id.to_string(),
                 session_id: record.session_id.clone(),
                 parent_session_id: Some(record.session_id.clone()),
@@ -257,8 +243,7 @@ fn add_hook_lifecycle_rollups(
                 tokens_estimated: None,
                 wall_time_secs: None,
                 outcome: None,
-            }
-        });
+            });
         if rollup.agent_type.is_none() {
             rollup.agent_type = data
                 .get("agent_type")
@@ -269,12 +254,12 @@ fn add_hook_lifecycle_rollups(
             "SubagentStart" => {
                 rollup.dispatched_at = timestamp;
                 rollup.outcome = Some("running".to_string());
-            },
+            }
             "SubagentStop" => {
                 rollup.stopped_at = timestamp;
                 rollup.outcome = Some("stopped".to_string());
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 }
@@ -283,11 +268,7 @@ fn add_hook_lifecycle_rollups(
 mod tests {
     use super::*;
     use crate::{
-        CopilotHookEvent,
-        SessionLinks,
-        SessionMetadata,
-        SessionTurn,
-        SessionTurnEventMeta,
+        CopilotHookEvent, SessionLinks, SessionMetadata, SessionTurn, SessionTurnEventMeta,
     };
     use chrono::Utc;
 
@@ -357,8 +338,7 @@ mod tests {
             ],
         };
 
-        let rollups =
-            compute_subagent_rollups_with_events(&record, None, Some(&events));
+        let rollups = compute_subagent_rollups_with_events(&record, None, Some(&events));
 
         assert_eq!(rollups.len(), 1);
         let rollup = rollups.get("agent-42").expect("lifecycle rollup");
@@ -493,16 +473,11 @@ mod tests {
         use tempfile::TempDir;
 
         let temp_dir = TempDir::new().unwrap();
-        let config = SessionStoreConfig::new(
-            temp_dir.path().join(".session"),
-        );
+        let config = SessionStoreConfig::new(temp_dir.path().join(".session"));
 
         // Create a simple session using the capture API
         let session_id = "f5555555-5555-4555-8555-555555555555";
-        use crate::hook::{
-            CopilotHookMessage,
-            CopilotHookPayload,
-        };
+        use crate::hook::{CopilotHookMessage, CopilotHookPayload};
 
         let payload = CopilotHookPayload {
             session_id: session_id.to_string(),
@@ -568,8 +543,7 @@ mod tests {
         assert!(!rollups.is_empty(), "Should have at least one rollup");
 
         // Check the main session rollup
-        let rollup =
-            rollups.get(session_id).expect("Should have session rollup");
+        let rollup = rollups.get(session_id).expect("Should have session rollup");
         assert_eq!(rollup.session_id, session_id);
         assert_eq!(rollup.turn_count, 1); // One assistant turn
         assert_eq!(rollup.input_tokens, 500);
@@ -812,8 +786,7 @@ mod tests {
         };
 
         let rollups = compute_subagent_rollups(&record, None);
-        let rollup =
-            rollups.get("session-no-mcp").expect("rollup should exist");
+        let rollup = rollups.get("session-no-mcp").expect("rollup should exist");
 
         // AC4, AC6: tokens_estimated should be None (not Some(0))
         assert_eq!(

@@ -12,19 +12,10 @@
 
 use std::{
     collections::hash_map::DefaultHasher,
-    hash::{
-        Hash,
-        Hasher,
-    },
-    path::{
-        Path,
-        PathBuf,
-    },
+    hash::{Hash, Hasher},
+    path::{Path, PathBuf},
     sync::Arc,
-    time::{
-        Duration,
-        SystemTime,
-    },
+    time::{Duration, SystemTime},
 };
 
 use tokio::sync::mpsc::UnboundedSender;
@@ -87,10 +78,7 @@ fn hash_bytes(bytes: &[u8]) -> u64 {
 /// calling it here — before the old child is killed — would corrupt the
 /// file the live child is still executing from. The scratch copy used for
 /// hashing is deliberately a completely separate path.
-fn copy_for_hash(
-    canonical: &Path,
-    scratch_dir: &Path,
-) -> std::io::Result<Vec<u8>> {
+fn copy_for_hash(canonical: &Path, scratch_dir: &Path) -> std::io::Result<Vec<u8>> {
     std::fs::create_dir_all(scratch_dir)?;
     let dest = scratch_dir.join(format!("candidate-{}", std::process::id()));
     std::fs::copy(canonical, &dest)?;
@@ -121,10 +109,7 @@ enum Step {
 }
 
 impl Debouncer {
-    fn observe(
-        &mut self,
-        current: (SystemTime, u64),
-    ) -> Step {
+    fn observe(&mut self, current: (SystemTime, u64)) -> Step {
         if Some(current) == self.baseline {
             self.pending = None;
             return Step::Steady;
@@ -136,10 +121,7 @@ impl Debouncer {
         Step::Candidate
     }
 
-    fn set_baseline(
-        &mut self,
-        meta: (SystemTime, u64),
-    ) {
+    fn set_baseline(&mut self, meta: (SystemTime, u64)) {
         self.baseline = Some(meta);
         self.pending = None;
     }
@@ -147,10 +129,7 @@ impl Debouncer {
     /// Re-affirm `meta` as still-pending without treating it as a fresh
     /// candidate — used when the copy attempt fails after stability was
     /// already confirmed (R11: retry, don't restart the stability count).
-    fn reaffirm_pending(
-        &mut self,
-        meta: (SystemTime, u64),
-    ) {
+    fn reaffirm_pending(&mut self, meta: (SystemTime, u64)) {
         self.pending = Some(meta);
     }
 }
@@ -217,7 +196,7 @@ impl Watcher {
                 Err(_) => {
                     self.debouncer.reaffirm_pending(current);
                     PollResult::CopyFailed
-                },
+                }
                 Ok(bytes) => {
                     let new_hash = hash_bytes(&bytes);
                     self.debouncer.set_baseline(current);
@@ -226,7 +205,7 @@ impl Watcher {
                     } else {
                         PollResult::Changed
                     }
-                },
+                }
             },
         }
     }
@@ -235,11 +214,7 @@ impl Watcher {
     /// a throwaway scratch file under `shadow_root` for hashing (never the
     /// live shadow path — see [`copy_for_hash`]), and compare against the
     /// hash of the supervisor's currently-running shadow file.
-    pub fn poll_real(
-        &mut self,
-        supervisor: &Supervisor,
-        shadow_root: &Path,
-    ) -> PollResult {
+    pub fn poll_real(&mut self, supervisor: &Supervisor, shadow_root: &Path) -> PollResult {
         let canonical = self.canonical.clone();
         let scratch_dir = shadow_root.join("watcher-candidates");
         let current_shadow = supervisor.shadow_path();
@@ -282,9 +257,7 @@ pub fn spawn(
     Some(tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(config.poll_ms)).await;
-            if watcher.poll_real(&supervisor, &shadow_root)
-                == PollResult::Changed
-            {
+            if watcher.poll_real(&supervisor, &shadow_root) == PollResult::Changed {
                 let synthesized = supervisor.swap_child().await;
                 for err in synthesized {
                     if let Ok(line) = serde_json::to_string(&err) {
@@ -339,9 +312,7 @@ mod tests {
             }
             if matches!(
                 result,
-                PollResult::Changed
-                    | PollResult::SameContent
-                    | PollResult::CopyFailed
+                PollResult::Changed | PollResult::SameContent | PollResult::CopyFailed
             ) {
                 stability_attempts += 1;
             }
@@ -367,8 +338,7 @@ mod tests {
 
         let stable_meta = (t(1), 55);
         // First poll observes the candidate.
-        let r1 =
-            watcher.poll_once_with(|| Ok(stable_meta), || Ok(vec![]), || None);
+        let r1 = watcher.poll_once_with(|| Ok(stable_meta), || Ok(vec![]), || None);
         assert_eq!(r1, PollResult::NoAction);
         // Second poll: stable, but copy fails (mid-write).
         let r2 = watcher.poll_once_with(

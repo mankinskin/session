@@ -10,9 +10,7 @@ pub enum SessionError {
     #[error("session capture is missing a session id")]
     MissingSessionId,
 
-    #[error(
-        "runtime session id is required; no active-session fallback exists"
-    )]
+    #[error("runtime session id is required; no active-session fallback exists")]
     MissingRuntimeSessionId,
 
     #[error("session capture did not include any turns")]
@@ -27,9 +25,7 @@ pub enum SessionError {
     #[error("terminal id '{0}' must be a UUID")]
     InvalidTerminalId(String),
 
-    #[error(
-        "terminal observer {terminal_id} was not found for session {session_id}"
-    )]
+    #[error("terminal observer {terminal_id} was not found for session {session_id}")]
     TerminalNotFound {
         session_id: String,
         terminal_id: String,
@@ -38,9 +34,7 @@ pub enum SessionError {
     #[error("terminal observer {terminal_id} is closed")]
     TerminalClosed { terminal_id: String },
 
-    #[error(
-        "session identity `{0}` must be a UUID; use the capture or provisioning UUID"
-    )]
+    #[error("session identity `{0}` must be a UUID; use the capture or provisioning UUID")]
     SessionIdentityMustBeUuid(String),
 
     #[error(
@@ -75,9 +69,7 @@ pub enum SessionError {
     #[error("worktree {path} is not a registered managed worktree: {reason}")]
     InvalidManagedWorktree { path: PathBuf, reason: String },
 
-    #[error(
-        "worktree {path} is checked out on branch {actual}, not {expected}"
-    )]
+    #[error("worktree {path} is checked out on branch {actual}, not {expected}")]
     WorktreeBranchMismatch {
         path: PathBuf,
         expected: String,
@@ -92,17 +84,13 @@ pub enum SessionError {
     )]
     MissingWorktreeAssignment { session_id: String },
 
-    #[error(
-        "session {session_id} worktree registry points at missing worktree {path}"
-    )]
+    #[error("session {session_id} worktree registry points at missing worktree {path}")]
     RegisteredWorktreeMissing { session_id: String, path: PathBuf },
 
     #[error("session {session_id} ownership mismatch for worktree check-in")]
     SessionOwnershipMismatch { session_id: String },
 
-    #[error(
-        "worktree path {path} is already owned by active session {session_id}"
-    )]
+    #[error("worktree path {path} is already owned by active session {session_id}")]
     WorktreeConflict { path: PathBuf, session_id: String },
 
     #[error(
@@ -148,9 +136,7 @@ pub enum SessionError {
     #[error("no persisted sessions were found under {root}")]
     NoSessionsFound { root: PathBuf },
 
-    #[error(
-        "session schema version mismatch at {path}: found {found}, expected {expected}"
-    )]
+    #[error("session schema version mismatch at {path}: found {found}, expected {expected}")]
     SchemaVersionMismatch {
         path: PathBuf,
         found: u32,
@@ -176,9 +162,7 @@ pub enum SessionError {
     #[error("session move failed: {0}")]
     Move(String),
 
-    #[error(
-        "handoff package is incomplete — missing required fields: {fields}"
-    )]
+    #[error("handoff package is incomplete — missing required fields: {fields}")]
     HandoffPackageIncomplete { fields: String },
 
     #[error(
@@ -190,9 +174,7 @@ pub enum SessionError {
         workspace_root: PathBuf,
     },
 
-    #[error(
-        "handoff {handoff_id} was not found in any session's handoff backlog"
-    )]
+    #[error("handoff {handoff_id} was not found in any session's handoff backlog")]
     HandoffNotFound { handoff_id: String },
 
     #[error(

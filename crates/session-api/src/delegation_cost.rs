@@ -16,15 +16,9 @@
 
 use std::collections::BTreeMap;
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    SessionRecord,
-    SessionRole,
-};
+use crate::{SessionRecord, SessionRole};
 
 /// Normalize a file path spelling for cross-agent duplicate-read detection.
 ///
@@ -37,7 +31,7 @@ pub fn normalize_path_for_dedup(path: &str) -> String {
         (Some(drive), Some(':')) if drive.is_ascii_alphabetic() => {
             let rest: String = chars.collect();
             format!("{}:{}", drive.to_ascii_lowercase(), rest)
-        },
+        }
         _ => unified,
     }
 }
@@ -67,8 +61,7 @@ const PATH_RESOLUTION_TOOL_NAMES: &[&str] = &["read_file", "list_dir"];
 /// counted as a "substitutable shell command" (ticket `10d21210` threshold:
 /// 77eb143b AC4 tracks this against a 116/298 baseline ratio).
 const SUBSTITUTABLE_SHELL_HEADS: &[&str] = &[
-    "cat", "head", "tail", "grep", "find", "ls", "dir", "wc", "sed", "type",
-    "more", "less",
+    "cat", "head", "tail", "grep", "find", "ls", "dir", "wc", "sed", "type", "more", "less",
 ];
 
 /// Shell command heads that are exploratory directory/file search commands,
@@ -103,8 +96,7 @@ pub enum ShellCommandCategory {
 impl ShellCommandCategory {
     pub fn as_str(self) -> &'static str {
         match self {
-            ShellCommandCategory::ReadLikeExploratory =>
-                "read_like_exploratory",
+            ShellCommandCategory::ReadLikeExploratory => "read_like_exploratory",
             ShellCommandCategory::CliShadowingMcp => "cli_shadowing_mcp",
             ShellCommandCategory::CargoRunCli => "cargo_run_cli",
             ShellCommandCategory::LegitimateDev => "legitimate_dev",
@@ -160,10 +152,7 @@ fn command_basename(token: &str) -> &str {
 /// The MCP tool-name prefix a CLI-shadowing shell command corresponds to, if
 /// any, given its invoked binary `basename` and (for the ambiguous bare
 /// `test` binary) its immediate next token.
-fn mcp_family_for_command(
-    basename: &str,
-    second_token: Option<&str>,
-) -> Option<&'static str> {
+fn mcp_family_for_command(basename: &str, second_token: Option<&str>) -> Option<&'static str> {
     if basename == "test" {
         return second_token
             .filter(|t| TEST_CLI_SUBCOMMANDS.contains(t))
@@ -420,17 +409,13 @@ const PARENT_BUCKET: &str = "__parent__";
 /// per-sub-agent tool histograms, cross-agent duplicate-read detection
 /// (path-normalization safe), duplicate-command detection, failure
 /// classification, and real per-sub-agent token/cost totals when available.
-pub fn compute_delegation_cost_report(
-    record: &SessionRecord
-) -> DelegationCostReport {
+pub fn compute_delegation_cost_report(record: &SessionRecord) -> DelegationCostReport {
     // Discover agent_name/description/declared_model per run_id from the
     // `runSubagent` wrapper's own completion turn. That turn's own
     // `subagent_run_id` is its *parent's* span (it is a call the parent
     // made), but its `tool_call_id` names the span it opens for descendants.
-    let mut agent_info: BTreeMap<
-        String,
-        (Option<String>, Option<String>, Option<String>),
-    > = BTreeMap::new();
+    let mut agent_info: BTreeMap<String, (Option<String>, Option<String>, Option<String>)> =
+        BTreeMap::new();
     for turn in &record.turns {
         if turn.tool_name.as_deref() != Some("runSubagent") {
             continue;
@@ -454,12 +439,10 @@ pub fn compute_delegation_cost_report(
             .and_then(|v| v.get("model"))
             .and_then(|v| v.as_str())
             .map(String::from);
-        agent_info
-            .insert(run_id.clone(), (agent_name, description, declared_model));
+        agent_info.insert(run_id.clone(), (agent_name, description, declared_model));
     }
 
-    let mut per_run: BTreeMap<String, SubAgentDelegationReport> =
-        BTreeMap::new();
+    let mut per_run: BTreeMap<String, SubAgentDelegationReport> = BTreeMap::new();
     let mut parent_tool_call_count = 0u64;
     let mut parent_tools: BTreeMap<String, u64> = BTreeMap::new();
     let mut path_resolution_failures = 0u64;
@@ -474,17 +457,12 @@ pub fn compute_delegation_cost_report(
 
     // path/command -> run bucket (PARENT_BUCKET or a run_id) -> count, used
     // for both within-agent repeat detection and cross-agent duplicates.
-    let mut reads_by_key: BTreeMap<String, BTreeMap<String, u64>> =
-        BTreeMap::new();
-    let mut commands_by_key: BTreeMap<String, BTreeMap<String, u64>> =
-        BTreeMap::new();
+    let mut reads_by_key: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
+    let mut commands_by_key: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
 
     // bucket (PARENT_BUCKET or a run_id) -> taxonomy category -> count
     // (ticket `77eb143b` AC1/AC2).
-    let mut shell_categories_by_bucket: BTreeMap<
-        String,
-        BTreeMap<String, u64>,
-    > = BTreeMap::new();
+    let mut shell_categories_by_bucket: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
     let mut shell_command_categories: BTreeMap<String, u64> = BTreeMap::new();
     // Ordered occurrences of CLI-shadowing-MCP shell commands, as
     // (bucket, mcp_family_prefix), used to compute the AC3 dominant-cause
@@ -518,20 +496,17 @@ pub fn compute_delegation_cost_report(
 
         let meta = turn.event_meta.as_ref();
         let run_id = meta.and_then(|m| m.subagent_run_id.clone());
-        let bucket =
-            run_id.clone().unwrap_or_else(|| PARENT_BUCKET.to_string());
+        let bucket = run_id.clone().unwrap_or_else(|| PARENT_BUCKET.to_string());
 
         match &run_id {
             None => {
                 parent_tool_call_count += 1;
                 *parent_tools.entry(tool_name.clone()).or_insert(0) += 1;
-            },
+            }
             Some(rid) => {
                 let entry = per_run.entry(rid.clone()).or_insert_with(|| {
-                    let (agent_name, description, declared_model) = agent_info
-                        .get(rid)
-                        .cloned()
-                        .unwrap_or((None, None, None));
+                    let (agent_name, description, declared_model) =
+                        agent_info.get(rid).cloned().unwrap_or((None, None, None));
                     SubAgentDelegationReport {
                         run_id: rid.clone(),
                         agent_name,
@@ -542,7 +517,7 @@ pub fn compute_delegation_cost_report(
                 });
                 entry.tool_call_count += 1;
                 *entry.tools.entry(tool_name.clone()).or_insert(0) += 1;
-            },
+            }
         }
 
         let is_failure = meta
@@ -584,8 +559,7 @@ pub fn compute_delegation_cost_report(
                     .or_insert(0) += 1;
             }
         } else if tool_name == TERMINAL_TOOL_NAME {
-            if let Some(raw_command) =
-                args.and_then(|a| a.get("command")).and_then(|v| v.as_str())
+            if let Some(raw_command) = args.and_then(|a| a.get("command")).and_then(|v| v.as_str())
             {
                 if let Some(head) = command_head(raw_command) {
                     if SUBSTITUTABLE_SHELL_HEADS.contains(&head) {
@@ -605,9 +579,7 @@ pub fn compute_delegation_cost_report(
                     .entry(category.as_str().to_string())
                     .or_insert(0) += 1;
                 if category == ShellCommandCategory::CliShadowingMcp {
-                    if let Some(family) =
-                        mcp_family_for_raw_command(raw_command)
-                    {
+                    if let Some(family) = mcp_family_for_raw_command(raw_command) {
                         cli_shadow_occurrences.push((bucket.clone(), family));
                     }
                 }
@@ -651,8 +623,7 @@ pub fn compute_delegation_cost_report(
         if let Some(cost) = meta.cost_usd {
             entry.cost_usd = Some(entry.cost_usd.unwrap_or(0.0) + cost);
         }
-        let observed_model =
-            turn.model.clone().or_else(|| meta.model_id.clone());
+        let observed_model = turn.model.clone().or_else(|| meta.model_id.clone());
         if let Some(model) = observed_model {
             run_model.entry(rid.clone()).or_insert(model);
         }
@@ -687,12 +658,12 @@ pub fn compute_delegation_cost_report(
         }
     }
     for entry in per_run.values_mut() {
-        entry.repeat_reads.sort_by(|a, b| {
-            b.count.cmp(&a.count).then_with(|| a.key.cmp(&b.key))
-        });
-        entry.repeat_commands.sort_by(|a, b| {
-            b.count.cmp(&a.count).then_with(|| a.key.cmp(&b.key))
-        });
+        entry
+            .repeat_reads
+            .sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.key.cmp(&b.key)));
+        entry
+            .repeat_commands
+            .sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.key.cmp(&b.key)));
     }
 
     // Cross-agent duplicates: read/run by more than one distinct sub-agent.
@@ -760,10 +731,8 @@ pub fn compute_delegation_cost_report(
     // in the order they were issued, and count every dispatch after the
     // first in a group where an earlier dispatch in that same group already
     // recorded a failure.
-    let mut dispatch_groups: BTreeMap<
-        (Option<String>, Option<String>),
-        Vec<String>,
-    > = BTreeMap::new();
+    let mut dispatch_groups: BTreeMap<(Option<String>, Option<String>), Vec<String>> =
+        BTreeMap::new();
     for run_id in &dispatch_order {
         let (agent_name, description, _) = agent_info
             .get(run_id)
@@ -800,8 +769,7 @@ pub fn compute_delegation_cost_report(
     // Attach each sub-agent's own shell-command-category breakdown (ticket
     // `77eb143b` AC1/AC2).
     for entry in subagents.iter_mut() {
-        if let Some(categories) = shell_categories_by_bucket.get(&entry.run_id)
-        {
+        if let Some(categories) = shell_categories_by_bucket.get(&entry.run_id) {
             entry.shell_command_categories = categories.clone();
         }
     }
@@ -816,11 +784,10 @@ pub fn compute_delegation_cost_report(
     // called at all in the same span (tool-discovery failure), or called
     // and succeeded yet the agent still shelled out anyway (ambiguous —
     // reported separately, not folded into either dominant-cause bucket).
-    let subagents_by_run_id: BTreeMap<&str, &SubAgentDelegationReport> =
-        subagents
-            .iter()
-            .map(|entry| (entry.run_id.as_str(), entry))
-            .collect();
+    let subagents_by_run_id: BTreeMap<&str, &SubAgentDelegationReport> = subagents
+        .iter()
+        .map(|entry| (entry.run_id.as_str(), entry))
+        .collect();
     let mut mcp_tool_failure_fallback_count = 0u64;
     let mut mcp_tool_discovery_failure_count = 0u64;
     let mut mcp_tool_shadow_ambiguous_count = 0u64;
@@ -845,8 +812,7 @@ pub fn compute_delegation_cost_report(
             subagents_by_run_id
                 .get(bucket.as_str())
                 .map(|entry| {
-                    let ever_called =
-                        entry.tools.keys().any(|k| k.starts_with(family));
+                    let ever_called = entry.tools.keys().any(|k| k.starts_with(family));
                     let ever_failed = entry
                         .failures
                         .iter()
@@ -909,21 +875,17 @@ pub fn compute_delegation_cost_report_from_events(
 
     // event_id -> the subagent_run_id (tool_call_id of the nearest enclosing
     // `runSubagent` span) that descendants of that event should inherit.
-    let mut span_owner_by_event_id: BTreeMap<String, Option<String>> =
-        BTreeMap::new();
+    let mut span_owner_by_event_id: BTreeMap<String, Option<String>> = BTreeMap::new();
     let mut turns: Vec<crate::SessionTurn> = Vec::new();
 
     for (sequence, event) in events.events.iter().enumerate() {
         let parent_owner = event
             .parent_event_id
             .as_ref()
-            .and_then(|parent_id| {
-                span_owner_by_event_id.get(parent_id.as_str()).cloned()
-            })
+            .and_then(|parent_id| span_owner_by_event_id.get(parent_id.as_str()).cloned())
             .flatten();
 
-        let is_subagent_start = event.tool_name.as_deref()
-            == Some("runSubagent")
+        let is_subagent_start = event.tool_name.as_deref() == Some("runSubagent")
             && matches!(
                 event.event_type.as_deref(),
                 Some("tool.execution_start") | Some("tool_execution_start")
@@ -934,8 +896,7 @@ pub fn compute_delegation_cost_report_from_events(
             parent_owner.clone()
         };
         if let Some(event_id) = &event.event_id {
-            span_owner_by_event_id
-                .insert(event_id.clone(), owner_for_descendants);
+            span_owner_by_event_id.insert(event_id.clone(), owner_for_descendants);
         }
 
         let is_tool_complete = matches!(
@@ -1026,12 +987,7 @@ pub fn compute_delegation_cost_report_from_events(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        SessionLinks,
-        SessionMetadata,
-        SessionTurn,
-        SessionTurnEventMeta,
-    };
+    use crate::{SessionLinks, SessionMetadata, SessionTurn, SessionTurnEventMeta};
     use chrono::Utc;
 
     fn base_meta() -> SessionTurnEventMeta {
@@ -1141,10 +1097,8 @@ mod tests {
         ];
         // Re-key the wrapper turns' own tool_call_id so agent_info resolves.
         let mut turns = turns;
-        turns[0].event_meta.as_mut().unwrap().tool_call_id =
-            Some("call-a".to_string());
-        turns[1].event_meta.as_mut().unwrap().tool_call_id =
-            Some("call-b".to_string());
+        turns[0].event_meta.as_mut().unwrap().tool_call_id = Some("call-a".to_string());
+        turns[1].event_meta.as_mut().unwrap().tool_call_id = Some("call-b".to_string());
 
         let record = record_with_turns(turns);
         let report = compute_delegation_cost_report(&record);
@@ -1164,9 +1118,7 @@ mod tests {
         assert_eq!(call_b.tool_call_count, 1);
         // No tool call is double-counted or dropped: 3 real reads total.
         assert_eq!(
-            call_a.tool_call_count
-                + call_b.tool_call_count
-                + report.parent_tool_call_count,
+            call_a.tool_call_count + call_b.tool_call_count + report.parent_tool_call_count,
             3
         );
     }
@@ -1206,10 +1158,8 @@ mod tests {
             serde_json::json!({"command": "cargo test"}),
         );
         turn.event_meta.as_mut().unwrap().tool_success = Some(false);
-        turn.event_meta.as_mut().unwrap().result_code =
-            Some("error".to_string());
-        turn.event_meta.as_mut().unwrap().error_message =
-            Some("compile error".to_string());
+        turn.event_meta.as_mut().unwrap().result_code = Some("error".to_string());
+        turn.event_meta.as_mut().unwrap().error_message = Some("compile error".to_string());
 
         let record = record_with_turns(vec![turn]);
         let report = compute_delegation_cost_report(&record);
@@ -1236,8 +1186,7 @@ mod tests {
                 ..base_meta()
             }),
         };
-        assistant_turn.event_meta.as_mut().unwrap().model_id =
-            Some("gpt-5".to_string());
+        assistant_turn.event_meta.as_mut().unwrap().model_id = Some("gpt-5".to_string());
 
         let record = record_with_turns(vec![assistant_turn]);
         let report = compute_delegation_cost_report(&record);
@@ -1278,9 +1227,7 @@ mod tests {
             ShellCommandCategory::CliShadowingMcp
         );
         assert_eq!(
-            classify_shell_command(
-                "./target/debug/ticket.exe board check-in bd5e9aee"
-            ),
+            classify_shell_command("./target/debug/ticket.exe board check-in bd5e9aee"),
             ShellCommandCategory::CliShadowingMcp
         );
         assert_eq!(
@@ -1329,9 +1276,7 @@ mod tests {
         // `test -f`/`test -d`/`test !` are the POSIX shell builtin, not the
         // test-cli binary, and must not be miscounted as cli_shadowing_mcp.
         assert_eq!(
-            classify_shell_command(
-                "test -f .spec/specs/x/body.md && echo exists"
-            ),
+            classify_shell_command("test -f .spec/specs/x/body.md && echo exists"),
             ShellCommandCategory::Other
         );
         assert_eq!(
@@ -1353,9 +1298,7 @@ mod tests {
             ShellCommandCategory::CargoRunCli
         );
         assert_eq!(
-            classify_shell_command(
-                "cargo run --release --package spec-cli -- get 123"
-            ),
+            classify_shell_command("cargo run --release --package spec-cli -- get 123"),
             ShellCommandCategory::CargoRunCli
         );
         assert_eq!(
@@ -1433,8 +1376,7 @@ mod tests {
             ),
         ];
         let mut turns = turns;
-        turns[0].event_meta.as_mut().unwrap().tool_call_id =
-            Some("run-1".to_string());
+        turns[0].event_meta.as_mut().unwrap().tool_call_id = Some("run-1".to_string());
 
         let record = record_with_turns(turns);
         let report = compute_delegation_cost_report(&record);
@@ -1448,10 +1390,7 @@ mod tests {
             span.shell_command_categories.get("cli_shadowing_mcp"),
             Some(&1)
         );
-        assert_eq!(
-            span.shell_command_categories.get("cargo_run_cli"),
-            Some(&1)
-        );
+        assert_eq!(span.shell_command_categories.get("cargo_run_cli"), Some(&1));
         assert_eq!(
             span.shell_command_categories.get("legitimate_dev"),
             Some(&1)

@@ -34,23 +34,13 @@
 //! so the same signal always maps to the same ticket id. [`synthesize_follow_up_ticket`]
 //! checks whether a ticket with that id already exists before creating one.
 
-use std::{
-    collections::BTreeMap,
-    path::Path,
-    str::FromStr,
-};
+use std::{collections::BTreeMap, path::Path, str::FromStr};
 
-use feedback_api::{
-    EntityUrn,
-    FeedbackRating,
-};
+use feedback_api::{EntityUrn, FeedbackRating};
 use ticket_api::storage::TicketStore;
 use uuid::Uuid;
 
-use crate::{
-    FeedbackSignalKind,
-    StructuredFeedbackSignal,
-};
+use crate::{FeedbackSignalKind, StructuredFeedbackSignal};
 
 /// A backtraceable, verifiable follow-up ticket draft synthesized from a
 /// confident structured feedback signal. Pure data; building a draft
@@ -196,10 +186,7 @@ pub fn synthesize_follow_up_ticket(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ExplicitIngestionArgs,
-        StructuredFeedbackSignal,
-    };
+    use crate::{ExplicitIngestionArgs, StructuredFeedbackSignal};
 
     fn ingestion_signal(
         tool_success: Option<bool>,
@@ -248,12 +235,7 @@ mod tests {
 
     #[test]
     fn skips_helpful_rating() {
-        let signal = ingestion_signal(
-            Some(true),
-            "ce://memory-api/rule/r1",
-            "helpful",
-            None,
-        );
+        let signal = ingestion_signal(Some(true), "ce://memory-api/rule/r1", "helpful", None);
 
         assert!(
             build_follow_up_ticket_draft(&signal, "session-1")
@@ -266,12 +248,7 @@ mod tests {
     fn skips_failed_live_call() {
         // The live call did not persist; recovery (a separate concern) may
         // still record the FeedbackEntry, but synthesis does not fire here.
-        let signal = ingestion_signal(
-            Some(false),
-            "ce://memory-api/rule/r1",
-            "not-helpful",
-            None,
-        );
+        let signal = ingestion_signal(Some(false), "ce://memory-api/rule/r1", "not-helpful", None);
 
         assert!(
             build_follow_up_ticket_draft(&signal, "session-1")
@@ -282,12 +259,8 @@ mod tests {
 
     #[test]
     fn skips_non_ingestion_signal_kind() {
-        let mut signal = ingestion_signal(
-            Some(true),
-            "ce://memory-api/rule/r1",
-            "not-helpful",
-            None,
-        );
+        let mut signal =
+            ingestion_signal(Some(true), "ce://memory-api/rule/r1", "not-helpful", None);
         signal.kind = FeedbackSignalKind::FailedToolCall;
 
         assert!(
@@ -312,15 +285,13 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        let first =
-            synthesize_follow_up_ticket(&ticket_store, &draft, None).unwrap();
+        let first = synthesize_follow_up_ticket(&ticket_store, &draft, None).unwrap();
         let FollowUpSynthesisOutcome::Created(first_id) = first else {
             panic!("expected Created on first synthesis, got {first:?}");
         };
 
         // Re-running against the same signal/session must not duplicate.
-        let second =
-            synthesize_follow_up_ticket(&ticket_store, &draft, None).unwrap();
+        let second = synthesize_follow_up_ticket(&ticket_store, &draft, None).unwrap();
         assert_eq!(second, FollowUpSynthesisOutcome::AlreadyExists(first_id));
 
         let manifest = ticket_store.get(&first_id).unwrap();

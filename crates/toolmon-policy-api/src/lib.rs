@@ -46,24 +46,13 @@ pub enum Decision {
 pub trait Policy: Send + Sync {
     /// Mutate a single tool schema advertised by a `tools/list` response
     /// (e.g. inject a required argument). Called once per advertised tool.
-    fn on_tools_list(
-        &self,
-        tool: &mut Value,
-    );
+    fn on_tools_list(&self, tool: &mut Value);
 
     /// Whether `caller_model` resolves to a known entry this policy tracks.
-    fn resolves(
-        &self,
-        caller_model: &str,
-    ) -> bool;
+    fn resolves(&self, caller_model: &str) -> bool;
 
     /// Evaluate an outbound `tools/call` and return an allow/delegate/reject verdict.
-    fn evaluate(
-        &self,
-        caller_model: &str,
-        tool: &str,
-        grant_id: Option<&str>,
-    ) -> Decision;
+    fn evaluate(&self, caller_model: &str, tool: &str, grant_id: Option<&str>) -> Decision;
 }
 
 /// Ensure a single tool object requires a `caller_model` string argument.

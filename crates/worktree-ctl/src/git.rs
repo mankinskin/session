@@ -1,7 +1,4 @@
-use std::{
-    path::Path,
-    process::Command as ProcessCommand,
-};
+use std::{path::Path, process::Command as ProcessCommand};
 
 pub(crate) fn run_git<const N: usize>(
     repository: &Path,

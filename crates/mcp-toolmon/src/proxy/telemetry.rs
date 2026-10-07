@@ -1,10 +1,7 @@
 //! Per-call telemetry: payload sizing, `caller_model` fallback normalization,
 //! and in-flight `tools/call` tracking for duration/decision correlation.
 
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Payload telemetry for an MCP tool call (ticket 9d527ad1).
@@ -63,18 +60,11 @@ pub struct PendingCalls {
 }
 
 impl PendingCalls {
-    pub fn record(
-        &mut self,
-        id: &Value,
-        call: PendingCall,
-    ) {
+    pub fn record(&mut self, id: &Value, call: PendingCall) {
         self.calls.insert(id_key(id), call);
     }
 
-    pub fn take(
-        &mut self,
-        id: &Value,
-    ) -> Option<PendingCall> {
+    pub fn take(&mut self, id: &Value) -> Option<PendingCall> {
         self.calls.remove(&id_key(id))
     }
 }

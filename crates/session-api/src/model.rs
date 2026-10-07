@@ -1,11 +1,5 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
@@ -19,43 +13,22 @@ mod terminal;
 mod workflow;
 
 pub use handoff::{
-    HandoffBacklogFilter,
-    SessionFinishRecord,
-    SessionFinishResult,
-    SessionHandoffPackage,
-    SessionHandoffRecord,
-    SessionHandoffResult,
-    SessionHandoffTargetTicket,
-    SessionHandoffUpwardContextEntry,
-    SessionHandoffUpwardContextRole,
+    HandoffBacklogFilter, SessionFinishRecord, SessionFinishResult, SessionHandoffPackage,
+    SessionHandoffRecord, SessionHandoffResult, SessionHandoffTargetTicket,
+    SessionHandoffUpwardContextEntry, SessionHandoffUpwardContextRole,
 };
 pub use links::SessionLinks;
 pub use pin_feedback::SessionPinFeedbackSink;
 pub use terminal::{
-    SessionTerminalCreateRequest,
-    SessionTerminalEvent,
-    SessionTerminalManifest,
-    SessionTerminalPeekResult,
-    SessionTerminalRecord,
-    SessionTerminalStatus,
+    SessionTerminalCreateRequest, SessionTerminalEvent, SessionTerminalManifest,
+    SessionTerminalPeekResult, SessionTerminalRecord, SessionTerminalStatus,
 };
 pub use workflow::{
-    SessionTicketStateResolver,
-    SessionValidationGate,
-    SessionWorkflowDiagnostic,
-    SessionWorkflowEdge,
-    SessionWorkflowEdgeKind,
-    SessionWorkflowGraph,
-    SessionWorkflowNode,
-    SessionWorkflowNodeDraft,
-    SessionWorkflowNodeKind,
-    SessionWorkflowNodePatch,
-    SessionWorkflowNodeRequirement,
-    SessionWorkflowNodeResolution,
-    SessionWorkflowNodeStatus,
-    SessionWorkflowSnapshot,
-    SessionWorkflowValidationIssue,
-    validate_workflow_graph,
+    SessionTicketStateResolver, SessionValidationGate, SessionWorkflowDiagnostic,
+    SessionWorkflowEdge, SessionWorkflowEdgeKind, SessionWorkflowGraph, SessionWorkflowNode,
+    SessionWorkflowNodeDraft, SessionWorkflowNodeKind, SessionWorkflowNodePatch,
+    SessionWorkflowNodeRequirement, SessionWorkflowNodeResolution, SessionWorkflowNodeStatus,
+    SessionWorkflowSnapshot, SessionWorkflowValidationIssue, validate_workflow_graph,
 };
 
 mod handoff;
@@ -118,10 +91,7 @@ impl SessionRuntimeContext {
             .find(|run| run.run_id == self.active_run_id)
     }
 
-    pub fn runs_for_session(
-        &self,
-        session_id: &str,
-    ) -> Vec<&SessionRunLineage> {
+    pub fn runs_for_session(&self, session_id: &str) -> Vec<&SessionRunLineage> {
         self.runs
             .iter()
             .filter(|run| {
@@ -132,27 +102,18 @@ impl SessionRuntimeContext {
             .collect()
     }
 
-    pub fn session_for_run(
-        &self,
-        run_id: &str,
-    ) -> Option<&str> {
+    pub fn session_for_run(&self, run_id: &str) -> Option<&str> {
         self.runs
             .iter()
             .find(|run| run.run_id == run_id)
             .and_then(|run| run.captured_session_id.as_deref())
     }
 
-    pub fn find_pin_mut(
-        &mut self,
-        urn: &str,
-    ) -> Option<&mut SessionPinnedEntity> {
+    pub fn find_pin_mut(&mut self, urn: &str) -> Option<&mut SessionPinnedEntity> {
         self.pinned_entities.iter_mut().find(|pin| pin.urn == urn)
     }
 
-    pub fn remove_pin(
-        &mut self,
-        urn: &str,
-    ) -> bool {
+    pub fn remove_pin(&mut self, urn: &str) -> bool {
         let before = self.pinned_entities.len();
         self.pinned_entities.retain(|pin| pin.urn != urn);
         self.pinned_entities.len() != before
@@ -408,14 +369,8 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        SessionLinks,
-        SessionMetadata,
-        SessionRecord,
-        SessionRole,
-        SessionTurn,
-        SessionTurnEventMeta,
-        SessionWorktreeAllocationMode,
-        SessionWorktreeAssignment,
+        SessionLinks, SessionMetadata, SessionRecord, SessionRole, SessionTurn,
+        SessionTurnEventMeta, SessionWorktreeAllocationMode, SessionWorktreeAssignment,
         SessionWorktreeStatus,
     };
     use crate::SESSION_SCHEMA_VERSION;
@@ -499,12 +454,8 @@ mod tests {
                 spec_ids: vec!["spec-1".to_string()],
                 doc_evidence_ids: vec!["doc-1".to_string()],
                 log_ids: vec!["log-1".to_string()],
-                runtime_session_id: Some(
-                    "03baab6c-0fdb-4ffc-8159-b83066a6283f".to_string(),
-                ),
-                runtime_run_id: Some(
-                    "8cf1255d-7969-4ac2-905a-cbd234dc3eac".to_string(),
-                ),
+                runtime_session_id: Some("03baab6c-0fdb-4ffc-8159-b83066a6283f".to_string()),
+                runtime_run_id: Some("8cf1255d-7969-4ac2-905a-cbd234dc3eac".to_string()),
             },
             track_id: None,
             anchor_ticket_id: None,

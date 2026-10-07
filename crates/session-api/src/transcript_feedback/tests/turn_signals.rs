@@ -2,10 +2,7 @@ use chrono::Utc;
 
 use super::super::super::*;
 
-fn tool_turn(
-    sequence: usize,
-    tool_success: Option<bool>,
-) -> SessionTurn {
+fn tool_turn(sequence: usize, tool_success: Option<bool>) -> SessionTurn {
     SessionTurn {
         sequence,
         role: SessionRole::Tool,
@@ -63,8 +60,7 @@ fn detects_failed_tool_calls_from_structured_metadata() {
 fn ignores_message_text_and_non_tool_roles() {
     let mut assistant = tool_turn(0, Some(false));
     assistant.role = SessionRole::Assistant;
-    assistant.content =
-        "This failed with a conflict and the wrong error".to_string();
+    assistant.content = "This failed with a conflict and the wrong error".to_string();
 
     let signals = mine_structured_feedback_signals(&[assistant]);
 

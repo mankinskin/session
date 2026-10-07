@@ -4,28 +4,17 @@ pub const DEFAULT_SKELETON_PREVIEW_CHARS: usize = 120;
 mod prompt_pack;
 
 pub use prompt_pack::{
-    DEFAULT_PROMPT_SUMMARIZE_THRESHOLD_CHARS,
-    PromptInclusion,
-    PromptPackOptions,
-    SessionPromptPack,
-    SessionPromptPackEntry,
-    peek_prompt_pack,
+    DEFAULT_PROMPT_SUMMARIZE_THRESHOLD_CHARS, PromptInclusion, PromptPackOptions,
+    SessionPromptPack, SessionPromptPackEntry, peek_prompt_pack,
 };
 pub use views::{
-    SessionSkeleton,
-    SessionSkeletonEntry,
-    SessionTurnRange,
-    peek_skeleton,
-    peek_turn_range,
+    SessionSkeleton, SessionSkeletonEntry, SessionTurnRange, peek_skeleton, peek_turn_range,
 };
 
 mod views;
 
 /// Build a single-line, character-bounded preview of `content`.
-pub(super) fn preview_line(
-    content: &str,
-    preview_chars: usize,
-) -> String {
+pub(super) fn preview_line(content: &str, preview_chars: usize) -> String {
     let first_line = content
         .lines()
         .map(str::trim)
@@ -44,17 +33,9 @@ mod tests {
     use chrono::Utc;
 
     use super::*;
-    use crate::{
-        SessionRecord,
-        SessionRole,
-        SessionTurn,
-    };
+    use crate::{SessionRecord, SessionRole, SessionTurn};
 
-    fn turn(
-        sequence: usize,
-        role: SessionRole,
-        content: &str,
-    ) -> SessionTurn {
+    fn turn(sequence: usize, role: SessionRole, content: &str) -> SessionTurn {
         SessionTurn {
             sequence,
             role,
@@ -208,11 +189,7 @@ mod tests {
 
     #[test]
     fn prompt_pack_summarizes_oversized_content() {
-        let record = record_with(vec![turn(
-            0,
-            SessionRole::Assistant,
-            &"x".repeat(800),
-        )]);
+        let record = record_with(vec![turn(0, SessionRole::Assistant, &"x".repeat(800))]);
 
         let pack = peek_prompt_pack(
             &record,
@@ -308,8 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn prompt_pack_enforces_measurable_compactness_ratio_for_tool_output_noise()
-    {
+    fn prompt_pack_enforces_measurable_compactness_ratio_for_tool_output_noise() {
         let record = record_with(vec![
             turn(
                 0,

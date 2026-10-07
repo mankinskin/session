@@ -1,16 +1,9 @@
 use chrono::TimeZone;
 use pretty_assertions::assert_eq;
 
-use crate::{
-    PromptPackOptions,
-    SessionRole,
-    peek_prompt_pack,
-};
+use crate::{PromptPackOptions, SessionRole, peek_prompt_pack};
 
-use super::{
-    SessionCaptureRequest,
-    copilot_payload_from_transcript_reader,
-};
+use super::{SessionCaptureRequest, copilot_payload_from_transcript_reader};
 
 #[path = "tests/capture_request.rs"]
 mod capture_request;
@@ -45,9 +38,7 @@ fn transcript_reader_maps_visible_messages_into_payload() {
     let result_event = payload
         .events
         .iter()
-        .find(|event| {
-            event.event_type.as_deref() == Some("tool.execution_result")
-        })
+        .find(|event| event.event_type.as_deref() == Some("tool.execution_result"))
         .expect("expected synthesized tool.execution_result event");
     assert_eq!(result_event.tool_name.as_deref(), Some("read_file"));
     assert_eq!(payload.messages[0].role, SessionRole::User);
@@ -157,9 +148,12 @@ fn transcript_reader_retags_tool_only_assistant_messages() {
     .unwrap();
 
     assert_eq!(payload.messages.len(), 1);
-    assert!(payload.events.iter().any(|event| {
-        event.event_type.as_deref() == Some("assistant.tool_plan")
-    }));
+    assert!(
+        payload
+            .events
+            .iter()
+            .any(|event| { event.event_type.as_deref() == Some("assistant.tool_plan") })
+    );
     assert!(!payload.events.iter().any(|event| {
         event.event_type.as_deref() == Some("assistant.message")
             && event
@@ -189,9 +183,7 @@ fn transcript_reader_does_not_mark_ambiguous_sync_terminal_without_signals() {
     let result_event = payload
         .events
         .iter()
-        .find(|event| {
-            event.event_type.as_deref() == Some("tool.execution_result")
-        })
+        .find(|event| event.event_type.as_deref() == Some("tool.execution_result"))
         .expect("expected tool.execution_result event");
     assert_eq!(result_event.tool_name.as_deref(), Some("run_in_terminal"));
     assert_eq!(
@@ -229,9 +221,7 @@ fn transcript_reader_marks_ambiguous_sync_terminal_with_background_signal() {
     let result_event = payload
         .events
         .iter()
-        .find(|event| {
-            event.event_type.as_deref() == Some("tool.execution_result")
-        })
+        .find(|event| event.event_type.as_deref() == Some("tool.execution_result"))
         .expect("expected tool.execution_result event");
     assert_eq!(result_event.tool_name.as_deref(), Some("run_in_terminal"));
     assert_eq!(
@@ -272,9 +262,7 @@ fn transcript_normalization_and_prompt_pack_tool_result_consistency() {
     let result_event = payload
         .events
         .iter()
-        .find(|event| {
-            event.event_type.as_deref() == Some("tool.execution_result")
-        })
+        .find(|event| event.event_type.as_deref() == Some("tool.execution_result"))
         .expect("expected synthesized tool.execution_result event");
     assert_eq!(
         result_event
@@ -300,7 +288,6 @@ fn transcript_normalization_and_prompt_pack_tool_result_consistency() {
     assert_eq!(pack.dropped_turns, 0);
     assert_eq!(pack.entries.len(), 4);
     assert!(pack.entries.iter().any(|entry| {
-        entry.preview.contains("Durable finding")
-            && entry.reason == "durable-content"
+        entry.preview.contains("Durable finding") && entry.reason == "durable-content"
     }));
 }

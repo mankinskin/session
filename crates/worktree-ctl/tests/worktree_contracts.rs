@@ -1,14 +1,8 @@
 use std::{
     ffi::OsStr,
     fs,
-    path::{
-        Path,
-        PathBuf,
-    },
-    process::{
-        Command,
-        Output,
-    },
+    path::{Path, PathBuf},
+    process::{Command, Output},
 };
 use tempfile::TempDir;
 
@@ -20,22 +14,13 @@ struct Fixture {
     tool: PathBuf,
 }
 impl Fixture {
-    fn worktree(
-        &self,
-        slug: &str,
-    ) -> PathBuf {
+    fn worktree(&self, slug: &str) -> PathBuf {
         self.main.join(".worktrees").join(SESSION_UUID).join(slug)
     }
-    fn name(
-        &self,
-        slug: &str,
-    ) -> String {
+    fn name(&self, slug: &str) -> String {
         format!("{SESSION_UUID}/{slug}")
     }
-    fn run<I, S>(
-        &self,
-        args: I,
-    ) -> Output
+    fn run<I, S>(&self, args: I) -> Output
     where
         I: IntoIterator<Item = S>,
         S: AsRef<OsStr>,
@@ -149,16 +134,10 @@ fn init_repo(path: &Path) {
     git(path, &["config", "user.email", "test@example.invalid"]);
     git(path, &["config", "user.name", "test"]);
 }
-fn git(
-    repo: &Path,
-    args: &[&str],
-) {
+fn git(repo: &Path, args: &[&str]) {
     git_in(repo, args)
 }
-fn git_in(
-    directory: &Path,
-    args: &[&str],
-) {
+fn git_in(directory: &Path, args: &[&str]) {
     let output = Command::new("git")
         .args(args)
         .current_dir(directory)
@@ -166,10 +145,7 @@ fn git_in(
         .unwrap();
     ok(&output, "git command");
 }
-fn git_out(
-    repo: &Path,
-    args: &[&str],
-) -> String {
+fn git_out(repo: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
         .args(args)
         .current_dir(repo)
@@ -178,10 +154,7 @@ fn git_out(
     ok(&output, "git command");
     out(&output).trim().to_owned()
 }
-fn recorded_sha(
-    repo: &Path,
-    path: &str,
-) -> String {
+fn recorded_sha(repo: &Path, path: &str) -> String {
     git_out(repo, &["rev-parse", &format!("HEAD:{path}")])
 }
 fn out(output: &Output) -> String {
@@ -190,16 +163,10 @@ fn out(output: &Output) -> String {
 fn all(output: &Output) -> String {
     format!("{}{}", out(output), String::from_utf8_lossy(&output.stderr))
 }
-fn ok(
-    output: &Output,
-    label: &str,
-) {
+fn ok(output: &Output, label: &str) {
     assert!(output.status.success(), "{label} failed: {}", all(output));
 }
-fn fails_with(
-    output: &Output,
-    expected: &str,
-) {
+fn fails_with(output: &Output, expected: &str) {
     assert!(
         !output.status.success(),
         "command unexpectedly succeeded: {}",
@@ -214,10 +181,7 @@ fn fails_with(
 fn tool() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_worktree-ctl"))
 }
-fn create(
-    fixture: &Fixture,
-    slug: &str,
-) {
+fn create(fixture: &Fixture, slug: &str) {
     ok(&fixture.run(["new", SESSION_UUID, slug]), "new worktree")
 }
 fn workspace_root() -> &'static Path {
@@ -344,19 +308,15 @@ fn create_preserves_dirty_main_checkout() {
     fs::write(f.main.join("README"), "fixture\ndirty main change\n").unwrap();
     fails_with(&f.run(["new", SESSION_UUID, "dirty"]), "README");
     assert!(!f.worktree("dirty").exists());
-    let result =
-        f.run(["new", SESSION_UUID, "dirty", "--preserve-main-changes"]);
+    let result = f.run(["new", SESSION_UUID, "dirty", "--preserve-main-changes"]);
     ok(&result, "preserved new");
     assert!(all(&result).contains("README"));
-    assert!(
-        git_out(&f.main, &["stash", "list"]).contains("preserve-main-changes")
-    );
+    assert!(git_out(&f.main, &["stash", "list"]).contains("preserve-main-changes"));
 }
 #[test]
 fn create_requires_acknowledgement_when_dirty() {
     let f = fixture_repo(&tool());
-    fs::write(f.main.join("README"), "fixture\nunacknowledged change\n")
-        .unwrap();
+    fs::write(f.main.join("README"), "fixture\nunacknowledged change\n").unwrap();
     fails_with(
         &f.run(["new", SESSION_UUID, "dirty"]),
         "uncommitted changes",

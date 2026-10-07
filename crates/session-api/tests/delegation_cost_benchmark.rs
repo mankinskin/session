@@ -15,15 +15,9 @@
 //! `.benchmark/10d21210/README.md` for the full scenario definition, metric
 //! set, thresholds, and the documented replay-only limitation.
 
-use std::{
-    collections::BTreeMap,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
-use session_api::{
-    PersistedSessionEvents,
-    compute_delegation_cost_report_from_events,
-};
+use session_api::{PersistedSessionEvents, compute_delegation_cost_report_from_events};
 
 const BASELINE_SESSION_IDS: &[&str] = &[
     "3e9bc20b-4fe8-4996-ae7f-7be32525e429",
@@ -31,8 +25,7 @@ const BASELINE_SESSION_IDS: &[&str] = &[
 ];
 
 fn benchmark_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-    .join("../../.benchmark/10d21210/baseline")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.benchmark/10d21210/baseline")
 }
 
 fn checked_in_report_path() -> PathBuf {
@@ -44,20 +37,17 @@ fn load_events(session_id: &str) -> PersistedSessionEvents {
         .join("sessions")
         .join(session_id)
         .join("events.json");
-    let raw = std::fs::read_to_string(&path).unwrap_or_else(|err| {
-        panic!("failed to read {}: {err}", path.display())
-    });
-    serde_json::from_str(&raw).unwrap_or_else(|err| {
-        panic!("failed to parse {}: {err}", path.display())
-    })
+    let raw = std::fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("failed to read {}: {err}", path.display()));
+    serde_json::from_str(&raw)
+        .unwrap_or_else(|err| panic!("failed to parse {}: {err}", path.display()))
 }
 
 fn compute_all() -> BTreeMap<String, serde_json::Value> {
     let mut computed = BTreeMap::new();
     for session_id in BASELINE_SESSION_IDS {
         let events = load_events(session_id);
-        let report =
-            compute_delegation_cost_report_from_events(session_id, &events);
+        let report = compute_delegation_cost_report_from_events(session_id, &events);
         computed.insert(
             (*session_id).to_string(),
             serde_json::to_value(&report).expect("report serializes to JSON"),
@@ -77,16 +67,14 @@ fn replay_reproduces_checked_in_baseline_report_exactly() {
 
     let computed = compute_all();
 
-    let checked_in_raw = std::fs::read_to_string(checked_in_report_path())
-        .unwrap_or_else(|err| {
-            panic!(
-                "failed to read checked-in baseline report at {}: {err}",
-                checked_in_report_path().display()
-            )
-        });
+    let checked_in_raw = std::fs::read_to_string(checked_in_report_path()).unwrap_or_else(|err| {
+        panic!(
+            "failed to read checked-in baseline report at {}: {err}",
+            checked_in_report_path().display()
+        )
+    });
     let checked_in: BTreeMap<String, serde_json::Value> =
-        serde_json::from_str(&checked_in_raw)
-            .expect("checked-in report is valid JSON");
+        serde_json::from_str(&checked_in_raw).expect("checked-in report is valid JSON");
 
     pretty_assertions::assert_eq!(
         computed,
@@ -102,10 +90,8 @@ fn replay_reproduces_checked_in_baseline_report_exactly() {
             intentionally changing the analyzer's metric set"]
 fn generate_checked_in_baseline_report() {
     let computed = compute_all();
-    let pretty =
-        serde_json::to_string_pretty(&computed).expect("pretty json") + "\n";
-    std::fs::write(checked_in_report_path(), pretty)
-        .expect("write checked-in report");
+    let pretty = serde_json::to_string_pretty(&computed).expect("pretty json") + "\n";
+    std::fs::write(checked_in_report_path(), pretty).expect("write checked-in report");
 }
 
 /// Ticket `77eb143b` AC1/AC2: the classifier partitions every
@@ -118,8 +104,7 @@ fn generate_checked_in_baseline_report() {
 fn shell_command_categories_partition_every_terminal_call_per_session() {
     for session_id in BASELINE_SESSION_IDS {
         let events = load_events(session_id);
-        let report =
-            compute_delegation_cost_report_from_events(session_id, &events);
+        let report = compute_delegation_cost_report_from_events(session_id, &events);
 
         let total_terminal_calls: u64 = report
             .parent_tools
@@ -131,8 +116,7 @@ fn shell_command_categories_partition_every_terminal_call_per_session() {
                 .iter()
                 .filter_map(|s| s.tools.get("run_in_terminal"))
                 .sum::<u64>();
-        let categorized_total: u64 =
-            report.shell_command_categories.values().sum();
+        let categorized_total: u64 = report.shell_command_categories.values().sum();
         assert_eq!(
             categorized_total, total_terminal_calls,
             "session {session_id}: shell_command_categories must partition every \
@@ -153,14 +137,8 @@ fn cli_shadowing_and_cargo_run_cli_counts_match_baseline() {
     let session_a = "3e9bc20b-4fe8-4996-ae7f-7be32525e429";
     let session_b = "41966513-a8fa-4b44-98fa-9c57f0437cc0";
 
-    let report_a = compute_delegation_cost_report_from_events(
-        session_a,
-        &load_events(session_a),
-    );
-    let report_b = compute_delegation_cost_report_from_events(
-        session_b,
-        &load_events(session_b),
-    );
+    let report_a = compute_delegation_cost_report_from_events(session_a, &load_events(session_a));
+    let report_b = compute_delegation_cost_report_from_events(session_b, &load_events(session_b));
 
     assert_eq!(
         report_a.shell_command_categories.get("cli_shadowing_mcp"),
@@ -201,10 +179,7 @@ fn cli_shadowing_and_cargo_run_cli_counts_match_baseline() {
     let worst_case = report_a
         .subagents
         .iter()
-        .find(|s| {
-            s.description.as_deref()
-                == Some("Materialize spec and validation files")
-        })
+        .find(|s| s.description.as_deref() == Some("Materialize spec and validation files"))
         .expect("worst-case sub-agent present in baseline");
     assert_eq!(
         worst_case.shell_command_categories.get("cargo_run_cli"),
@@ -220,11 +195,9 @@ fn cli_shadowing_and_cargo_run_cli_counts_match_baseline() {
 fn dominant_cause_is_discovery_failure_not_failure_fallback() {
     for session_id in BASELINE_SESSION_IDS {
         let events = load_events(session_id);
-        let report =
-            compute_delegation_cost_report_from_events(session_id, &events);
+        let report = compute_delegation_cost_report_from_events(session_id, &events);
         assert!(
-            report.mcp_tool_discovery_failure_count
-                > report.mcp_tool_failure_fallback_count,
+            report.mcp_tool_discovery_failure_count > report.mcp_tool_failure_fallback_count,
             "session {session_id}: expected tool-discovery failure ({}) to dominate over \
              tool-failure fallback ({}) as the cause of cli_shadowing_mcp shell calls",
             report.mcp_tool_discovery_failure_count,

@@ -1,11 +1,7 @@
-use session_api::{
-    SessionAuditSelector,
-    SessionStoreConfig,
-};
+use session_api::{SessionAuditSelector, SessionStoreConfig};
 
 fn main() {
-    let tmp = std::env::temp_dir()
-        .join(format!("session-smoke-{}", std::process::id()));
+    let tmp = std::env::temp_dir().join(format!("session-smoke-{}", std::process::id()));
     std::fs::create_dir_all(&tmp).unwrap();
     let store = SessionStoreConfig::new(tmp.clone());
 
@@ -18,10 +14,8 @@ fn main() {
     let _ = transcript_path;
 
     // Fallback smoke path: capture a tiny synthetic transcript via capture_copilot_transcript
-    let jsonl = std::path::Path::new(
-        "c:/Users/linus/git/graph_app/context-engine/tmp/mini.jsonl",
-    )
-    .to_path_buf();
+    let jsonl = std::path::Path::new("c:/Users/linus/git/graph_app/context-engine/tmp/mini.jsonl")
+        .to_path_buf();
 
     let plan = store.capture_copilot_transcript(&jsonl, "smoke").unwrap();
     println!("captured session_id={}", plan.record.session_id);

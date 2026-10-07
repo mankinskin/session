@@ -1,16 +1,9 @@
 use chrono::TimeZone;
 use pretty_assertions::assert_eq;
 
-use crate::{
-    SessionError,
-    SessionRole,
-};
+use crate::{SessionError, SessionRole};
 
-use super::super::{
-    CopilotHookMessage,
-    CopilotHookPayload,
-    SessionCaptureRequest,
-};
+use super::super::{CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest};
 
 fn sample_time() -> chrono::DateTime<chrono::Utc> {
     chrono::Utc

@@ -5,27 +5,15 @@ mod sync;
 use std::{
     collections::HashSet,
     env,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
     process::Command as ProcessCommand,
 };
 
-use clap::{
-    Args,
-    Parser,
-    Subcommand,
-};
+use clap::{Args, Parser, Subcommand};
 use git2::Repository;
 use session_worktree_provision::{
-    ReclaimEligibility,
-    ReclaimRejectionReason,
-    SessionActivity,
-    SessionStoreActivity,
-    WorktreeGit,
-    evaluate_reclaim_candidate,
-    policy::ProvisionPolicy,
+    ReclaimEligibility, ReclaimRejectionReason, SessionActivity, SessionStoreActivity, WorktreeGit,
+    evaluate_reclaim_candidate, policy::ProvisionPolicy,
 };
 
 fn canonical_session_store(workspace: &Path) -> PathBuf {
@@ -42,10 +30,7 @@ const WORKTREE_PATH_TEMPLATE: &str = ".worktrees/<full-session-uuid>/<slug>";
 const BRANCH_TEMPLATE: &str = "agent/<full-session-uuid>/<slug>";
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "worktree-ctl",
-    about = "Manage local Git worktree lifecycles"
-)]
+#[command(name = "worktree-ctl", about = "Manage local Git worktree lifecycles")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -170,12 +155,7 @@ fn dispatch(command: Command) -> Result<(), String> {
             slug,
             dry_run,
             preserve_main_changes,
-        } => handle_bootstrap(
-            &session_uuid,
-            &slug,
-            dry_run,
-            preserve_main_changes,
-        ),
+        } => handle_bootstrap(&session_uuid, &slug, dry_run, preserve_main_changes),
         Command::List { dry_run, verbose } => handle_list(dry_run, verbose),
         Command::Rebase {
             selection,
@@ -197,8 +177,7 @@ fn dispatch(command: Command) -> Result<(), String> {
             force,
             dry_run,
         } => handle_remove(&name, force, dry_run),
-        Command::Clean { selection, dry_run } =>
-            handle_clean(selection, dry_run),
+        Command::Clean { selection, dry_run } => handle_clean(selection, dry_run),
         Command::Commit {
             selection,
             message,
@@ -226,10 +205,7 @@ fn selected_worktrees(
         .collect::<Vec<_>>();
     if selection.all {
         if !selectors.is_empty() {
-            return Err(
-                "--all cannot be combined with explicit worktree selectors"
-                    .to_owned(),
-            );
+            return Err("--all cannot be combined with explicit worktree selectors".to_owned());
         }
         return git.list_worktrees().map_err(|error| error.to_string());
     }
@@ -266,9 +242,8 @@ pub(crate) fn checkpoint_owned_session_changes(
     worktree: &session_worktree_provision::WorktreeRef,
     dry_run: bool,
 ) -> Result<(), String> {
-    let activity = SessionStoreActivity::with_default_staleness(
-        canonical_session_store(git.main_checkout()),
-    );
+    let activity =
+        SessionStoreActivity::with_default_staleness(canonical_session_store(git.main_checkout()));
     let session_worktree_provision::WorktreeOwnership::Owned(owner_session_id) =
         activity.worktree_ownership(&worktree.path)
     else {
@@ -300,9 +275,8 @@ pub(crate) fn checkpoint_session_mirror_changes(
     worktree: &session_worktree_provision::WorktreeRef,
     dry_run: bool,
 ) -> Result<(), String> {
-    let activity = SessionStoreActivity::with_default_staleness(
-        canonical_session_store(git.main_checkout()),
-    );
+    let activity =
+        SessionStoreActivity::with_default_staleness(canonical_session_store(git.main_checkout()));
     let session_worktree_provision::WorktreeOwnership::Owned(owner_session_id) =
         activity.worktree_ownership(&worktree.path)
     else {
@@ -333,10 +307,8 @@ fn handle_rebase(
     dry_run: bool,
     auto_commit: bool,
 ) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     for worktree in selected_worktrees(&git, &selection)? {
         let selector = worktree_selector(&git, &worktree)?;
         if selection.all && worktree.branch.is_none() {
@@ -354,10 +326,8 @@ fn handle_merge(
     dry_run: bool,
     auto_commit: bool,
 ) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     for worktree in selected_worktrees(&git, &selection)? {
         let selector = worktree_selector(&git, &worktree)?;
         sync::handle_merge(&selector, dry_run, auto_commit)
@@ -371,10 +341,8 @@ fn handle_sync(
     dry_run: bool,
     auto_commit: bool,
 ) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let mut ordered = selected_worktrees(&git, &selection)?
         .into_iter()
         .map(|worktree| {
@@ -408,10 +376,8 @@ fn handle_commit(
     paths: &[PathBuf],
     dry_run: bool,
 ) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     for worktree in selected_worktrees(&git, &selection)? {
         if dry_run {
             let target = if paths.is_empty() {
@@ -464,10 +430,7 @@ struct LifecyclePlan {
 }
 
 impl LifecyclePlan {
-    fn add(
-        &mut self,
-        action: impl Into<String>,
-    ) {
+    fn add(&mut self, action: impl Into<String>) {
         self.actions.push(action.into());
     }
 
@@ -485,14 +448,11 @@ fn handle_new(
     preserve_main_changes: bool,
 ) -> Result<(), String> {
     validate_full_session_uuid(session_uuid)?;
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
     let relative_path = Path::new(session_uuid).join(slug);
     let branch = format!("agent/{session_uuid}/{slug}");
-    let worktree_path =
-        git.main_checkout().join(".worktrees").join(&relative_path);
+    let worktree_path = git.main_checkout().join(".worktrees").join(&relative_path);
     let worktrees = git.list_worktrees().map_err(|error| error.to_string())?;
 
     if let Some(worktree) = worktrees
@@ -503,8 +463,7 @@ fn handle_new(
         return Ok(());
     }
 
-    let nested_slugs =
-        nested_slug_directories(git.main_checkout(), session_uuid)?;
+    let nested_slugs = nested_slug_directories(git.main_checkout(), session_uuid)?;
     if !nested_slugs.is_empty() {
         return Err(format!(
             "ambiguous session worktree for {session_uuid}: nested slug directories already exist: {}; exactly one active slug is allowed",
@@ -581,10 +540,8 @@ fn handle_bootstrap(
 ) -> Result<(), String> {
     handle_new(session_uuid, slug, dry_run, preserve_main_changes)?;
 
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let worktree_path = git
         .main_checkout()
         .join(".worktrees")
@@ -611,9 +568,7 @@ fn handle_bootstrap(
         .arg("init.sh")
         .current_dir(&worktree_path)
         .status()
-        .map_err(|error| {
-            format!("could not run {}: {error}", init_script.display())
-        })?;
+        .map_err(|error| format!("could not run {}: {error}", init_script.display()))?;
     if status.success() {
         Ok(())
     } else {
@@ -640,17 +595,11 @@ struct RepositoryState {
     behind: Option<usize>,
 }
 
-fn handle_list(
-    _dry_run: bool,
-    verbose: bool,
-) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
-    let activity = SessionStoreActivity::with_default_staleness(
-        canonical_session_store(git.main_checkout()),
-    );
+fn handle_list(_dry_run: bool, verbose: bool) -> Result<(), String> {
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
+    let activity =
+        SessionStoreActivity::with_default_staleness(canonical_session_store(git.main_checkout()));
     let policy = ProvisionPolicy::default();
     let registered = git.list_worktrees().map_err(|error| error.to_string())?;
 
@@ -659,20 +608,9 @@ fn handle_list(
         let superproject = live_repository_state(&git, &worktree.path)?;
         let submodules = live_submodule_states(&git, worktree)?;
         if verbose {
-            print_verbose_worktree(
-                &worktree.path,
-                &lifecycle,
-                &superproject,
-                &submodules,
-            );
+            print_verbose_worktree(&worktree.path, &lifecycle, &superproject, &submodules);
         } else {
-            print_compact_worktree(
-                &git,
-                worktree,
-                &lifecycle,
-                &superproject,
-                &submodules,
-            );
+            print_compact_worktree(&git, worktree, &lifecycle, &superproject, &submodules);
         }
     }
 
@@ -708,9 +646,9 @@ fn unregistered_worktree_debris(
         .map(|entry| entry.path())
         .filter(|path| {
             path.is_dir()
-                && !registered.iter().any(|worktree| {
-                    worktree.path == *path || worktree.path.starts_with(path)
-                })
+                && !registered
+                    .iter()
+                    .any(|worktree| worktree.path == *path || worktree.path.starts_with(path))
         })
         .collect();
     Ok(debris)
@@ -724,8 +662,7 @@ fn live_submodule_states(
         .map_err(|error| error.to_string())?
         .into_iter()
         .map(|submodule| {
-            let state =
-                live_repository_state(&git, &worktree.path.join(&submodule));
+            let state = live_repository_state(&git, &worktree.path.join(&submodule));
             Ok((submodule, state))
         })
         .collect()
@@ -746,8 +683,7 @@ fn print_verbose_worktree(
         println!("  submodules:");
         for (name, state) in submodules {
             match state {
-                Ok(state) =>
-                    println!("    {name}: {}", verbose_repository_state(state)),
+                Ok(state) => println!("    {name}: {}", verbose_repository_state(state)),
                 Err(error) => println!("    {name}: unavailable ({error})"),
             }
         }
@@ -774,8 +710,7 @@ fn print_compact_worktree(
     println!("{} {}", relative.display(), lifecycle);
     print_wrapped("  ", compact_reason(superproject, submodules));
 
-    let superproject =
-        compact_repository_state(superproject, expected_branch.as_deref());
+    let superproject = compact_repository_state(superproject, expected_branch.as_deref());
     let mut repositories = vec![compact_item("super", superproject)];
     repositories.extend(submodules.iter().map(|(name, state)| match state {
         Ok(state) => compact_item(name, compact_repository_state(state, None)),
@@ -784,18 +719,13 @@ fn print_compact_worktree(
     print_wrapped("  ", repositories);
 }
 
-fn print_wrapped(
-    prefix: &str,
-    items: Vec<String>,
-) {
+fn print_wrapped(prefix: &str, items: Vec<String>) {
     let mut line = prefix.to_owned();
     let mut width = visible_width(prefix);
     for item in items {
         let item_width = visible_width(&item);
         let separator_width = usize::from(width > visible_width(prefix));
-        if width + separator_width + item_width > COMPACT_WIDTH
-            && width > visible_width(prefix)
-        {
+        if width + separator_width + item_width > COMPACT_WIDTH && width > visible_width(prefix) {
             println!("{line}");
             line = prefix.to_owned();
             width = visible_width(prefix);
@@ -819,8 +749,7 @@ fn visible_width(value: &str) -> usize {
     while index < bytes.len() {
         if bytes[index] == b'\x1b' && bytes.get(index + 1) == Some(&b'[') {
             index += 2;
-            while index < bytes.len() && !(b'@'..=b'~').contains(&bytes[index])
-            {
+            while index < bytes.len() && !(b'@'..=b'~').contains(&bytes[index]) {
                 index += 1;
             }
             index += usize::from(index < bytes.len());
@@ -831,20 +760,14 @@ fn visible_width(value: &str) -> usize {
     }
     width
 }
-fn compact_item(
-    name: &str,
-    state: String,
-) -> String {
+fn compact_item(name: &str, state: String) -> String {
     if state.is_empty() {
         color(ANSI_GREEN, name)
     } else {
         format!("{name}={state}")
     }
 }
-fn color(
-    code: &str,
-    value: impl std::fmt::Display,
-) -> String {
+fn color(code: &str, value: impl std::fmt::Display) -> String {
     format!("{code}{value}{ANSI_RESET}")
 }
 
@@ -879,19 +802,12 @@ fn compact_reason(
                     parts.push(color(ANSI_RED, format!("dirty:{name}")));
                 }
                 if let Some(ahead) = state.ahead.filter(|ahead| *ahead != 0) {
-                    parts.push(color(
-                        ANSI_YELLOW,
-                        format!("ahead:{name}+{ahead}"),
-                    ));
+                    parts.push(color(ANSI_YELLOW, format!("ahead:{name}+{ahead}")));
                 }
-                if let Some(behind) = state.behind.filter(|behind| *behind != 0)
-                {
-                    parts.push(color(
-                        ANSI_BLUE,
-                        format!("behind:{name}-{behind}"),
-                    ));
+                if let Some(behind) = state.behind.filter(|behind| *behind != 0) {
+                    parts.push(color(ANSI_BLUE, format!("behind:{name}-{behind}")));
                 }
-            },
+            }
             Err(_) => parts.push(color(ANSI_RED, format!("missing:{name}"))),
         }
     }
@@ -900,10 +816,7 @@ fn compact_reason(
     }
     parts
 }
-fn compact_repository_state(
-    state: &RepositoryState,
-    expected_branch: Option<&str>,
-) -> String {
+fn compact_repository_state(state: &RepositoryState, expected_branch: Option<&str>) -> String {
     let mut parts = Vec::new();
     if state.branch != "HEAD"
         && state.branch != "main"
@@ -936,12 +849,8 @@ fn verbose_repository_state(state: &RepositoryState) -> String {
     )
 }
 
-fn live_repository_state(
-    git: &WorktreeGit,
-    path: &Path,
-) -> Result<RepositoryState, String> {
-    let repository =
-        Repository::open(path).map_err(|error| error.to_string())?;
+fn live_repository_state(git: &WorktreeGit, path: &Path) -> Result<RepositoryState, String> {
+    let repository = Repository::open(path).map_err(|error| error.to_string())?;
     let branch = repository
         .head()
         .ok()
@@ -958,17 +867,11 @@ fn live_repository_state(
         behind,
     })
 }
-fn handle_clean(
-    selection: WorktreeSelection,
-    dry_run: bool,
-) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
-    let activity = SessionStoreActivity::with_default_staleness(
-        canonical_session_store(git.main_checkout()),
-    );
+fn handle_clean(selection: WorktreeSelection, dry_run: bool) -> Result<(), String> {
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+    let activity =
+        SessionStoreActivity::with_default_staleness(canonical_session_store(git.main_checkout()));
     let registered = selected_worktrees(&git, &selection)?;
     let mut removable = Vec::new();
     for worktree in registered {
@@ -989,19 +892,14 @@ fn handle_clean(
         checkpoint_owned_session_changes(&git, &worktree, dry_run)?;
         match ensure_safe_to_remove(&git, &worktree) {
             Ok(()) => removable.push(worktree),
-            Err(reason) => println!(
-                "preserved path={} reason={reason}",
-                worktree.path.display()
-            ),
+            Err(reason) => println!("preserved path={} reason={reason}", worktree.path.display()),
         }
     }
     let mut removable_debris = Vec::new();
     if selection.all {
-        let registered =
-            git.list_worktrees().map_err(|error| error.to_string())?;
+        let registered = git.list_worktrees().map_err(|error| error.to_string())?;
         for path in unregistered_worktree_debris(&git, &registered)? {
-            let mut entries =
-                std::fs::read_dir(&path).map_err(|error| error.to_string())?;
+            let mut entries = std::fs::read_dir(&path).map_err(|error| error.to_string())?;
             if entries.next().is_none() {
                 removable_debris.push(path);
             } else {
@@ -1054,9 +952,7 @@ fn ensure_safe_to_remove(
             return Err(format!("submodule {submodule} is not initialized"));
         }
         if git.is_dirty(&path).map_err(|error| error.to_string())? {
-            return Err(format!(
-                "submodule {submodule} has uncommitted changes"
-            ));
+            return Err(format!("submodule {submodule} has uncommitted changes"));
         }
         let ahead = git
             .ahead_behind(&path, "main")
@@ -1083,15 +979,9 @@ fn ensure_safe_to_remove(
     }
     Ok(())
 }
-fn handle_remove(
-    name: &str,
-    force: bool,
-    dry_run: bool,
-) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+fn handle_remove(name: &str, force: bool, dry_run: bool) -> Result<(), String> {
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let worktree = find_worktree(&git, name)?;
     if !force {
         ensure_safe_to_remove(&git, &worktree)?;
@@ -1121,15 +1011,9 @@ fn handle_remove(
     remove_empty_nested_parent(git.main_checkout(), &worktree.path)
 }
 
-fn handle_rename(
-    source_name: &str,
-    target_name: &str,
-    dry_run: bool,
-) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+fn handle_rename(source_name: &str, target_name: &str, dry_run: bool) -> Result<(), String> {
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let source = find_worktree(&git, source_name)?;
     let source_relative = worktree_relative_path(&git, &source)?;
     let target_relative = rename_target_path(&source_relative, target_name)?;
@@ -1154,14 +1038,9 @@ fn handle_rename(
     Ok(())
 }
 
-fn handle_finish(
-    name: &str,
-    dry_run: bool,
-) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
+fn handle_finish(name: &str, dry_run: bool) -> Result<(), String> {
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(main_checkout).map_err(|error| error.to_string())?;
     let worktree = find_worktree(&git, name)?;
     let mut plan = LifecyclePlan::default();
     plan.add(format!(
@@ -1217,8 +1096,7 @@ fn validate_full_session_uuid(session_uuid: &str) -> Result<(), String> {
     let valid = session_uuid.len() == 36
         && session_uuid.chars().enumerate().all(|(index, character)| {
             matches!(index, 8 | 13 | 18 | 23) && character == '-'
-                || !matches!(index, 8 | 13 | 18 | 23)
-                    && character.is_ascii_hexdigit()
+                || !matches!(index, 8 | 13 | 18 | 23) && character.is_ascii_hexdigit()
         });
     if valid {
         Ok(())
@@ -1250,32 +1128,19 @@ fn worktree_relative_path(
         .path
         .strip_prefix(git.main_checkout().join(".worktrees"))
         .map(Path::to_path_buf)
-        .map_err(|_| {
-            format!(
-                "worktree {} is outside .worktrees",
-                worktree.path.display()
-            )
-        })
+        .map_err(|_| format!("worktree {} is outside .worktrees", worktree.path.display()))
 }
 
-fn rename_target_path(
-    source_relative: &Path,
-    target_name: &str,
-) -> Result<PathBuf, String> {
+fn rename_target_path(source_relative: &Path, target_name: &str) -> Result<PathBuf, String> {
     if source_relative.components().count() == 2 {
         let target_relative = nested_relative_path(target_name)?;
         if target_relative.parent() != source_relative.parent() {
-            return Err(
-                "nested worktree rename must keep the same full session UUID"
-                    .to_owned(),
-            );
+            return Err("nested worktree rename must keep the same full session UUID".to_owned());
         }
         return Ok(target_relative);
     }
     if target_name.contains('/') {
-        return Err(
-            "legacy worktree rename target must be a flat name".to_owned()
-        );
+        return Err("legacy worktree rename target must be a flat name".to_owned());
     }
     Ok(PathBuf::from(target_name))
 }
@@ -1311,10 +1176,7 @@ fn nested_slug_directories(
     Ok(slugs)
 }
 
-fn nested_worktree_parent(
-    main_checkout: &Path,
-    worktree_path: &Path,
-) -> Option<PathBuf> {
+fn nested_worktree_parent(main_checkout: &Path, worktree_path: &Path) -> Option<PathBuf> {
     let relative = worktree_path
         .strip_prefix(main_checkout.join(".worktrees"))
         .ok()?;
@@ -1325,12 +1187,8 @@ fn nested_worktree_parent(
     }
 }
 
-fn remove_empty_nested_parent(
-    main_checkout: &Path,
-    worktree_path: &Path,
-) -> Result<(), String> {
-    let Some(parent) = nested_worktree_parent(main_checkout, worktree_path)
-    else {
+fn remove_empty_nested_parent(main_checkout: &Path, worktree_path: &Path) -> Result<(), String> {
+    let Some(parent) = nested_worktree_parent(main_checkout, worktree_path) else {
         return Ok(());
     };
     if parent.is_dir()
@@ -1345,10 +1203,8 @@ fn remove_empty_nested_parent(
 }
 
 fn handle_doctor(dry_run: bool) -> Result<(), String> {
-    let main_checkout =
-        env::current_dir().map_err(|error| error.to_string())?;
-    let git =
-        WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
+    let main_checkout = env::current_dir().map_err(|error| error.to_string())?;
+    let git = WorktreeGit::open(&main_checkout).map_err(|error| error.to_string())?;
     let mut plan = LifecyclePlan::default();
 
     scan_submodules_for_repairs(&git, &mut plan)?;
@@ -1367,15 +1223,10 @@ fn handle_doctor(dry_run: bool) -> Result<(), String> {
 /// Recurse into each already-initialized submodule so a deinitialized
 /// submodule-of-a-submodule (e.g. `workflow-tools`'s own `spec`/`session`)
 /// is reported too, not just direct submodules of the invoked checkout.
-fn scan_submodules_for_repairs(
-    git: &WorktreeGit,
-    plan: &mut LifecyclePlan,
-) -> Result<(), String> {
+fn scan_submodules_for_repairs(git: &WorktreeGit, plan: &mut LifecyclePlan) -> Result<(), String> {
     for submodule in git.submodule_paths().map_err(|error| error.to_string())? {
         let path = git.main_checkout().join(&submodule);
-        if let Some(config) =
-            stale_worktree_config(git.main_checkout(), &submodule)?
-        {
+        if let Some(config) = stale_worktree_config(git.main_checkout(), &submodule)? {
             println!(
                 "submodule={submodule} status=stale-core-worktree path={}",
                 config.display()
@@ -1431,31 +1282,28 @@ fn lifecycle_status(
         .map_err(|error| error.to_string())?
     {
         ReclaimEligibility::Reclaimable => Ok("reclaimable".to_owned()),
-        ReclaimEligibility::Rejected(reason) =>
-            Ok(format!("preserved reason={}", rejection_reason(&reason))),
+        ReclaimEligibility::Rejected(reason) => {
+            Ok(format!("preserved reason={}", rejection_reason(&reason)))
+        }
     }
 }
 
 fn rejection_reason(reason: &ReclaimRejectionReason) -> String {
     match reason {
-        ReclaimRejectionReason::OutsideWorktreeRoot =>
-            "outside-worktree-root".to_owned(),
+        ReclaimRejectionReason::OutsideWorktreeRoot => "outside-worktree-root".to_owned(),
         ReclaimRejectionReason::SessionActive => "session-active".to_owned(),
         ReclaimRejectionReason::Detached => "detached".to_owned(),
         ReclaimRejectionReason::Dirty => "dirty".to_owned(),
-        ReclaimRejectionReason::ContainsCurrentDirectory =>
-            "contains-current-directory".to_owned(),
+        ReclaimRejectionReason::ContainsCurrentDirectory => "contains-current-directory".to_owned(),
         ReclaimRejectionReason::NotIdle => "not-idle".to_owned(),
-        ReclaimRejectionReason::DirtySubmodule { path } =>
-            format!("dirty-submodule:{}", path.display()),
+        ReclaimRejectionReason::DirtySubmodule { path } => {
+            format!("dirty-submodule:{}", path.display())
+        }
         ReclaimRejectionReason::AheadOfMain => "ahead-of-main".to_owned(),
     }
 }
 
-fn stale_worktree_config(
-    main_checkout: &Path,
-    submodule: &str,
-) -> Result<Option<PathBuf>, String> {
+fn stale_worktree_config(main_checkout: &Path, submodule: &str) -> Result<Option<PathBuf>, String> {
     let config_path = main_checkout
         .join(".git")
         .join("modules")
@@ -1464,12 +1312,10 @@ fn stale_worktree_config(
     if !config_path.exists() {
         return Ok(None);
     }
-    let config =
-        git2::Config::open(&config_path).map_err(|error| error.to_string())?;
+    let config = git2::Config::open(&config_path).map_err(|error| error.to_string())?;
     let value = match config.get_string("core.worktree") {
         Ok(value) => value,
-        Err(error) if error.code() == git2::ErrorCode::NotFound =>
-            return Ok(None),
+        Err(error) if error.code() == git2::ErrorCode::NotFound => return Ok(None),
         Err(error) => return Err(error.to_string()),
     };
     let configured_path = PathBuf::from(value);
@@ -1484,12 +1330,8 @@ fn stale_worktree_config(
     Ok((!resolved_path.exists()).then_some(resolved_path))
 }
 
-fn initialize_submodule(
-    main_checkout: &Path,
-    submodule: &str,
-) -> Result<(), String> {
-    let repository =
-        Repository::open(main_checkout).map_err(|error| error.to_string())?;
+fn initialize_submodule(main_checkout: &Path, submodule: &str) -> Result<(), String> {
+    let repository = Repository::open(main_checkout).map_err(|error| error.to_string())?;
     let mut handle = repository
         .find_submodule(submodule)
         .map_err(|error| error.to_string())?;
@@ -1497,17 +1339,13 @@ fn initialize_submodule(
     handle.update(true, None).map_err(|error| error.to_string())
 }
 
-fn unset_core_worktree(
-    main_checkout: &Path,
-    submodule: &str,
-) -> Result<(), String> {
+fn unset_core_worktree(main_checkout: &Path, submodule: &str) -> Result<(), String> {
     let config = main_checkout
         .join(".git")
         .join("modules")
         .join(submodule)
         .join("config");
-    let mut config =
-        git2::Config::open(&config).map_err(|error| error.to_string())?;
+    let mut config = git2::Config::open(&config).map_err(|error| error.to_string())?;
     config
         .remove("core.worktree")
         .map_err(|error| error.to_string())
@@ -1518,15 +1356,9 @@ mod tests {
     use clap::Parser;
 
     use super::{
-        BRANCH_TEMPLATE,
-        Cli,
-        Command,
-        DIRTY_MAIN_UNCOMMITTED_CHANGES_MESSAGE,
-        FINISH_READY_TO_MERGE_MARKER,
-        PRESERVE_MAIN_CHANGES_HINT,
-        WORKTREE_PATH_OUTPUT_PREFIX,
-        WORKTREE_PATH_TEMPLATE,
-        WorktreeSelection,
+        BRANCH_TEMPLATE, Cli, Command, DIRTY_MAIN_UNCOMMITTED_CHANGES_MESSAGE,
+        FINISH_READY_TO_MERGE_MARKER, PRESERVE_MAIN_CHANGES_HINT, WORKTREE_PATH_OUTPUT_PREFIX,
+        WORKTREE_PATH_TEMPLATE, WorktreeSelection,
     };
 
     #[test]
@@ -1583,13 +1415,7 @@ mod tests {
 
     #[test]
     fn parses_rebase_with_dry_run() {
-        let cli = Cli::try_parse_from([
-            "worktree-ctl",
-            "rebase",
-            "example",
-            "--dry-run",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["worktree-ctl", "rebase", "example", "--dry-run"]).unwrap();
 
         assert_eq!(
             cli.command,
@@ -1607,13 +1433,7 @@ mod tests {
 
     #[test]
     fn parses_merge_with_dry_run() {
-        let cli = Cli::try_parse_from([
-            "worktree-ctl",
-            "merge",
-            "example",
-            "--dry-run",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["worktree-ctl", "merge", "example", "--dry-run"]).unwrap();
 
         assert_eq!(
             cli.command,
@@ -1631,13 +1451,7 @@ mod tests {
 
     #[test]
     fn parses_sync_with_dry_run() {
-        let cli = Cli::try_parse_from([
-            "worktree-ctl",
-            "sync",
-            "example",
-            "--dry-run",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["worktree-ctl", "sync", "example", "--dry-run"]).unwrap();
 
         assert_eq!(
             cli.command,
@@ -1655,13 +1469,8 @@ mod tests {
 
     #[test]
     fn parses_sync_with_auto_commit() {
-        let cli = Cli::try_parse_from([
-            "worktree-ctl",
-            "sync",
-            "example",
-            "--auto-commit",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["worktree-ctl", "sync", "example", "--auto-commit"]).unwrap();
 
         assert_eq!(
             cli.command,
@@ -1701,8 +1510,7 @@ mod tests {
             }
         );
 
-        let all =
-            Cli::try_parse_from(["worktree-ctl", "clean", "--all"]).unwrap();
+        let all = Cli::try_parse_from(["worktree-ctl", "clean", "--all"]).unwrap();
         assert_eq!(
             all.command,
             Command::Clean {
@@ -1744,14 +1552,9 @@ mod tests {
 
     #[test]
     fn parses_remove_with_force_and_dry_run() {
-        let cli = Cli::try_parse_from([
-            "worktree-ctl",
-            "remove",
-            "example",
-            "--force",
-            "--dry-run",
-        ])
-        .unwrap();
+        let cli =
+            Cli::try_parse_from(["worktree-ctl", "remove", "example", "--force", "--dry-run"])
+                .unwrap();
 
         assert_eq!(
             cli.command,
@@ -1786,13 +1589,7 @@ mod tests {
 
     #[test]
     fn parses_finish_with_dry_run() {
-        let cli = Cli::try_parse_from([
-            "worktree-ctl",
-            "finish",
-            "example",
-            "--dry-run",
-        ])
-        .unwrap();
+        let cli = Cli::try_parse_from(["worktree-ctl", "finish", "example", "--dry-run"]).unwrap();
 
         assert_eq!(
             cli.command,
@@ -1805,8 +1602,7 @@ mod tests {
 
     #[test]
     fn parses_doctor_with_dry_run() {
-        let cli = Cli::try_parse_from(["worktree-ctl", "doctor", "--dry-run"])
-            .unwrap();
+        let cli = Cli::try_parse_from(["worktree-ctl", "doctor", "--dry-run"]).unwrap();
 
         assert_eq!(cli.command, Command::Doctor { dry_run: true });
     }

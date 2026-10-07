@@ -1,30 +1,12 @@
-use chrono::{
-    DateTime,
-    Duration,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
-use std::{
-    collections::BTreeMap,
-    path::Path,
-};
+use chrono::{DateTime, Duration, Utc};
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, path::Path};
 
-use crate::{
-    CopilotHookEvent,
-    SessionError,
-    SessionRecord,
-    SessionRole,
-};
+use crate::{CopilotHookEvent, SessionError, SessionRecord, SessionRole};
 
 /// Trait for estimating token counts from character counts.
 pub trait TokenEstimator {
-    fn estimate_tokens(
-        &self,
-        chars: u64,
-    ) -> f64;
+    fn estimate_tokens(&self, chars: u64) -> f64;
 }
 
 /// Default token estimator using a fixed chars-per-token ratio.
@@ -42,10 +24,7 @@ impl Default for CharsPerTokenEstimator {
 }
 
 impl TokenEstimator for CharsPerTokenEstimator {
-    fn estimate_tokens(
-        &self,
-        chars: u64,
-    ) -> f64 {
+    fn estimate_tokens(&self, chars: u64) -> f64 {
         chars as f64 / self.chars_per_token
     }
 }
@@ -126,10 +105,7 @@ impl Default for GradedCostCalibration {
 
 /// Compute graded cost from estimated tokens using linear mapping.
 /// Maps [0, tokens_at_max] -> [1, scale_max], clamped.
-pub fn graded_cost(
-    est_tokens: f64,
-    cal: &GradedCostCalibration,
-) -> u32 {
+pub fn graded_cost(est_tokens: f64, cal: &GradedCostCalibration) -> u32 {
     if est_tokens <= 0.0 {
         return 1;
     }
@@ -212,28 +188,24 @@ impl ToolCallSummary {
     /// Increment the outcome bucket implied by `result_code`, falling back to
     /// `tool_success` when the code is missing or unrecognized. Returns whether
     /// the call was classified as successful.
-    fn classify(
-        &mut self,
-        result_code: Option<&str>,
-        tool_success: Option<bool>,
-    ) -> bool {
+    fn classify(&mut self, result_code: Option<&str>, tool_success: Option<bool>) -> bool {
         match result_code {
             Some("ok") => {
                 self.success_count += 1;
                 true
-            },
+            }
             Some("error") => {
                 self.fail_count += 1;
                 false
-            },
+            }
             Some("timeout") => {
                 self.timeout_count += 1;
                 false
-            },
+            }
             Some("hang") => {
                 self.hang_count += 1;
                 false
-            },
+            }
             _ => {
                 let success = tool_success != Some(false);
                 if success {
@@ -242,7 +214,7 @@ impl ToolCallSummary {
                     self.fail_count += 1;
                 }
                 success
-            },
+            }
         }
     }
 }
@@ -321,9 +293,7 @@ pub fn compute_session_summary_with_events(
         // Capture input size and duration from event_meta
         if let Some(event_meta) = &turn.event_meta {
             if let Some(args_json) = &event_meta.tool_arguments_json {
-                let input_chars = serde_json::to_string(args_json)
-                    .unwrap_or_default()
-                    .len() as u64;
+                let input_chars = serde_json::to_string(args_json).unwrap_or_default().len() as u64;
                 entry.input_char_sizes.push(input_chars);
             }
 
@@ -458,9 +428,7 @@ fn record_event_tool_call(
         if let Some(tracked) = tracked_calls.get_mut(&tool_call_id) {
             // Already counted this call: never recount call_count, input, or
             // duration. Only a strictly higher-fidelity output may land.
-            if let (Some(output_chars), Some(output_source)) =
-                (output_chars, output_source)
-            {
+            if let (Some(output_chars), Some(output_source)) = (output_chars, output_source) {
                 if new_rank > tracked.output_rank {
                     let entry = tools
                         .entry(tracked.tool_name.clone())
@@ -469,13 +437,12 @@ fn record_event_tool_call(
                         Some(index) => {
                             entry.output_char_sizes[index] = output_chars;
                             entry.output_source[index] = output_source;
-                        },
+                        }
                         None => {
                             entry.output_char_sizes.push(output_chars);
                             entry.output_source.push(output_source);
-                            tracked.output_slot =
-                                Some(entry.output_char_sizes.len() - 1);
-                        },
+                            tracked.output_slot = Some(entry.output_char_sizes.len() - 1);
+                        }
                     }
                     tracked.output_rank = new_rank;
                 }
@@ -500,15 +467,12 @@ fn record_event_tool_call(
         .as_ref()
         .or_else(|| data.and_then(|data| data.get("arguments")))
     {
-        let input_chars =
-            serde_json::to_string(arguments).unwrap_or_default().len() as u64;
+        let input_chars = serde_json::to_string(arguments).unwrap_or_default().len() as u64;
         entry.input_char_sizes.push(input_chars);
     }
 
     let mut output_slot = None;
-    if let (Some(output_chars), Some(output_source)) =
-        (output_chars, output_source)
-    {
+    if let (Some(output_chars), Some(output_source)) = (output_chars, output_source) {
         entry.output_char_sizes.push(output_chars);
         entry.output_source.push(output_source);
         output_slot = Some(entry.output_char_sizes.len() - 1);
@@ -534,10 +498,7 @@ fn record_event_tool_call(
     }
 }
 
-fn json_str(
-    value: Option<&serde_json::Value>,
-    keys: &[&str],
-) -> Option<String> {
+fn json_str(value: Option<&serde_json::Value>, keys: &[&str]) -> Option<String> {
     let value = value?;
     keys.iter()
         .find_map(|key| value.get(*key)?.as_str())
@@ -588,19 +549,18 @@ pub fn aggregate_with_cost(
 
     for summary in &filtered_summaries {
         for (tool_name, call_summary) in &summary.tools {
-            let entry =
-                tool_data.entry(tool_name.clone()).or_insert_with(|| {
-                    ToolAggregation {
-                        call_count: 0,
-                        success_count: 0,
-                        fail_count: 0,
-                        timeout_count: 0,
-                        hang_count: 0,
-                        output_chars: Vec::new(),
-                        input_chars: Vec::new(),
-                        durations: Vec::new(),
-                        output_source_counts: BTreeMap::new(),
-                    }
+            let entry = tool_data
+                .entry(tool_name.clone())
+                .or_insert_with(|| ToolAggregation {
+                    call_count: 0,
+                    success_count: 0,
+                    fail_count: 0,
+                    timeout_count: 0,
+                    hang_count: 0,
+                    output_chars: Vec::new(),
+                    input_chars: Vec::new(),
+                    durations: Vec::new(),
+                    output_source_counts: BTreeMap::new(),
                 });
 
             entry.call_count += call_summary.call_count;
@@ -641,8 +601,7 @@ pub fn aggregate_with_cost(
         let p95_output_chars = percentile(&sorted_output, 95);
         let max_output_chars = sorted_output.last().copied().unwrap_or(0);
 
-        let est_mean_output_tokens =
-            estimator.estimate_tokens(mean_output_chars as u64);
+        let est_mean_output_tokens = estimator.estimate_tokens(mean_output_chars as u64);
         let est_p90_output_tokens = estimator.estimate_tokens(p90_output_chars);
 
         let mean_input_chars = if data.input_chars.is_empty() {
@@ -713,7 +672,9 @@ pub fn aggregate_with_cost(
                 e as *const _,
                 &CharsPerTokenEstimator::default() as *const _,
             ) =>
-                CharsPerTokenEstimator::default().chars_per_token,
+            {
+                CharsPerTokenEstimator::default().chars_per_token
+            }
             _ => 4.0, // fallback
         },
         window: ToolMetricsWindowDescription {
@@ -740,10 +701,7 @@ struct ToolAggregation {
     output_source_counts: BTreeMap<String, u64>,
 }
 
-fn percentile(
-    sorted_values: &[u64],
-    p: u8,
-) -> u64 {
+fn percentile(sorted_values: &[u64], p: u8) -> u64 {
     if sorted_values.is_empty() {
         return 0;
     }
@@ -755,10 +713,7 @@ fn percentile(
     sorted_values[rank.saturating_sub(1)]
 }
 
-fn percentile_i64(
-    sorted_values: &[i64],
-    p: u8,
-) -> i64 {
+fn percentile_i64(sorted_values: &[i64], p: u8) -> i64 {
     if sorted_values.is_empty() {
         return 0;
     }
@@ -771,25 +726,17 @@ fn percentile_i64(
 }
 
 /// Write a tool metrics rollup to a file.
-pub fn write_rollup(
-    path: &Path,
-    report: ToolMetricsReport,
-) -> Result<(), SessionError> {
-    use std::{
-        fs,
-        io::Write,
-    };
+pub fn write_rollup(path: &Path, report: ToolMetricsReport) -> Result<(), SessionError> {
+    use std::{fs, io::Write};
 
     let rollup = ToolMetricsRollup {
         schema_version: TOOL_METRICS_SCHEMA_VERSION,
         report,
     };
 
-    let json = serde_json::to_string_pretty(&rollup).map_err(|source| {
-        SessionError::Serialize {
-            path: path.to_path_buf(),
-            source,
-        }
+    let json = serde_json::to_string_pretty(&rollup).map_err(|source| SessionError::Serialize {
+        path: path.to_path_buf(),
+        source,
     })?;
 
     if let Some(parent) = path.parent() {
@@ -799,11 +746,10 @@ pub fn write_rollup(
         })?;
     }
 
-    let mut file =
-        fs::File::create(path).map_err(|source| SessionError::Io {
-            path: path.to_path_buf(),
-            source,
-        })?;
+    let mut file = fs::File::create(path).map_err(|source| SessionError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
 
     file.write_all(json.as_bytes())
         .map_err(|source| SessionError::Io {
@@ -837,22 +783,19 @@ pub fn aggregate_multi_store(
             continue;
         }
 
-        for entry in std::fs::read_dir(&sessions_root).map_err(|source| {
-            SessionError::Io {
-                path: sessions_root.clone(),
-                source,
-            }
+        for entry in std::fs::read_dir(&sessions_root).map_err(|source| SessionError::Io {
+            path: sessions_root.clone(),
+            source,
         })? {
             let entry = entry.map_err(|source| SessionError::Io {
                 path: sessions_root.clone(),
                 source,
             })?;
 
-            let file_type =
-                entry.file_type().map_err(|source| SessionError::Io {
-                    path: entry.path(),
-                    source,
-                })?;
+            let file_type = entry.file_type().map_err(|source| SessionError::Io {
+                path: entry.path(),
+                source,
+            })?;
 
             if !file_type.is_dir() {
                 continue;
@@ -864,11 +807,8 @@ pub fn aggregate_multi_store(
             let tool_metrics_path = entry.path().join("tool-metrics.json");
 
             if tool_metrics_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&tool_metrics_path)
-                {
-                    if let Ok(summary) = serde_json::from_str::<
-                        SessionToolMetricsSummary,
-                    >(&content)
+                if let Ok(content) = std::fs::read_to_string(&tool_metrics_path) {
+                    if let Ok(summary) = serde_json::from_str::<SessionToolMetricsSummary>(&content)
                     {
                         if !summary.is_empty() {
                             all_summaries.push(summary);
@@ -880,16 +820,11 @@ pub fn aggregate_multi_store(
 
             // Otherwise recompute from the transcript plus the event stream.
             if let Ok(record) = config.read_session(&session_id) {
-                let events = std::fs::read_to_string(
-                    entry.path().join("events.json"),
-                )
-                .ok()
-                .and_then(|content| {
-                    serde_json::from_str::<crate::PersistedSessionEvents>(
-                        &content,
-                    )
+                let events = std::fs::read_to_string(entry.path().join("events.json"))
                     .ok()
-                });
+                    .and_then(|content| {
+                        serde_json::from_str::<crate::PersistedSessionEvents>(&content).ok()
+                    });
                 let estimator = CharsPerTokenEstimator::default();
                 let summary = compute_session_summary_with_events(
                     &record,
@@ -917,12 +852,7 @@ pub fn aggregate_multi_store(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        SESSION_SCHEMA_VERSION,
-        SessionMetadata,
-        SessionTurn,
-        SessionTurnEventMeta,
-    };
+    use crate::{SESSION_SCHEMA_VERSION, SessionMetadata, SessionTurn, SessionTurnEventMeta};
     use chrono::TimeZone;
 
     fn sample_time() -> DateTime<Utc> {
@@ -1251,8 +1181,7 @@ mod tests {
         };
 
         let serialized = serde_json::to_string(&rollup).unwrap();
-        let deserialized: ToolMetricsRollup =
-            serde_json::from_str(&serialized).unwrap();
+        let deserialized: ToolMetricsRollup = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(deserialized.report.tools[0].cost, Some(25));
         assert_eq!(deserialized.report.session_count, 10);
@@ -1335,9 +1264,7 @@ mod tests {
                         tool_arguments_json: Some(json!({"duration_ms": 200})),
                         result_code: Some("error".to_string()),
                         subagent_run_id: None,
-                        error_message: Some(
-                            "Command failed with non-zero exit".to_string(),
-                        ),
+                        error_message: Some("Command failed with non-zero exit".to_string()),
                         exit_code: Some(1),
                         event_id: None,
                         parent_event_id: None,
@@ -1370,14 +1297,10 @@ mod tests {
                     model: None,
                     event_meta: Some(SessionTurnEventMeta {
                         tool_success: Some(false),
-                        tool_arguments_json: Some(
-                            json!({"duration_ms": 305000}),
-                        ),
+                        tool_arguments_json: Some(json!({"duration_ms": 305000})),
                         result_code: Some("timeout".to_string()),
                         subagent_run_id: None,
-                        error_message: Some(
-                            "Execution exceeded timeout cap".to_string(),
-                        ),
+                        error_message: Some("Execution exceeded timeout cap".to_string()),
                         exit_code: None,
                         event_id: None,
                         parent_event_id: None,
@@ -1410,14 +1333,10 @@ mod tests {
                     model: None,
                     event_meta: Some(SessionTurnEventMeta {
                         tool_success: None,
-                        tool_arguments_json: Some(
-                            json!({"duration_ms": 50000}),
-                        ),
+                        tool_arguments_json: Some(json!({"duration_ms": 50000})),
                         result_code: Some("hang".to_string()),
                         subagent_run_id: None,
-                        error_message: Some(
-                            "sync-terminal-state-ambiguous".to_string(),
-                        ),
+                        error_message: Some("sync-terminal-state-ambiguous".to_string()),
                         exit_code: None,
                         event_id: None,
                         parent_event_id: None,
@@ -1842,8 +1761,7 @@ mod tests {
     #[test]
     fn aggregate_preserves_mixed_output_source_breakdown() {
         fn make_summary(sources: Vec<&str>) -> SessionToolMetricsSummary {
-            let output_char_sizes: Vec<u64> =
-                sources.iter().map(|s| s.len() as u64 * 10).collect();
+            let output_char_sizes: Vec<u64> = sources.iter().map(|s| s.len() as u64 * 10).collect();
             SessionToolMetricsSummary {
                 schema_version: TOOL_METRICS_SCHEMA_VERSION,
                 session_id: format!("session-{}", sources.join("-")),
@@ -1859,10 +1777,7 @@ mod tests {
                             timeout_count: 0,
                             hang_count: 0,
                             output_char_sizes,
-                            output_source: sources
-                                .iter()
-                                .map(|s| s.to_string())
-                                .collect(),
+                            output_source: sources.iter().map(|s| s.to_string()).collect(),
                             input_char_sizes: Vec::new(),
                             duration_ms_values: Vec::new(),
                         },

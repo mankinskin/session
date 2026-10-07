@@ -5,20 +5,9 @@
 
 use chrono::Utc;
 use session_api::{
-    QualityGate,
-    QualityGateOutcome,
-    QualityGatePhase,
-    SessionLinks,
-    SessionMetadata,
-    SessionRecord,
-    SessionRole,
-    SessionRunLineage,
-    SessionRuntimeContext,
-    SessionTurn,
-    SessionTurnEventMeta,
-    SubAgentRollup,
-    compute_subagent_rollups,
-    post_delegation_gate,
+    QualityGate, QualityGateOutcome, QualityGatePhase, SessionLinks, SessionMetadata,
+    SessionRecord, SessionRole, SessionRunLineage, SessionRuntimeContext, SessionTurn,
+    SessionTurnEventMeta, SubAgentRollup, compute_subagent_rollups, post_delegation_gate,
     pre_delegation_gate,
 };
 use std::collections::HashMap;
@@ -105,8 +94,7 @@ fn subagent_rollup_links_delegated_session_to_parent() {
     };
 
     let rollups = compute_subagent_rollups(&parent_record, Some(&context));
-    let delegated_rollup =
-        rollups.get(run_id).expect("delegated rollup should exist");
+    let delegated_rollup = rollups.get(run_id).expect("delegated rollup should exist");
 
     assert_eq!(delegated_rollup.session_id, delegated_session_id);
     assert_eq!(
@@ -322,8 +310,7 @@ fn data_model_supports_per_model_satisfactory_work_rate_query() {
     };
 
     // Collect into queryable structures
-    let mut rollups_by_model: HashMap<String, Vec<SubAgentRollup>> =
-        HashMap::new();
+    let mut rollups_by_model: HashMap<String, Vec<SubAgentRollup>> = HashMap::new();
     rollups_by_model
         .entry(model.to_string())
         .or_default()

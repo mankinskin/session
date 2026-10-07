@@ -35,10 +35,7 @@ const PATH_ARGUMENT_REGISTRY: &[(&str, &str, PathArgumentKind)] = &[
     ("peek_skeleton", "path", PathArgumentKind::Path),
 ];
 
-pub(crate) fn registered_path_argument(
-    tool: &str,
-    name: &str,
-) -> Option<PathArgument> {
+pub(crate) fn registered_path_argument(tool: &str, name: &str) -> Option<PathArgument> {
     if name == "workspace" {
         return Some(PathArgument {
             name: "workspace",

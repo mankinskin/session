@@ -7,46 +7,20 @@
 use std::{
     ffi::OsString,
     fs,
-    io::{
-        BufRead,
-        BufReader,
-        Write,
-    },
-    path::{
-        Path,
-        PathBuf,
-    },
-    process::{
-        Command,
-        Stdio,
-    },
+    io::{BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::{
-        Arc,
-        Mutex,
-        atomic::{
-            AtomicBool,
-            Ordering,
-        },
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     thread,
-    time::{
-        Duration,
-        Instant,
-    },
+    time::{Duration, Instant},
 };
 
-use serde_json::{
-    Value,
-    json,
-};
-use session_api::{
-    SessionStoreConfig,
-    SessionWorktreeCheckInRequest,
-};
-use session_workspace_resolver::{
-    ResolverConfig,
-    SessionWorkspaceResolver,
-};
+use serde_json::{Value, json};
+use session_api::{SessionStoreConfig, SessionWorktreeCheckInRequest};
+use session_workspace_resolver::{ResolverConfig, SessionWorkspaceResolver};
 use tempfile::TempDir;
 
 static ENV_LOCK: Mutex<()> = Mutex::new(());
@@ -177,10 +151,7 @@ fn canonical_exe_name() -> &'static str {
     }
 }
 
-fn write_exe(
-    path: &Path,
-    bytes: &[u8],
-) {
+fn write_exe(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
     #[cfg(unix)]
     {
@@ -211,9 +182,8 @@ fn spawn_collector(stdout: std::process::ChildStdout) -> Transcript {
                 Ok(0) | Err(_) => {
                     eof2.store(true, Ordering::SeqCst);
                     break;
-                },
-                Ok(_) =>
-                    lines2.lock().unwrap().push(line.trim_end().to_string()),
+                }
+                Ok(_) => lines2.lock().unwrap().push(line.trim_end().to_string()),
             }
         }
     });
@@ -221,12 +191,7 @@ fn spawn_collector(stdout: std::process::ChildStdout) -> Transcript {
 }
 
 /// Bounded wait (deadline, not a bare sleep as the sync primitive).
-fn wait_until<F: Fn(&[String]) -> bool>(
-    t: &Transcript,
-    timeout: Duration,
-    msg: &str,
-    pred: F,
-) {
+fn wait_until<F: Fn(&[String]) -> bool>(t: &Transcript, timeout: Duration, msg: &str, pred: F) {
     let deadline = Instant::now() + timeout;
     loop {
         if pred(&t.lines.lock().unwrap()) {
@@ -246,10 +211,7 @@ fn parsed(lines: &[String]) -> Vec<Value> {
         .collect()
 }
 
-fn find_response(
-    lines: &[String],
-    id: i64,
-) -> Option<Value> {
+fn find_response(lines: &[String], id: i64) -> Option<Value> {
     parsed(lines)
         .into_iter()
         .find(|v| v.get("id").and_then(Value::as_i64) == Some(id))
@@ -268,12 +230,9 @@ struct WindowsJob(windows_sys::Win32::Foundation::HANDLE);
 impl WindowsJob {
     fn new() -> Self {
         use windows_sys::Win32::System::JobObjects::{
-            JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
-            JOBOBJECT_BASIC_LIMIT_INFORMATION,
-            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-            JobObjectExtendedLimitInformation,
-            CreateJobObjectW,
-            SetInformationJobObject,
+            CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+            JOBOBJECT_BASIC_LIMIT_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+            JobObjectExtendedLimitInformation, SetInformationJobObject,
         };
         unsafe {
             let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
@@ -289,8 +248,7 @@ impl WindowsJob {
                 job,
                 JobObjectExtendedLimitInformation,
                 &info as *const _ as *const _,
-                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()
-                    as u32,
+                std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
             );
             assert!(ok != 0, "SetInformationJobObject failed");
             Self(job)
@@ -303,8 +261,7 @@ impl WindowsJob {
         use std::os::windows::io::AsRawHandle;
         use windows_sys::Win32::System::JobObjects::AssignProcessToJobObject;
         unsafe {
-            let handle = child.as_raw_handle()
-                as windows_sys::Win32::Foundation::HANDLE;
+            let handle = child.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
             let _ = AssignProcessToJobObject(self.0, handle);
         }
     }
@@ -387,8 +344,7 @@ fn transparent_reload_end_to_end_subprocess() {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null());
-    let mut child = ChildGuard::spawn(command)
-        .expect("failed to spawn real mcp-toolmon binary");
+    let mut child = ChildGuard::spawn(command).expect("failed to spawn real mcp-toolmon binary");
 
     let mut stdin = child.stdin.take().unwrap();
     let transcript = spawn_collector(child.stdout.take().unwrap());
@@ -426,8 +382,7 @@ fn transparent_reload_end_to_end_subprocess() {
     // 3) Overwrite the canonical path while the proxy runs — the
     // lock-freedom property; this must succeed because mcp-toolmon only
     // ever executes a shadow copy of P, never P itself.
-    let overwrite =
-        std::panic::catch_unwind(|| write_exe(&canonical, &fake_v2_bytes()));
+    let overwrite = std::panic::catch_unwind(|| write_exe(&canonical, &fake_v2_bytes()));
     assert!(
         overwrite.is_ok(),
         "overwriting canonical path P while mcp-toolmon runs must succeed"
@@ -448,8 +403,7 @@ fn transparent_reload_end_to_end_subprocess() {
         "notifications/tools/list_changed was never observed after the real file swap",
         |lines| {
             parsed(lines).iter().any(|v| {
-                v.get("method").and_then(Value::as_str)
-                    == Some("notifications/tools/list_changed")
+                v.get("method").and_then(Value::as_str) == Some("notifications/tools/list_changed")
             })
         },
     );
@@ -472,11 +426,7 @@ fn transparent_reload_end_to_end_subprocess() {
     // finishing draining/respawning for a brief moment after list_changed
     // was queued). Each attempt gets its own bounded (non-panicking) wait
     // so a slow-but-eventual respawn doesn't abort the whole assertion.
-    fn wait_or_none(
-        t: &Transcript,
-        timeout: Duration,
-        id: i64,
-    ) -> Option<Value> {
+    fn wait_or_none(t: &Transcript, timeout: Duration, id: i64) -> Option<Value> {
         let deadline = Instant::now() + timeout;
         loop {
             if let Some(v) = find_response(&t.lines.lock().unwrap(), id) {
@@ -496,8 +446,7 @@ fn transparent_reload_end_to_end_subprocess() {
         send(
             &json!({"jsonrpc":"2.0","id":next_id,"method":"tools/call","params":{"name":"generation","arguments":{"session_id":"11111111-1111-4111-8111-111111111111"}}}),
         );
-        if let Some(resp) =
-            wait_or_none(&transcript, Duration::from_secs(2), next_id)
+        if let Some(resp) = wait_or_none(&transcript, Duration::from_secs(2), next_id)
             && resp["result"]["content"][0]["text"] == "v2"
         {
             got_v2 = true;

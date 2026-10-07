@@ -1,52 +1,24 @@
 use std::path::PathBuf;
 
 use rmcp::{
-    ErrorData as McpError,
-    ServerHandler,
-    ServiceExt,
-    handler::server::{
-        tool::ToolRouter,
-        wrapper::Parameters,
-    },
+    ErrorData as McpError, ServerHandler, ServiceExt,
+    handler::server::{tool::ToolRouter, wrapper::Parameters},
     model::*,
-    schemars::{
-        self,
-        JsonSchema,
-    },
-    tool,
-    tool_handler,
-    tool_router,
+    schemars::{self, JsonSchema},
+    tool, tool_handler, tool_router,
     transport::stdio,
 };
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use memory_kernel::workspace;
 use session_api::{
-    DEFAULT_SKELETON_PREVIEW_CHARS,
-    RelationStrength,
-    SessionError,
-    SessionHandoffPackage,
-    SessionHandoffTargetTicket,
-    SessionHandoffUpwardContextEntry,
-    SessionHandoffUpwardContextRole,
-    SessionQuery,
-    SessionRuntimeInitRequest,
-    SessionTerminalCreateRequest,
-    SessionStoreConfig,
-    SessionValidationGate,
-    SessionWorkflowEdge,
-    SessionWorkflowEdgeKind,
-    SessionWorkflowNodeDraft,
-    SessionWorkflowNodeKind,
-    SessionWorkflowNodePatch,
-    SessionWorkflowNodeRequirement,
-    SessionWorkflowNodeStatus,
-    SessionWorktreeCheckInRequest,
-    ToolMetricsWindow,
+    DEFAULT_SKELETON_PREVIEW_CHARS, RelationStrength, SessionError, SessionHandoffPackage,
+    SessionHandoffTargetTicket, SessionHandoffUpwardContextEntry, SessionHandoffUpwardContextRole,
+    SessionQuery, SessionRuntimeInitRequest, SessionStoreConfig, SessionTerminalCreateRequest,
+    SessionValidationGate, SessionWorkflowEdge, SessionWorkflowEdgeKind, SessionWorkflowNodeDraft,
+    SessionWorkflowNodeKind, SessionWorkflowNodePatch, SessionWorkflowNodeRequirement,
+    SessionWorkflowNodeStatus, SessionWorktreeCheckInRequest, ToolMetricsWindow,
 };
 
 // ── Workflow enum schema advertisement ─────────────────────────────────────
@@ -672,12 +644,9 @@ impl From<HandoffUpwardContextInput> for SessionHandoffUpwardContextEntry {
             entity_urn: value.entity_urn,
             title: value.title,
             role: match value.role {
-                HandoffUpwardContextRoleInput::Epic =>
-                    SessionHandoffUpwardContextRole::Epic,
-                HandoffUpwardContextRoleInput::Phase =>
-                    SessionHandoffUpwardContextRole::Phase,
-                HandoffUpwardContextRoleInput::Parent =>
-                    SessionHandoffUpwardContextRole::Parent,
+                HandoffUpwardContextRoleInput::Epic => SessionHandoffUpwardContextRole::Epic,
+                HandoffUpwardContextRoleInput::Phase => SessionHandoffUpwardContextRole::Phase,
+                HandoffUpwardContextRoleInput::Parent => SessionHandoffUpwardContextRole::Parent,
             },
         }
     }
@@ -743,24 +712,16 @@ impl SessionServer {
         workspace_selector: &str,
     ) -> Result<SessionStoreConfig, McpError> {
         let workspace_root =
-            workspace::normalize_explicit_workspace_selector(Some(
-                workspace_selector,
-            ))
-            .map_err(|err| McpError::invalid_params(err.to_string(), None))?;
+            workspace::normalize_explicit_workspace_selector(Some(workspace_selector))
+                .map_err(|err| McpError::invalid_params(err.to_string(), None))?;
         Ok(SessionStoreConfig::new(
-            workspace::resolve_store_root_for_initialization_from(
-                &workspace_root,
-                ".session",
-            ),
+            workspace::resolve_store_root_for_initialization_from(&workspace_root, ".session"),
         ))
     }
 
-    fn json_result<T: Serialize>(
-        value: &T
-    ) -> Result<CallToolResult, McpError> {
-        let text = serde_json::to_string(value).map_err(|err| {
-            McpError::internal_error(format!("serialization: {err}"), None)
-        })?;
+    fn json_result<T: Serialize>(value: &T) -> Result<CallToolResult, McpError> {
+        let text = serde_json::to_string(value)
+            .map_err(|err| McpError::internal_error(format!("serialization: {err}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(text)]))
     }
 
@@ -771,26 +732,24 @@ impl SessionServer {
         session_id: &str,
         value: &T,
     ) -> Result<CallToolResult, McpError> {
-        let mut payload = serde_json::to_value(value).map_err(|err| {
-            McpError::internal_error(format!("serialization: {err}"), None)
-        })?;
+        let mut payload = serde_json::to_value(value)
+            .map_err(|err| McpError::internal_error(format!("serialization: {err}"), None))?;
         match payload.as_object_mut() {
             Some(object) => {
                 object.insert(
                     "session_id".to_string(),
                     serde_json::Value::String(session_id.to_string()),
                 );
-            },
+            }
             None => {
                 payload = serde_json::json!({
                     "session_id": session_id,
                     "result": payload,
                 });
-            },
+            }
         }
-        let text = serde_json::to_string(&payload).map_err(|err| {
-            McpError::internal_error(format!("serialization: {err}"), None)
-        })?;
+        let text = serde_json::to_string(&payload)
+            .map_err(|err| McpError::internal_error(format!("serialization: {err}"), None))?;
         Ok(CallToolResult::success(vec![Content::text(text)]))
     }
 
@@ -814,15 +773,13 @@ impl SessionServer {
             | SessionError::FinishBlocked { .. }
             | SessionError::WorkflowGraphInvalid { .. }
             | SessionError::WorkflowDiagnosticsUnresolved { .. }
-            | SessionError::Move(_) =>
-                McpError::invalid_params(err.to_string(), None),
-            _ =>
-                McpError::internal_error(format!("session error: {err}"), None),
+            | SessionError::Move(_) => McpError::invalid_params(err.to_string(), None),
+            _ => McpError::internal_error(format!("session error: {err}"), None),
         }
     }
 
     fn move_plan_json(
-        report: &memory_kernel::storage::move_kernel::MovePlan
+        report: &memory_kernel::storage::move_kernel::MovePlan,
     ) -> Result<serde_json::Value, McpError> {
         Ok(serde_json::json!({
             "supported": report.supported(),
@@ -852,7 +809,7 @@ impl SessionServer {
     }
 
     fn move_outcome_json(
-        outcome: &memory_kernel::storage::move_kernel::MoveOutcome
+        outcome: &memory_kernel::storage::move_kernel::MoveOutcome,
     ) -> Result<serde_json::Value, McpError> {
         Ok(serde_json::json!({
             "resumed": outcome.resumed,
@@ -899,8 +856,7 @@ fn parse_node_kind(value: &str) -> Result<SessionWorkflowNodeKind, McpError> {
         "spec" => Ok(SessionWorkflowNodeKind::Spec),
         // `task` is the generic descriptive bucket. The legacy cosmetic kinds
         // are accepted as back-compat aliases so old call sites keep working.
-        "task" | "action" | "decision" | "checkpoint" =>
-            Ok(SessionWorkflowNodeKind::Task),
+        "task" | "action" | "decision" | "checkpoint" => Ok(SessionWorkflowNodeKind::Task),
         _ => Err(McpError::invalid_params(
             format!(
                 "invalid workflow node kind: {value}. allowed values: \
@@ -913,9 +869,7 @@ fn parse_node_kind(value: &str) -> Result<SessionWorkflowNodeKind, McpError> {
     }
 }
 
-fn parse_requirement(
-    value: &str
-) -> Result<SessionWorkflowNodeRequirement, McpError> {
+fn parse_requirement(value: &str) -> Result<SessionWorkflowNodeRequirement, McpError> {
     match value {
         "required" => Ok(SessionWorkflowNodeRequirement::Required),
         "optional" => Ok(SessionWorkflowNodeRequirement::Optional),
@@ -944,13 +898,10 @@ fn parse_edge_kind(value: &str) -> Result<SessionWorkflowEdgeKind, McpError> {
     }
 }
 
-fn parse_node_status(
-    value: &str
-) -> Result<SessionWorkflowNodeStatus, McpError> {
+fn parse_node_status(value: &str) -> Result<SessionWorkflowNodeStatus, McpError> {
     match value {
         "pending" => Ok(SessionWorkflowNodeStatus::Pending),
-        "in-progress" | "in_progress" =>
-            Ok(SessionWorkflowNodeStatus::InProgress),
+        "in-progress" | "in_progress" => Ok(SessionWorkflowNodeStatus::InProgress),
         "blocked" => Ok(SessionWorkflowNodeStatus::Blocked),
         "done" => Ok(SessionWorkflowNodeStatus::Done),
         "deferred" => Ok(SessionWorkflowNodeStatus::Deferred),
@@ -965,15 +916,8 @@ fn parse_node_status(
     }
 }
 
-fn indexed_mcp_error(
-    collection: &str,
-    index: usize,
-    error: McpError,
-) -> McpError {
-    McpError::invalid_params(
-        format!("{collection}[{index}]: {}", error.message),
-        None,
-    )
+fn indexed_mcp_error(collection: &str, index: usize, error: McpError) -> McpError {
+    McpError::invalid_params(format!("{collection}[{index}]: {}", error.message), None)
 }
 
 /// Build the self-describing session capability catalog.
@@ -1113,10 +1057,7 @@ impl SessionServer {
     ) -> Result<CallToolResult, McpError> {
         let result = self
             .config_for_workspace(&input.workspace)?
-            .resume_workspace_context(
-                &input.session_id,
-                &input.predecessor_run_id,
-            )
+            .resume_workspace_context(&input.session_id, &input.predecessor_run_id)
             .map_err(Self::session_err)?;
         let handle = result.context.session_id.clone();
         Self::json_result_with_handle(&handle, &result)
@@ -1184,10 +1125,7 @@ impl SessionServer {
             .config_for_workspace(&input.workspace)?
             .render_pinned_rule_instructions(&input.session_id)
             .map_err(Self::session_err)?;
-        Self::json_result_with_handle(
-            &input.session_id,
-            &serde_json::json!({"render": render}),
-        )
+        Self::json_result_with_handle(&input.session_id, &serde_json::json!({"render": render}))
     }
 
     #[tool(
@@ -1239,12 +1177,10 @@ impl SessionServer {
             .map(|(index, node)| {
                 Ok(SessionWorkflowNodeDraft {
                     node_id: node.node_id,
-                    kind: parse_node_kind(&node.kind).map_err(|error| {
-                        indexed_mcp_error("nodes", index, error)
-                    })?,
-                    requirement: parse_requirement(&node.requirement).map_err(
-                        |error| indexed_mcp_error("nodes", index, error),
-                    )?,
+                    kind: parse_node_kind(&node.kind)
+                        .map_err(|error| indexed_mcp_error("nodes", index, error))?,
+                    requirement: parse_requirement(&node.requirement)
+                        .map_err(|error| indexed_mcp_error("nodes", index, error))?,
                     title: node.title,
                     ticket_urn: node.ticket_urn,
                     spec_urn: node.spec_urn,
@@ -1298,9 +1234,8 @@ impl SessionServer {
                 Ok(SessionWorkflowEdge {
                     from: edge.from,
                     to: edge.to,
-                    kind: parse_edge_kind(&edge.kind).map_err(|error| {
-                        indexed_mcp_error("edges", index, error)
-                    })?,
+                    kind: parse_edge_kind(&edge.kind)
+                        .map_err(|error| indexed_mcp_error("edges", index, error))?,
                 })
             })
             .collect::<Result<Vec<_>, McpError>>()?;
@@ -1419,10 +1354,7 @@ impl SessionServer {
             .config_for_workspace(&input.workspace)?
             .workflow_render_terminal(&input.session_id, None)
             .map_err(Self::session_err)?;
-        Self::json_result_with_handle(
-            &input.session_id,
-            &serde_json::json!({"render": render}),
-        )
+        Self::json_result_with_handle(&input.session_id, &serde_json::json!({"render": render}))
     }
 
     #[tool(
@@ -1437,10 +1369,7 @@ impl SessionServer {
             .config_for_workspace(&input.workspace)?
             .workflow_render_mermaid(&input.session_id, None)
             .map_err(Self::session_err)?;
-        Self::json_result_with_handle(
-            &input.session_id,
-            &serde_json::json!({"render": render}),
-        )
+        Self::json_result_with_handle(&input.session_id, &serde_json::json!({"render": render}))
     }
 
     #[tool(
@@ -1465,17 +1394,9 @@ impl SessionServer {
         {
             Some(SessionHandoffPackage {
                 objective: input.objective,
-                target_tickets: input
-                    .target_tickets
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
+                target_tickets: input.target_tickets.into_iter().map(Into::into).collect(),
                 higher_level_objective: input.higher_level_objective,
-                upward_context: input
-                    .upward_context
-                    .into_iter()
-                    .map(Into::into)
-                    .collect(),
+                upward_context: input.upward_context.into_iter().map(Into::into).collect(),
                 target_files: input.target_files,
                 decisions: input.decisions,
                 non_goals: input.non_goals,
@@ -1671,7 +1592,7 @@ impl SessionServer {
                     ),
                     None,
                 ));
-            },
+            }
         };
         let sessions = self
             .config()
@@ -1758,10 +1679,7 @@ impl SessionServer {
         &self,
         Parameters(input): Parameters<GrantCreateInput>,
     ) -> Result<CallToolResult, McpError> {
-        use session_api::{
-            BudgetGrantScope,
-            create_grant,
-        };
+        use session_api::{BudgetGrantScope, create_grant};
 
         let scope = match input.scope.to_lowercase().as_str() {
             "session" => BudgetGrantScope::Session,
@@ -1774,7 +1692,7 @@ impl SessionServer {
                     ),
                     None,
                 ));
-            },
+            }
         };
 
         let grant = create_grant(
@@ -1835,10 +1753,7 @@ impl SessionServer {
         &self,
         Parameters(input): Parameters<EscalationCreateInput>,
     ) -> Result<CallToolResult, McpError> {
-        use session_api::{
-            create_escalation,
-            escalation_marker,
-        };
+        use session_api::{create_escalation, escalation_marker};
 
         let escalation = create_escalation(
             &self.config_for_workspace(&input.workspace)?,
@@ -1852,16 +1767,13 @@ impl SessionServer {
         .map_err(Self::session_err)?;
 
         // Include the marker in the response
-        let mut result = serde_json::to_value(&escalation).map_err(|e| {
-            McpError::internal_error(format!("serialization: {e}"), None)
-        })?;
+        let mut result = serde_json::to_value(&escalation)
+            .map_err(|e| McpError::internal_error(format!("serialization: {e}"), None))?;
 
         if let Some(obj) = result.as_object_mut() {
             obj.insert(
                 "marker".to_string(),
-                serde_json::Value::String(escalation_marker(
-                    &escalation.escalation_id,
-                )),
+                serde_json::Value::String(escalation_marker(&escalation.escalation_id)),
             );
         }
 
@@ -1876,10 +1788,7 @@ impl SessionServer {
         &self,
         Parameters(input): Parameters<EscalationListInput>,
     ) -> Result<CallToolResult, McpError> {
-        use session_api::{
-            EscalationStatus,
-            list_escalations,
-        };
+        use session_api::{EscalationStatus, list_escalations};
 
         let status_filter = if let Some(status_str) = input.status {
             match status_str.to_lowercase().as_str() {
@@ -1893,17 +1802,15 @@ impl SessionServer {
                         ),
                         None,
                     ));
-                },
+                }
             }
         } else {
             None
         };
 
-        let escalations = list_escalations(
-            &self.config_for_workspace(&input.workspace)?,
-            status_filter,
-        )
-        .map_err(Self::session_err)?;
+        let escalations =
+            list_escalations(&self.config_for_workspace(&input.workspace)?, status_filter)
+                .map_err(Self::session_err)?;
 
         Self::json_result(&escalations)
     }
@@ -1941,11 +1848,7 @@ impl SessionServer {
         Parameters(input): Parameters<EscalationResolveInput>,
     ) -> Result<CallToolResult, McpError> {
         use chrono::Utc;
-        use session_api::{
-            EscalationAction,
-            EscalationResolution,
-            resolve_escalation,
-        };
+        use session_api::{EscalationAction, EscalationResolution, resolve_escalation};
 
         let action = match input.action.to_lowercase().as_str() {
             "handled" => EscalationAction::Handled,
@@ -1960,7 +1863,7 @@ impl SessionServer {
                     ),
                     None,
                 ));
-            },
+            }
         };
 
         let resolution = EscalationResolution {
@@ -1990,30 +1893,21 @@ impl SessionServer {
         Parameters(input): Parameters<SessionMoveInput>,
     ) -> Result<CallToolResult, McpError> {
         let session_id = input.id.parse::<Uuid>().map_err(|error| {
-            McpError::invalid_params(
-                format!("invalid session UUID: {error}"),
-                None,
-            )
+            McpError::invalid_params(format!("invalid session UUID: {error}"), None)
         })?;
         let target_selector =
-            workspace::normalize_explicit_workspace_selector(Some(
-                &input.to_workspace_root,
-            ))
+            workspace::normalize_explicit_workspace_selector(Some(&input.to_workspace_root))
+                .map_err(|error| McpError::invalid_params(error.to_string(), None))?;
+        let target_workspace_root = workspace::canonicalize_workspace_root_strict(&target_selector)
             .map_err(|error| {
-                McpError::invalid_params(error.to_string(), None)
+                McpError::invalid_params(
+                    format!(
+                        "workspace root canonicalization failed for '{}': {error}",
+                        input.to_workspace_root
+                    ),
+                    None,
+                )
             })?;
-        let target_workspace_root = workspace::canonicalize_workspace_root_strict(
-            &target_selector,
-        )
-        .map_err(|error| {
-            McpError::invalid_params(
-                format!(
-                    "workspace root canonicalization failed for '{}': {error}",
-                    input.to_workspace_root
-                ),
-                None,
-            )
-        })?;
         let report = self
             .config()
             .plan_move_preflight(&session_id, &target_workspace_root)
@@ -2038,30 +1932,21 @@ impl SessionServer {
         Parameters(input): Parameters<SessionMoveInput>,
     ) -> Result<CallToolResult, McpError> {
         let session_id = input.id.parse::<Uuid>().map_err(|error| {
-            McpError::invalid_params(
-                format!("invalid session UUID: {error}"),
-                None,
-            )
+            McpError::invalid_params(format!("invalid session UUID: {error}"), None)
         })?;
         let target_selector =
-            workspace::normalize_explicit_workspace_selector(Some(
-                &input.to_workspace_root,
-            ))
+            workspace::normalize_explicit_workspace_selector(Some(&input.to_workspace_root))
+                .map_err(|error| McpError::invalid_params(error.to_string(), None))?;
+        let target_workspace_root = workspace::canonicalize_workspace_root_strict(&target_selector)
             .map_err(|error| {
-                McpError::invalid_params(error.to_string(), None)
+                McpError::invalid_params(
+                    format!(
+                        "workspace root canonicalization failed for '{}': {error}",
+                        input.to_workspace_root
+                    ),
+                    None,
+                )
             })?;
-        let target_workspace_root = workspace::canonicalize_workspace_root_strict(
-            &target_selector,
-        )
-        .map_err(|error| {
-            McpError::invalid_params(
-                format!(
-                    "workspace root canonicalization failed for '{}': {error}",
-                    input.to_workspace_root
-                ),
-                None,
-            )
-        })?;
         let report = self
             .config()
             .plan_move_preflight(&session_id, &target_workspace_root)
@@ -2097,10 +1982,7 @@ impl SessionServer {
         Parameters(input): Parameters<SessionMoveJournalInput>,
     ) -> Result<CallToolResult, McpError> {
         let journal = input.id.parse::<Uuid>().map_err(|error| {
-            McpError::invalid_params(
-                format!("invalid journal id: {error}"),
-                None,
-            )
+            McpError::invalid_params(format!("invalid journal id: {error}"), None)
         })?;
         let outcome = self
             .config()
@@ -2126,10 +2008,7 @@ impl SessionServer {
         Parameters(input): Parameters<SessionMoveJournalInput>,
     ) -> Result<CallToolResult, McpError> {
         let journal = input.id.parse::<Uuid>().map_err(|error| {
-            McpError::invalid_params(
-                format!("invalid journal id: {error}"),
-                None,
-            )
+            McpError::invalid_params(format!("invalid journal id: {error}"), None)
         })?;
         let outcome = self
             .config()
@@ -2175,9 +2054,7 @@ pub async fn run_mcp_server(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let server = SessionServer::new(store_root);
 
-    tracing::info!(
-        "Starting session-mcp server on stdio (direct store access)"
-    );
+    tracing::info!("Starting session-mcp server on stdio (direct store access)");
 
     let service = server.serve(stdio()).await.inspect_err(|err| {
         eprintln!("Server error: {err:?}");
@@ -2192,11 +2069,7 @@ mod tests {
     use chrono::Utc;
     use serde_json::Value;
     use session_api::{
-        CopilotHookMessage,
-        CopilotHookPayload,
-        SessionCaptureRequest,
-        SessionError,
-        SessionRole,
+        CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest, SessionError, SessionRole,
         SessionStoreConfig,
     };
     use std::process::Command;
@@ -2204,11 +2077,7 @@ mod tests {
 
     use super::*;
 
-    fn seed(
-        config: &SessionStoreConfig,
-        session_id: &str,
-        agent: &str,
-    ) {
+    fn seed(config: &SessionStoreConfig, session_id: &str, agent: &str) {
         let payload = CopilotHookPayload {
             session_id: session_id.to_string(),
             workspace_path: "default".to_string(),
@@ -2253,8 +2122,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store_root = dir.path().join(".session");
         let worktree = dir.path().join("wt");
-        let server =
-            SessionServer::new(store_root.clone());
+        let server = SessionServer::new(store_root.clone());
 
         let receipt = server
             .session_check_in(Parameters(CheckInInput {
@@ -2381,9 +2249,7 @@ mod tests {
                 target_tickets: vec![],
                 higher_level_objective: String::new(),
                 upward_context: vec![],
-                target_files: vec![
-                    "handoff-fixtures/assigned-only.txt".to_string(),
-                ],
+                target_files: vec!["handoff-fixtures/assigned-only.txt".to_string()],
                 decisions: vec![],
                 non_goals: vec![],
                 context_anchors: vec![],
@@ -2405,8 +2271,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let store_root = dir.path().join(".session");
         let worktree = dir.path().join("wt");
-        let server =
-            SessionServer::new(store_root.clone());
+        let server = SessionServer::new(store_root.clone());
 
         server
             .session_check_in(Parameters(CheckInInput {
@@ -2455,16 +2320,13 @@ mod tests {
         let config = SessionStoreConfig::new(&session_root);
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
-                session_id: Some(
-                    "11111111-1111-4111-8111-111111111111".to_string(),
-                ),
+                session_id: Some("11111111-1111-4111-8111-111111111111".to_string()),
                 predecessor_run_id: None,
                 force_new_run: false,
             })
             .expect("init runtime");
         let mut rule_store =
-            rule_api::RuleStore::open_or_init(&dir.path().join(".rule"))
-                .expect("rule store");
+            rule_api::RuleStore::open_or_init(&dir.path().join(".rule")).expect("rule store");
         let rule = rule_api::RuleManifest::new(
             "session/mcp/render",
             "MCP render",
@@ -2575,10 +2437,7 @@ mod tests {
         let source_store_root = repo_root.join(".workflow-tools/session");
         std::fs::create_dir_all(&source_store_root).unwrap();
         let target_workspace_root = repo_root.join("target-workspace");
-        std::fs::create_dir_all(
-            target_workspace_root.join(".workflow-tools/session"),
-        )
-            .unwrap();
+        std::fs::create_dir_all(target_workspace_root.join(".workflow-tools/session")).unwrap();
 
         let session_id = "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71";
         let config = SessionStoreConfig::new(source_store_root.clone());
@@ -2588,9 +2447,7 @@ mod tests {
         let preflight = server
             .session_move_preflight(Parameters(SessionMoveInput {
                 id: session_id.to_string(),
-                to_workspace_root: target_workspace_root
-                    .to_string_lossy()
-                    .to_string(),
+                to_workspace_root: target_workspace_root.to_string_lossy().to_string(),
             }))
             .await
             .expect("move preflight");
@@ -2602,9 +2459,7 @@ mod tests {
         let apply = server
             .session_move_apply(Parameters(SessionMoveInput {
                 id: session_id.to_string(),
-                to_workspace_root: target_workspace_root
-                    .to_string_lossy()
-                    .to_string(),
+                to_workspace_root: target_workspace_root.to_string_lossy().to_string(),
             }))
             .await
             .expect("move apply");
@@ -2613,9 +2468,8 @@ mod tests {
         assert_eq!(apply_json["mode"], "apply");
         assert!(apply_json["outcome"]["journal"]["id"].is_string());
 
-        let target_config = SessionStoreConfig::new(
-            target_workspace_root.join(".workflow-tools/session"),
-        );
+        let target_config =
+            SessionStoreConfig::new(target_workspace_root.join(".workflow-tools/session"));
         assert!(matches!(
             config.read_session(session_id),
             Err(SessionError::NotFound { .. })
@@ -2637,7 +2491,12 @@ mod tests {
                 id: "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71".to_string(),
                 to_workspace_root: selector.to_string(),
             };
-            assert!(server.session_move_preflight(Parameters(input)).await.is_err());
+            assert!(
+                server
+                    .session_move_preflight(Parameters(input))
+                    .await
+                    .is_err()
+            );
 
             let input = SessionMoveInput {
                 id: "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71".to_string(),
@@ -2670,16 +2529,12 @@ mod tests {
 
     #[test]
     fn workflow_edge_and_status_schemas_advertise_enums() {
-        let edge = serde_json::to_string(&rmcp::schemars::schema_for!(
-            WorkflowAddEdgeInput
-        ))
-        .unwrap();
+        let edge =
+            serde_json::to_string(&rmcp::schemars::schema_for!(WorkflowAddEdgeInput)).unwrap();
         assert!(edge.contains("\"depends-on\"") && edge.contains("\"order\""));
 
-        let status = serde_json::to_string(&rmcp::schemars::schema_for!(
-            WorkflowSetStatusInput
-        ))
-        .unwrap();
+        let status =
+            serde_json::to_string(&rmcp::schemars::schema_for!(WorkflowSetStatusInput)).unwrap();
         for value in ["pending", "in-progress", "blocked", "done", "deferred"] {
             assert!(
                 status.contains(&format!("\"{value}\"")),
@@ -2771,8 +2626,7 @@ mod tests {
             .await
             .expect("runtime init");
         let payload = extract_json(result);
-        let handle =
-            payload["session_id"].as_str().expect("top-line session_id");
+        let handle = payload["session_id"].as_str().expect("top-line session_id");
         assert!(!handle.is_empty());
         // The handle matches the nested context handle (no drift).
         assert_eq!(payload["context"]["session_id"].as_str(), Some(handle));
@@ -2808,9 +2662,7 @@ mod tests {
         let config = server.config_for_workspace(&workspace).unwrap();
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
-                session_id: Some(
-                    "33333333-3333-4333-8333-333333333333".to_string(),
-                ),
+                session_id: Some("33333333-3333-4333-8333-333333333333".to_string()),
                 predecessor_run_id: None,
                 force_new_run: false,
             })
@@ -2877,10 +2729,7 @@ mod tests {
             .session_workflow_add_edges(Parameters(WorkflowAddEdgesInput {
                 workspace: workspace.clone(),
                 session_id: session_id.clone(),
-                edges: vec![
-                    edge("a", "b", "depends-on"),
-                    edge("b", "a", "related-to"),
-                ],
+                edges: vec![edge("a", "b", "depends-on"), edge("b", "a", "related-to")],
             }))
             .await
             .unwrap_err();
@@ -2899,10 +2748,7 @@ mod tests {
             .session_workflow_add_edges(Parameters(WorkflowAddEdgesInput {
                 workspace,
                 session_id,
-                edges: vec![
-                    edge("a", "b", "depends-on"),
-                    edge("b", "a", "order"),
-                ],
+                edges: vec![edge("a", "b", "depends-on"), edge("b", "a", "order")],
             }))
             .await
             .unwrap();
@@ -2935,8 +2781,7 @@ mod tests {
         let steps = catalog["lifecycle"]["steps"]
             .as_array()
             .expect("lifecycle steps");
-        let tools: Vec<&str> =
-            steps.iter().filter_map(|s| s["tool"].as_str()).collect();
+        let tools: Vec<&str> = steps.iter().filter_map(|s| s["tool"].as_str()).collect();
         for expected in [
             "session_runtime_init",
             "session_workflow_add_node",
@@ -2952,8 +2797,7 @@ mod tests {
         let behavioral = catalog["enums"]["workflow_node_kind"]["behavioral"]
             .as_array()
             .expect("behavioral kinds");
-        let behavioral: Vec<&str> =
-            behavioral.iter().filter_map(|v| v.as_str()).collect();
+        let behavioral: Vec<&str> = behavioral.iter().filter_map(|v| v.as_str()).collect();
         assert!(behavioral.contains(&"ticket"));
         assert!(behavioral.contains(&"validation"));
         assert!(behavioral.contains(&"spec"));
@@ -2970,9 +2814,7 @@ mod tests {
                 "error should mention 'invalid workspace selector': {err_msg}"
             );
             assert!(
-                err_msg.contains(
-                    "entity creation requires an explicit workspace path"
-                ),
+                err_msg.contains("entity creation requires an explicit workspace path"),
                 "error should state the requirement: {err_msg}"
             );
         }
@@ -3027,7 +2869,8 @@ mod tests {
                 .join("sessions")
                 .join(SESSION_ID)
                 .join("session.json");
-            let context: Value = serde_json::from_slice(&std::fs::read(context_path).unwrap()).unwrap();
+            let context: Value =
+                serde_json::from_slice(&std::fs::read(context_path).unwrap()).unwrap();
             assert_eq!(context["session_id"], SESSION_ID);
             assert!(!parent.join(".workflow-tools/session").exists());
             assert!(!sibling.join(".workflow-tools/session").exists());
@@ -3036,7 +2879,10 @@ mod tests {
 
         let selected = std::env::current_dir().unwrap();
         let server = SessionServer::new(
-            selected.parent().unwrap().join("sibling/.workflow-tools/session"),
+            selected
+                .parent()
+                .unwrap()
+                .join("sibling/.workflow-tools/session"),
         );
         let result = server
             .session_runtime_init(Parameters(RuntimeInitInput {

@@ -1,37 +1,20 @@
 use std::{
     fs,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
     time::Duration,
 };
 
 use serde_json::Value;
 
-use git2::{
-    Config,
-    Repository,
-    Status,
-    StatusOptions,
-};
+use git2::{Config, Repository, Status, StatusOptions};
 use thiserror::Error;
 
 pub mod policy;
 
 pub use policy::{
-    NeverActive,
-    ProvisionError,
-    ProvisionOutcome,
-    ProvisionPolicy,
-    ReclaimEligibility,
-    ReclaimRejectionReason,
-    SessionActivity,
-    SessionStoreActivity,
-    WorktreeOwnership,
-    evaluate_reclaim_candidate,
-    provision_for_session,
-    reclaim_candidates,
+    NeverActive, ProvisionError, ProvisionOutcome, ProvisionPolicy, ReclaimEligibility,
+    ReclaimRejectionReason, SessionActivity, SessionStoreActivity, WorktreeOwnership,
+    evaluate_reclaim_candidate, provision_for_session, reclaim_candidates,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,20 +119,14 @@ pub enum WorktreeGitError {
 }
 
 impl WorktreeGit {
-    pub fn open(
-        main_checkout: impl Into<PathBuf>
-    ) -> Result<Self, WorktreeGitError> {
+    pub fn open(main_checkout: impl Into<PathBuf>) -> Result<Self, WorktreeGitError> {
         let supplied = main_checkout.into();
-        let main_checkout = fs::canonicalize(&supplied).map_err(|source| {
-            WorktreeGitError::Io {
-                path: supplied,
-                source,
-            }
+        let main_checkout = fs::canonicalize(&supplied).map_err(|source| WorktreeGitError::Io {
+            path: supplied,
+            source,
         })?;
-        Repository::open(&main_checkout).map_err(|_| {
-            WorktreeGitError::InvalidMainCheckout {
-                path: main_checkout.clone(),
-            }
+        Repository::open(&main_checkout).map_err(|_| WorktreeGitError::InvalidMainCheckout {
+            path: main_checkout.clone(),
         })?;
         Ok(Self { main_checkout })
     }
@@ -163,12 +140,11 @@ impl WorktreeGit {
         let mut worktrees = Vec::new();
         for name in repository.worktrees()?.iter().flatten() {
             let worktree = repository.find_worktree(name)?;
-            let path = fs::canonicalize(worktree.path()).map_err(|source| {
-                WorktreeGitError::Io {
+            let path =
+                fs::canonicalize(worktree.path()).map_err(|source| WorktreeGitError::Io {
                     path: worktree.path().to_path_buf(),
                     source,
-                }
-            })?;
+                })?;
             let branch = branch_for_worktree(&path)?;
             worktrees.push(WorktreeRef {
                 name: path
@@ -184,23 +160,16 @@ impl WorktreeGit {
         Ok(worktrees)
     }
 
-    pub fn branch_exists(
-        &self,
-        branch: &str,
-    ) -> Result<bool, WorktreeGitError> {
+    pub fn branch_exists(&self, branch: &str) -> Result<bool, WorktreeGitError> {
         let repository = self.repository()?;
         match repository.find_branch(branch, git2::BranchType::Local) {
             Ok(_) => Ok(true),
-            Err(error) if error.code() == git2::ErrorCode::NotFound =>
-                Ok(false),
+            Err(error) if error.code() == git2::ErrorCode::NotFound => Ok(false),
             Err(source) => Err(source.into()),
         }
     }
 
-    pub fn is_dirty(
-        &self,
-        worktree: &Path,
-    ) -> Result<bool, WorktreeGitError> {
+    pub fn is_dirty(&self, worktree: &Path) -> Result<bool, WorktreeGitError> {
         let repository = Repository::open(worktree)?;
         let mut options = StatusOptions::new();
         options.include_untracked(true).recurse_untracked_dirs(true);
@@ -213,10 +182,7 @@ impl WorktreeGit {
             }))
     }
 
-    pub fn dirty_paths(
-        &self,
-        worktree: &Path,
-    ) -> Result<Vec<DirtyPath>, WorktreeGitError> {
+    pub fn dirty_paths(&self, worktree: &Path) -> Result<Vec<DirtyPath>, WorktreeGitError> {
         let repository = Repository::open(worktree)?;
         let mut options = StatusOptions::new();
         options.include_untracked(true).recurse_untracked_dirs(true);
@@ -225,17 +191,15 @@ impl WorktreeGit {
             .iter()
             .filter_map(|entry| {
                 let status = entry.status();
-                if status == Status::CURRENT || status.contains(Status::IGNORED)
-                {
+                if status == Status::CURRENT || status.contains(Status::IGNORED) {
                     return None;
                 }
                 let path = entry.path()?;
-                let kind =
-                    if status.intersects(Status::INDEX_NEW | Status::WT_NEW) {
-                        DirtyPathKind::Untracked
-                    } else {
-                        DirtyPathKind::Tracked
-                    };
+                let kind = if status.intersects(Status::INDEX_NEW | Status::WT_NEW) {
+                    DirtyPathKind::Untracked
+                } else {
+                    DirtyPathKind::Tracked
+                };
                 Some(DirtyPath {
                     path: PathBuf::from(path),
                     kind,
@@ -254,11 +218,9 @@ impl WorktreeGit {
         worktree: &Path,
         owner_session_id: &str,
     ) -> Result<bool, WorktreeGitError> {
-        let Some(expected) = owned_session_directory(
-            self.main_checkout(),
-            worktree,
-            owner_session_id,
-        ) else {
+        let Some(expected) =
+            owned_session_directory(self.main_checkout(), worktree, owner_session_id)
+        else {
             return Ok(false);
         };
         let record = worktree.join(&expected).join("session.json");
@@ -266,18 +228,19 @@ impl WorktreeGit {
             Ok(text) => text,
             Err(_) => return Ok(false),
         };
-        let recorded_owner =
-            serde_json::from_str::<Value>(&record_text).ok().and_then(
-                |value| value.get("session_id")?.as_str().map(str::to_owned),
-            );
+        let recorded_owner = serde_json::from_str::<Value>(&record_text)
+            .ok()
+            .and_then(|value| value.get("session_id")?.as_str().map(str::to_owned));
         if recorded_owner.as_deref() != Some(owner_session_id) {
             return Ok(false);
         }
 
         let dirty = self.dirty_paths(worktree)?;
-        if dirty.is_empty() || dirty.iter().any(|path| {
-            !path.path.starts_with(&expected) && !expected.starts_with(&path.path)
-        }) {
+        if dirty.is_empty()
+            || dirty
+                .iter()
+                .any(|path| !path.path.starts_with(&expected) && !expected.starts_with(&path.path))
+        {
             return Ok(false);
         }
 
@@ -302,10 +265,7 @@ impl WorktreeGit {
         worktree: &Path,
         owner_session_id: &str,
     ) -> Result<bool, WorktreeGitError> {
-        let expected = existing_session_directory(
-            &self.main_checkout,
-            owner_session_id,
-        );
+        let expected = existing_session_directory(&self.main_checkout, owner_session_id);
         let record = expected.join("session.json");
         if !session_record_matches_owner(&record, owner_session_id, worktree) {
             return Ok(false);
@@ -314,9 +274,10 @@ impl WorktreeGit {
             .strip_prefix(&self.main_checkout)
             .unwrap_or(&expected);
         let dirty = self.dirty_paths(&self.main_checkout)?;
-        if !dirty.iter().any(|path| {
-            path.path.starts_with(relative) || relative.starts_with(&path.path)
-        }) {
+        if !dirty
+            .iter()
+            .any(|path| path.path.starts_with(relative) || relative.starts_with(&path.path))
+        {
             return Ok(false);
         }
 
@@ -333,30 +294,22 @@ impl WorktreeGit {
         worktree: &Path,
         owner_session_id: &str,
     ) -> Result<bool, WorktreeGitError> {
-        const CHECKPOINT_MESSAGE: &str =
-            "worktree-ctl checkpoint owned session record";
-        let Some(expected) = owned_session_directory(
-            self.main_checkout(),
-            worktree,
-            owner_session_id,
-        ) else {
+        const CHECKPOINT_MESSAGE: &str = "worktree-ctl checkpoint owned session record";
+        let Some(expected) =
+            owned_session_directory(self.main_checkout(), worktree, owner_session_id)
+        else {
             return Ok(false);
         };
         let repository = Repository::open(worktree)?;
         let head = repository.head()?.peel_to_commit()?;
-        if head.message().map(str::trim_end) != Some(CHECKPOINT_MESSAGE)
-            || head.parent_count() != 1
+        if head.message().map(str::trim_end) != Some(CHECKPOINT_MESSAGE) || head.parent_count() != 1
         {
             return Ok(false);
         }
         let parent = head.parent(0)?;
         let parent_tree = parent.tree()?;
         let head_tree = head.tree()?;
-        let diff = repository.diff_tree_to_tree(
-            Some(&parent_tree),
-            Some(&head_tree),
-            None,
-        )?;
+        let diff = repository.diff_tree_to_tree(Some(&parent_tree), Some(&head_tree), None)?;
         Ok(diff.deltas().all(|delta| {
             delta
                 .new_file()
@@ -366,20 +319,11 @@ impl WorktreeGit {
         }) && diff.deltas().len() != 0)
     }
 
-    pub fn stash_push(
-        &self,
-        message: &str,
-    ) -> Result<(), WorktreeGitError> {
-        subprocess::run_arguments(
-            &self.main_checkout,
-            ["stash", "push", "-m", message],
-        )
+    pub fn stash_push(&self, message: &str) -> Result<(), WorktreeGitError> {
+        subprocess::run_arguments(&self.main_checkout, ["stash", "push", "-m", message])
     }
 
-    pub fn stash_contains_message(
-        &self,
-        message: &str,
-    ) -> Result<bool, WorktreeGitError> {
+    pub fn stash_contains_message(&self, message: &str) -> Result<bool, WorktreeGitError> {
         let mut repository = self.repository()?;
         let mut found = false;
         repository.stash_foreach(|_, stash_message, _| {
@@ -434,17 +378,10 @@ impl WorktreeGit {
         worktree: &Path,
         sha: &str,
     ) -> Result<(), WorktreeGitError> {
-        submodule_worktree_add_detached_at(
-            &self.main_checkout.join(submodule_path),
-            worktree,
-            sha,
-        )
+        submodule_worktree_add_detached_at(&self.main_checkout.join(submodule_path), worktree, sha)
     }
 
-    pub fn worktree_remove_force(
-        &self,
-        path: &Path,
-    ) -> Result<(), WorktreeGitError> {
+    pub fn worktree_remove_force(&self, path: &Path) -> Result<(), WorktreeGitError> {
         subprocess::run(
             &self.main_checkout,
             ["worktree", "remove", "--force"],
@@ -456,11 +393,7 @@ impl WorktreeGit {
         subprocess::run(&self.main_checkout, ["worktree", "prune"], [])
     }
 
-    pub fn worktree_move(
-        &self,
-        from: &Path,
-        to: &Path,
-    ) -> Result<(), WorktreeGitError> {
+    pub fn worktree_move(&self, from: &Path, to: &Path) -> Result<(), WorktreeGitError> {
         if to.exists() {
             return Err(WorktreeGitError::Io {
                 path: to.to_path_buf(),
@@ -481,19 +414,11 @@ impl WorktreeGit {
         Ok(())
     }
 
-    pub fn branch_rename(
-        &self,
-        old: &str,
-        new: &str,
-    ) -> Result<(), WorktreeGitError> {
+    pub fn branch_rename(&self, old: &str, new: &str) -> Result<(), WorktreeGitError> {
         subprocess::run(&self.main_checkout, ["branch", "-m", old, new], [])
     }
 
-    pub fn branch_delete(
-        &self,
-        branch: &str,
-        force: bool,
-    ) -> Result<(), WorktreeGitError> {
+    pub fn branch_delete(&self, branch: &str, force: bool) -> Result<(), WorktreeGitError> {
         let flag = if force { "-D" } else { "-d" };
         subprocess::run(&self.main_checkout, ["branch", flag, branch], [])
     }
@@ -520,22 +445,18 @@ impl WorktreeGit {
             .expect("validated worktree path has a UTF-8 final component");
         let path = self.main_checkout.join(".worktrees").join(relative_path);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|source| {
-                WorktreeGitError::Io {
-                    path: parent.to_path_buf(),
-                    source,
-                }
+            fs::create_dir_all(parent).map_err(|source| WorktreeGitError::Io {
+                path: parent.to_path_buf(),
+                source,
             })?;
         }
         self.worktree_add_new_branch(&path, branch, base)?;
         let result = self.populate_submodules_offline(&path).and_then(|_| {
             Ok(WorktreeRef {
                 name: name.to_string(),
-                path: fs::canonicalize(&path).map_err(|source| {
-                    WorktreeGitError::Io {
-                        path: path.clone(),
-                        source,
-                    }
+                path: fs::canonicalize(&path).map_err(|source| WorktreeGitError::Io {
+                    path: path.clone(),
+                    source,
                 })?,
                 branch: Some(branch.to_string()),
             })
@@ -562,32 +483,28 @@ impl WorktreeGit {
             .ok_or_else(|| WorktreeGitError::WorktreeNotFound {
                 name: old_name.to_string(),
             })?;
-        let old_branch =
-            old.branch
-                .ok_or_else(|| WorktreeGitError::DetachedWorktree {
-                    name: old_name.to_string(),
-                })?;
+        let old_branch = old
+            .branch
+            .ok_or_else(|| WorktreeGitError::DetachedWorktree {
+                name: old_name.to_string(),
+            })?;
         let new_path = self
             .main_checkout
             .join(".worktrees")
             .join(new_relative_path);
         if let Some(parent) = new_path.parent() {
-            fs::create_dir_all(parent).map_err(|source| {
-                WorktreeGitError::Io {
-                    path: parent.to_path_buf(),
-                    source,
-                }
+            fs::create_dir_all(parent).map_err(|source| WorktreeGitError::Io {
+                path: parent.to_path_buf(),
+                source,
             })?;
         }
         self.worktree_move(&old.path, &new_path)?;
         self.branch_rename(&old_branch, new_branch)?;
         Ok(WorktreeRef {
             name: new_name.to_string(),
-            path: fs::canonicalize(&new_path).map_err(|source| {
-                WorktreeGitError::Io {
-                    path: new_path,
-                    source,
-                }
+            path: fs::canonicalize(&new_path).map_err(|source| WorktreeGitError::Io {
+                path: new_path,
+                source,
             })?,
             branch: Some(new_branch.to_string()),
         })
@@ -597,15 +514,8 @@ impl WorktreeGit {
         Ok(Repository::open(&self.main_checkout)?)
     }
 
-    fn repair_worktree(
-        &self,
-        worktree: &Path,
-    ) -> Result<(), WorktreeGitError> {
-        subprocess::run(
-            &self.main_checkout,
-            ["worktree", "repair"],
-            [worktree],
-        )?;
+    fn repair_worktree(&self, worktree: &Path) -> Result<(), WorktreeGitError> {
+        subprocess::run(&self.main_checkout, ["worktree", "repair"], [worktree])?;
         for submodule in self.submodule_paths()? {
             let nested_worktree = worktree.join(&submodule);
             if nested_worktree.exists() {
@@ -619,11 +529,7 @@ impl WorktreeGit {
         Ok(())
     }
 
-    fn verify_worktree_move(
-        &self,
-        from: &Path,
-        to: &Path,
-    ) -> Result<(), WorktreeGitError> {
+    fn verify_worktree_move(&self, from: &Path, to: &Path) -> Result<(), WorktreeGitError> {
         subprocess::run(to, ["rev-parse", "--git-dir"], [])?;
         let worktrees = self.list_worktrees()?;
         if worktrees
@@ -646,8 +552,7 @@ impl WorktreeGit {
         to: &Path,
         original: WorktreeGitError,
     ) -> WorktreeGitError {
-        let rollback = relocate_directory(to, from)
-            .and_then(|_| self.repair_worktree(from));
+        let rollback = relocate_directory(to, from).and_then(|_| self.repair_worktree(from));
         match rollback {
             Ok(()) => original,
             Err(rollback) => WorktreeGitError::MoveRollbackFailed {
@@ -659,10 +564,7 @@ impl WorktreeGit {
         }
     }
 
-    fn populate_submodules_offline(
-        &self,
-        worktree: &Path,
-    ) -> Result<(), WorktreeGitError> {
+    fn populate_submodules_offline(&self, worktree: &Path) -> Result<(), WorktreeGitError> {
         populate_submodules_offline_at(&self.main_checkout, worktree)
     }
 
@@ -673,19 +575,14 @@ impl WorktreeGit {
         original: WorktreeGitError,
     ) -> WorktreeGitError {
         let mut failures = Vec::new();
-        remove_nested_submodule_worktrees_at(
-            &self.main_checkout,
-            path,
-            &mut failures,
-        );
+        remove_nested_submodule_worktrees_at(&self.main_checkout, path, &mut failures);
         if path.exists() && self.worktree_remove_force(path).is_err() {
             failures.push(format!("remove {}", path.display()));
         }
         if self.worktree_prune().is_err() {
             failures.push("prune worktrees".to_string());
         }
-        if self.branch_exists(branch).unwrap_or(false)
-            && self.branch_delete(branch, true).is_err()
+        if self.branch_exists(branch).unwrap_or(false) && self.branch_delete(branch, true).is_err()
         {
             failures.push(format!("delete branch {branch}"));
         }
@@ -728,10 +625,7 @@ fn submodule_paths_at(checkout: &Path) -> Result<Vec<String>, WorktreeGitError> 
     Ok(paths)
 }
 
-fn gitlink_sha_at(
-    worktree: &Path,
-    submodule_path: &str,
-) -> Result<String, WorktreeGitError> {
+fn gitlink_sha_at(worktree: &Path, submodule_path: &str) -> Result<String, WorktreeGitError> {
     let repository = Repository::open(worktree)?;
     let tree = repository.head()?.peel_to_commit()?.tree()?;
     Ok(tree.get_path(Path::new(submodule_path))?.id().to_string())
@@ -840,16 +734,11 @@ fn rebuild_ticket_index(store_root: &Path) -> IndexRebuildOutcome {
         return IndexRebuildOutcome::Skipped {
             store: EntityStore::Ticket,
             elapsed: started.elapsed(),
-            reason: format!(
-                "ticket store is absent at {}",
-                store_root.display()
-            ),
+            reason: format!("ticket store is absent at {}", store_root.display()),
         };
     }
 
-    match ticket_api::storage::TicketStore::init(store_root)
-        .and_then(|store| store.scan(true))
-    {
+    match ticket_api::storage::TicketStore::init(store_root).and_then(|store| store.scan(true)) {
         Ok(_) => IndexRebuildOutcome::Rebuilt {
             store: EntityStore::Ticket,
             elapsed: started.elapsed(),
@@ -872,9 +761,7 @@ fn rebuild_spec_index(store_root: &Path) -> IndexRebuildOutcome {
         };
     }
 
-    match spec_api::SpecStore::init(store_root)
-        .and_then(|mut store| store.scan(true))
-    {
+    match spec_api::SpecStore::init(store_root).and_then(|mut store| store.scan(true)) {
         Ok(_) => IndexRebuildOutcome::Rebuilt {
             store: EntityStore::Spec,
             elapsed: started.elapsed(),
@@ -896,14 +783,12 @@ fn validate_name(name: &str) -> Result<(), WorktreeGitError> {
     Ok(())
 }
 
-fn validate_relative_worktree_path(
-    path: &Path
-) -> Result<(), WorktreeGitError> {
+fn validate_relative_worktree_path(path: &Path) -> Result<(), WorktreeGitError> {
     if path.as_os_str().is_empty()
         || path.is_absolute()
-        || path.components().any(|component| {
-            matches!(component, std::path::Component::ParentDir)
-        })
+        || path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
     {
         return Err(WorktreeGitError::InvalidWorktreeName {
             name: path.display().to_string(),
@@ -912,9 +797,7 @@ fn validate_relative_worktree_path(
     Ok(())
 }
 
-fn branch_for_worktree(
-    path: &Path
-) -> Result<Option<String>, WorktreeGitError> {
+fn branch_for_worktree(path: &Path) -> Result<Option<String>, WorktreeGitError> {
     let repository = Repository::open(path)?;
     if repository.head_detached()? {
         return Ok(None);
@@ -923,10 +806,7 @@ fn branch_for_worktree(
     Ok(head.shorthand().map(str::to_string))
 }
 
-fn relocate_directory(
-    from: &Path,
-    to: &Path,
-) -> Result<(), WorktreeGitError> {
+fn relocate_directory(from: &Path, to: &Path) -> Result<(), WorktreeGitError> {
     match fs::rename(from, to) {
         Ok(()) => Ok(()),
         Err(source) if source.kind() == std::io::ErrorKind::CrossesDevices => {
@@ -937,14 +817,12 @@ fn relocate_directory(
                     source,
                 }
             })?;
-            fs::remove_dir_all(from).map_err(|source| {
-                WorktreeGitError::MoveFallback {
-                    from: from.to_path_buf(),
-                    to: to.to_path_buf(),
-                    source,
-                }
+            fs::remove_dir_all(from).map_err(|source| WorktreeGitError::MoveFallback {
+                from: from.to_path_buf(),
+                to: to.to_path_buf(),
+                source,
             })
-        },
+        }
         Err(source) => Err(WorktreeGitError::Io {
             path: from.to_path_buf(),
             source,
@@ -952,10 +830,7 @@ fn relocate_directory(
     }
 }
 
-fn copy_directory_recursively(
-    from: &Path,
-    to: &Path,
-) -> Result<(), std::io::Error> {
+fn copy_directory_recursively(from: &Path, to: &Path) -> Result<(), std::io::Error> {
     fs::create_dir(to)?;
     for entry in fs::read_dir(from)? {
         let entry = entry?;
@@ -974,18 +849,12 @@ fn copy_directory_recursively(
 }
 
 #[cfg(unix)]
-fn copy_symlink(
-    source: &Path,
-    destination: &Path,
-) -> Result<(), std::io::Error> {
+fn copy_symlink(source: &Path, destination: &Path) -> Result<(), std::io::Error> {
     std::os::unix::fs::symlink(fs::read_link(source)?, destination)
 }
 
 #[cfg(windows)]
-fn copy_symlink(
-    source: &Path,
-    destination: &Path,
-) -> Result<(), std::io::Error> {
+fn copy_symlink(source: &Path, destination: &Path) -> Result<(), std::io::Error> {
     let target = fs::read_link(source)?;
     if fs::metadata(source)?.is_dir() {
         std::os::windows::fs::symlink_dir(target, destination)
@@ -994,10 +863,7 @@ fn copy_symlink(
     }
 }
 
-fn paths_equal(
-    left: &Path,
-    right: &Path,
-) -> bool {
+fn paths_equal(left: &Path, right: &Path) -> bool {
     let normalize = |path: &Path| {
         fs::canonicalize(path)
             .unwrap_or_else(|_| path.to_path_buf())
@@ -1022,8 +888,7 @@ fn owned_session_directory(
     if components.next().is_some() || session_id != owner_session_id {
         return None;
     }
-    let canonical = PathBuf::from(".workflow-tools/session/sessions")
-        .join(owner_session_id);
+    let canonical = PathBuf::from(".workflow-tools/session/sessions").join(owner_session_id);
     let legacy = PathBuf::from(".session/sessions").join(owner_session_id);
     Some(if worktree.join(&canonical).exists() {
         canonical
@@ -1032,10 +897,7 @@ fn owned_session_directory(
     })
 }
 
-fn existing_session_directory(
-    workspace: &Path,
-    session_id: &str,
-) -> PathBuf {
+fn existing_session_directory(workspace: &Path, session_id: &str) -> PathBuf {
     let canonical = workspace
         .join(".workflow-tools/session/sessions")
         .join(session_id);
@@ -1046,11 +908,7 @@ fn existing_session_directory(
     }
 }
 
-fn session_record_matches_owner(
-    record: &Path,
-    owner_session_id: &str,
-    worktree: &Path,
-) -> bool {
+fn session_record_matches_owner(record: &Path, owner_session_id: &str, worktree: &Path) -> bool {
     let Ok(record) = fs::read_to_string(record) else {
         return false;
     };
@@ -1074,11 +932,7 @@ fn session_record_matches_owner(
 /// with a filesystem relocation followed by Git's documented `worktree repair`.
 /// Do not migrate these commands to git2: reads belong to git2, these writes do not.
 mod subprocess {
-    use std::{
-        ffi::OsString,
-        path::Path,
-        process::Command,
-    };
+    use std::{ffi::OsString, path::Path, process::Command};
 
     use super::WorktreeGitError;
 
@@ -1092,20 +946,17 @@ mod subprocess {
         command.args(arguments);
         command.args(paths.into_iter().map(git_path));
         let rendered = render(&command);
-        let output =
-            command.output().map_err(|source| WorktreeGitError::Io {
-                path: directory.to_path_buf(),
-                source,
-            })?;
+        let output = command.output().map_err(|source| WorktreeGitError::Io {
+            path: directory.to_path_buf(),
+            source,
+        })?;
         if output.status.success() {
             Ok(())
         } else {
             Err(WorktreeGitError::CommandFailed {
                 command: rendered,
                 status: output.status,
-                stderr: String::from_utf8_lossy(&output.stderr)
-                    .trim()
-                    .to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
             })
         }
     }
@@ -1118,20 +969,17 @@ mod subprocess {
         command.arg("-C").arg(git_path(directory));
         command.args(arguments);
         let rendered = render(&command);
-        let output =
-            command.output().map_err(|source| WorktreeGitError::Io {
-                path: directory.to_path_buf(),
-                source,
-            })?;
+        let output = command.output().map_err(|source| WorktreeGitError::Io {
+            path: directory.to_path_buf(),
+            source,
+        })?;
         if output.status.success() {
             Ok(())
         } else {
             Err(WorktreeGitError::CommandFailed {
                 command: rendered,
                 status: output.status,
-                stderr: String::from_utf8_lossy(&output.stderr)
-                    .trim()
-                    .to_string(),
+                stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
             })
         }
     }
@@ -1153,17 +1001,9 @@ mod subprocess {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::{
-        fs,
-        path::Path,
-        process::Command,
-    };
+    use std::{fs, path::Path, process::Command};
 
-    use git2::{
-        IndexAddOption,
-        Repository,
-        Signature,
-    };
+    use git2::{IndexAddOption, Repository, Signature};
     use tempfile::TempDir;
 
     use super::WorktreeGit;
@@ -1192,10 +1032,7 @@ pub(crate) mod tests {
             self.add_submodule_named("nested")
         }
 
-        fn add_submodule_named(
-            &self,
-            name: &str,
-        ) -> String {
+        fn add_submodule_named(&self, name: &str) -> String {
             let inner = self.temp.path().join("inner");
             let repository = Repository::open(&inner).unwrap_or_else(|_| {
                 let repository = Repository::init(&inner).unwrap();
@@ -1220,10 +1057,7 @@ pub(crate) mod tests {
         }
     }
 
-    fn command<const N: usize>(
-        directory: &Path,
-        arguments: [&str; N],
-    ) {
+    fn command<const N: usize>(directory: &Path, arguments: [&str; N]) {
         let output = Command::new("git")
             .arg("-C")
             .arg(directory)
@@ -1237,10 +1071,7 @@ pub(crate) mod tests {
         );
     }
 
-    fn commit_all(
-        repository: &Repository,
-        message: &str,
-    ) {
+    fn commit_all(repository: &Repository, message: &str) {
         let mut index = repository.index().unwrap();
         index
             .add_all(["*"].iter(), IndexAddOption::DEFAULT, None)
@@ -1288,8 +1119,7 @@ pub(crate) mod tests {
     fn dirty_and_ahead_behind_report_worktree_state() {
         let fixture = Fixture::new();
         let git = fixture.git();
-        let worktree =
-            git.create_worktree("one", "session-one", "HEAD").unwrap();
+        let worktree = git.create_worktree("one", "session-one", "HEAD").unwrap();
         assert!(!git.is_dirty(&worktree.path).unwrap());
         fs::write(worktree.path.join("untracked.txt"), "untracked\n").unwrap();
         assert!(git.is_dirty(&worktree.path).unwrap());
@@ -1391,8 +1221,7 @@ pub(crate) mod tests {
     fn worktree_move_repairs_a_worktree_containing_a_submodule() {
         let fixture = Fixture::new();
         fixture.add_submodule();
-        fs::write(fixture.main.join(".git/info/exclude"), "marker.txt\n")
-            .unwrap();
+        fs::write(fixture.main.join(".git/info/exclude"), "marker.txt\n").unwrap();
         let git = fixture.git();
         let old = git.create_worktree("old", "session-old", "HEAD").unwrap();
         fs::write(old.path.join("marker.txt"), "keep\n").unwrap();
@@ -1466,8 +1295,7 @@ pub(crate) mod tests {
     fn remove_and_prune_clear_worktree_registration() {
         let fixture = Fixture::new();
         let git = fixture.git();
-        let worktree =
-            git.create_worktree("one", "session-one", "HEAD").unwrap();
+        let worktree = git.create_worktree("one", "session-one", "HEAD").unwrap();
         git.worktree_remove_force(&worktree.path).unwrap();
         git.worktree_prune().unwrap();
         assert!(git.list_worktrees().unwrap().is_empty());

@@ -128,9 +128,7 @@ impl Gate {
 
         let rollup = rollup_path
             .and_then(|p| std::fs::read_to_string(p).ok())
-            .and_then(|text| {
-                serde_json::from_str::<ToolMetricsRollup>(&text).ok()
-            });
+            .and_then(|text| serde_json::from_str::<ToolMetricsRollup>(&text).ok());
 
         Ok(Self::new(table.models, calibration, rollup, grants_dir))
     }
@@ -140,10 +138,7 @@ impl Gate {
     /// substring match on `provider_id`/`model_id`, taking the **maximum**
     /// price among matches so an ambiguous id is never cheaper than its most
     /// expensive variant. `None` when nothing matches.
-    pub fn resolve_output_mtok(
-        &self,
-        model: &str,
-    ) -> Option<f64> {
+    pub fn resolve_output_mtok(&self, model: &str) -> Option<f64> {
         let low = model.to_lowercase();
 
         let exact_max = self
@@ -167,17 +162,13 @@ impl Gate {
     }
 
     /// True when `model` resolves to a price-table entry via [`resolve_output_mtok`].
-    pub fn resolves(
-        &self,
-        model: &str,
-    ) -> bool {
+    pub fn resolves(&self, model: &str) -> bool {
         self.resolve_output_mtok(model).is_some()
     }
 
     /// Compact, sorted, deduplicated list of known `model_id`s, for rejection guidance.
     pub fn available_model_ids(&self) -> Vec<String> {
-        let mut ids: Vec<String> =
-            self.models.iter().map(|r| r.model_id.clone()).collect();
+        let mut ids: Vec<String> = self.models.iter().map(|r| r.model_id.clone()).collect();
         ids.sort();
         ids.dedup();
         ids
@@ -185,10 +176,7 @@ impl Gate {
 
     /// Compute base_budget from model's output_mtok using linear inverse mapping.
     /// Returns a value in [0, scale_max]. Unknown model → 0 (conservative).
-    pub fn base_budget(
-        &self,
-        model: &str,
-    ) -> u32 {
+    pub fn base_budget(&self, model: &str) -> u32 {
         let Some(out) = self.resolve_output_mtok(model) else {
             return 0;
         };
@@ -198,10 +186,7 @@ impl Gate {
     }
 
     /// Resolve tool cost from empirical rollup. Fail open (return 0) for unmeasured tools.
-    fn tool_cost(
-        &self,
-        tool: &str,
-    ) -> u32 {
+    fn tool_cost(&self, tool: &str) -> u32 {
         let Some(rollup) = &self.rollup else {
             return 0;
         };
@@ -209,9 +194,7 @@ impl Gate {
 
         // Try exact match first (case-insensitive)
         let exact_match = rollup.report.tools.iter().find(|t| {
-            t.tool_name.to_lowercase() == tool_low
-                && t.call_count >= MIN_CALLS
-                && t.cost.is_some()
+            t.tool_name.to_lowercase() == tool_low && t.call_count >= MIN_CALLS && t.cost.is_some()
         });
         if let Some(entry) = exact_match {
             return entry.cost.unwrap_or(0);
@@ -236,11 +219,7 @@ impl Gate {
     }
 
     /// Load grant offset from grants_dir/<grant_id>.json. Returns 0 on any error.
-    fn load_grant_offset(
-        &self,
-        grant_id: &str,
-        model: &str,
-    ) -> u32 {
+    fn load_grant_offset(&self, grant_id: &str, model: &str) -> u32 {
         let Some(dir) = &self.grants_dir else {
             return 0;
         };
@@ -253,8 +232,7 @@ impl Gate {
         };
         // Check expiry (RFC3339)
         if let Some(expires) = &grant.expires_at {
-            if let Ok(exp_time) = chrono::DateTime::parse_from_rfc3339(expires)
-            {
+            if let Ok(exp_time) = chrono::DateTime::parse_from_rfc3339(expires) {
                 if exp_time < chrono::Utc::now() {
                     return 0;
                 }
@@ -270,10 +248,7 @@ impl Gate {
     }
 
     /// True when `output_mtok` is strictly greater than the threshold (legacy).
-    pub fn is_orchestrator(
-        &self,
-        output_mtok: f64,
-    ) -> bool {
+    pub fn is_orchestrator(&self, output_mtok: f64) -> bool {
         output_mtok > DEFAULT_THRESHOLD_X
     }
 
@@ -282,21 +257,13 @@ impl Gate {
     /// * Compute: base_budget, tool_cost, offset.
     /// * effective = base_budget + offset (capped at 2*scale_max).
     /// * Allow if cost <= effective; else Delegate with guidance.
-    pub fn evaluate(
-        &self,
-        model: &str,
-        tool: &str,
-        grant_id: Option<&str>,
-    ) -> Decision {
+    pub fn evaluate(&self, model: &str, tool: &str, grant_id: Option<&str>) -> Decision {
         // Reject an unresolvable caller_model before any budget math. An unknown
         // id must never fall through to a zero budget: that silently disables
         // price-awareness enforcement instead of surfacing the mistake.
         if self.resolve_output_mtok(model).is_none() {
             return Decision::Reject {
-                guidance: unknown_model_guidance(
-                    model,
-                    &self.available_model_ids(),
-                ),
+                guidance: unknown_model_guidance(model, &self.available_model_ids()),
             };
         }
         let tool_cost = self.tool_cost(tool);
@@ -304,8 +271,7 @@ impl Gate {
             return Decision::Allow;
         }
         let base = self.base_budget(model);
-        let offset =
-            grant_id.map_or(0, |gid| self.load_grant_offset(gid, model));
+        let offset = grant_id.map_or(0, |gid| self.load_grant_offset(gid, model));
         let effective = (base + offset).min(2 * self.calibration.scale_max);
         if tool_cost <= effective {
             Decision::Allow
@@ -322,19 +288,12 @@ impl Gate {
     }
 
     /// Legacy evaluate without grant_id (for backward compatibility).
-    pub fn evaluate_legacy(
-        &self,
-        model: &str,
-        tool: &str,
-    ) -> Decision {
+    pub fn evaluate_legacy(&self, model: &str, tool: &str) -> Decision {
         self.evaluate(model, tool, None)
     }
 }
 
-fn fold_max(
-    acc: Option<f64>,
-    v: f64,
-) -> Option<f64> {
+fn fold_max(acc: Option<f64>, v: f64) -> Option<f64> {
     Some(match acc {
         Some(a) if a >= v => a,
         _ => v,
@@ -346,10 +305,7 @@ fn fold_max(
 /// parenthetical qualifier stripped; spaces/underscores folded to hyphens).
 /// `available` is the compact list of known `model_id`s, sourced from
 /// [`Gate::available_model_ids`].
-pub fn unknown_model_guidance(
-    model: &str,
-    available: &[String],
-) -> String {
+pub fn unknown_model_guidance(model: &str, available: &[String]) -> String {
     let sample = if available.is_empty() {
         "(no models loaded)".to_string()
     } else {
@@ -375,11 +331,7 @@ pub fn unknown_model_guidance(
 
 /// Delegation guidance returned when an orchestrator-tier model calls a
 /// token-heavy tool.
-pub fn delegation_guidance(
-    model: &str,
-    tool: &str,
-    x: f64,
-) -> String {
+pub fn delegation_guidance(model: &str, tool: &str, x: f64) -> String {
     format!(
         "Model '{model}' exceeds the orchestrator threshold (output_mtok > {x} \
          USD/1M). Do not call the token-heavy tool '{tool}' directly. Delegate \
@@ -623,8 +575,7 @@ mod tests {
     fn evaluate_graded_with_offset() {
         let tmp = tempfile::tempdir().unwrap();
         let grant_path = tmp.path().join("boost.json");
-        std::fs::write(&grant_path, r#"{"grant_id":"boost","offset":30}"#)
-            .unwrap();
+        std::fs::write(&grant_path, r#"{"grant_id":"boost","offset":30}"#).unwrap();
 
         let rollup = ToolMetricsRollup {
             report: ToolMetricsReport {

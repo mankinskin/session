@@ -1,104 +1,45 @@
 use std::{
-    collections::{
-        BTreeMap,
-        BTreeSet,
-    },
+    collections::{BTreeMap, BTreeSet},
     fs,
     io::ErrorKind,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
 };
 use uuid::Uuid;
 
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-    de::DeserializeOwned,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use crate::{
-    CopilotHookPayload,
-    HandoffBacklogFilter,
-    SESSION_SCHEMA_VERSION,
-    SessionAuditReport,
-    SessionAuditSelector,
-    SessionCaptureRequest,
-    SessionError,
-    SessionFinishRecord,
-    SessionFinishResult,
-    SessionHandoffPackage,
-    SessionHandoffRecord,
-    SessionHandoffResult,
-    SessionLinks,
-    SessionMetadata,
-    SessionPinFeedbackSink,
-    SessionPinnedEntity,
-    SessionPinnedEntityHeader,
-    SessionPinnedEntityKind,
-    SessionRecord,
-    SessionRunLineage,
-    SessionRuntimeContext,
-    SessionRuntimeInitRequest,
-    SessionRuntimeInitResult,
-    SessionRuntimeView,
-    SessionTerminalCreateRequest,
-    SessionTerminalEvent,
-    SessionTerminalManifest,
-    SessionTerminalPeekResult,
-    SessionTerminalRecord,
-    SessionTerminalStatus,
-    SessionTicketStateResolver,
-    SessionTurn,
-    SessionValidationGate,
-    SessionWorkflowDiagnostic,
-    SessionWorkflowEdge,
-    SessionWorkflowEdgeKind,
-    SessionWorkflowNode,
-    SessionWorkflowNodeDraft,
-    SessionWorkflowNodeResolution,
-    SessionWorkflowNodeStatus,
-    SessionWorkflowSnapshot,
-    SessionWorktreeAllocationMode,
-    SessionWorktreeAssignment,
-    SessionWorktreeStatus,
+    CopilotHookPayload, HandoffBacklogFilter, SESSION_SCHEMA_VERSION, SessionAuditReport,
+    SessionAuditSelector, SessionCaptureRequest, SessionError, SessionFinishRecord,
+    SessionFinishResult, SessionHandoffPackage, SessionHandoffRecord, SessionHandoffResult,
+    SessionLinks, SessionMetadata, SessionPinFeedbackSink, SessionPinnedEntity,
+    SessionPinnedEntityHeader, SessionPinnedEntityKind, SessionRecord, SessionRunLineage,
+    SessionRuntimeContext, SessionRuntimeInitRequest, SessionRuntimeInitResult, SessionRuntimeView,
+    SessionTerminalCreateRequest, SessionTerminalEvent, SessionTerminalManifest,
+    SessionTerminalPeekResult, SessionTerminalRecord, SessionTerminalStatus,
+    SessionTicketStateResolver, SessionTurn, SessionValidationGate, SessionWorkflowDiagnostic,
+    SessionWorkflowEdge, SessionWorkflowEdgeKind, SessionWorkflowNode, SessionWorkflowNodeDraft,
+    SessionWorkflowNodeResolution, SessionWorkflowNodeStatus, SessionWorkflowSnapshot,
+    SessionWorktreeAllocationMode, SessionWorktreeAssignment, SessionWorktreeStatus,
     audit::build_session_audit_report,
     hook::{
-        CopilotHookEvent,
-        ToolResponseOverride,
-        copilot_payload_from_transcript_path,
+        CopilotHookEvent, ToolResponseOverride, copilot_payload_from_transcript_path,
         copilot_payload_from_transcript_path_with_tool_response_override,
     },
     peek::{
-        PromptPackOptions,
-        SessionPromptPack,
-        SessionSkeleton,
-        SessionTurnRange,
-        peek_prompt_pack,
-        peek_skeleton,
-        peek_turn_range,
+        PromptPackOptions, SessionPromptPack, SessionSkeleton, SessionTurnRange, peek_prompt_pack,
+        peek_skeleton, peek_turn_range,
     },
     validate_workflow_graph,
 };
 use rule_api::RuleStore;
 use spec_api::SpecStore;
-use test_api::{
-    ExecutionQuery,
-    TestStoreConfig,
-    ValidationOutcome,
-};
+use test_api::{ExecutionQuery, TestStoreConfig, ValidationOutcome};
 use ticket_api::{
     model::parts::ViewProfile,
     query_helpers::resolve_uuid_with_prefix,
-    storage::{
-        ReadProjection,
-        TicketStore,
-    },
+    storage::{ReadProjection, TicketStore},
 };
 
 #[path = "store_persistence_types.rs"]
@@ -134,9 +75,7 @@ pub struct SessionQueryDiagnostic {
 
 /// Widening relation tiers for [`SessionStoreConfig::sessions_for_ticket`].
 /// Each tier includes every match from the tiers before it.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum RelationStrength {
     Strict,
@@ -249,15 +188,8 @@ pub(crate) use config::WorktreeCheckInFailurePoint;
 #[path = "store_routing_types.rs"]
 mod store_routing_types;
 use crate::SessionWorkflowGraph;
-pub use store_routing_types::{
-    SessionRuntimePaths,
-    SessionStorePaths,
-};
-use store_routing_types::{
-    parse_entity_urn,
-    parse_entity_urn_kind,
-    validate_session_id,
-};
+pub use store_routing_types::{SessionRuntimePaths, SessionStorePaths};
+use store_routing_types::{parse_entity_urn, parse_entity_urn_kind, validate_session_id};
 
 fn sibling_store_base(session_store_root: &Path) -> PathBuf {
     let is_legacy_session_store = session_store_root
@@ -283,15 +215,9 @@ fn sibling_store_base(session_store_root: &Path) -> PathBuf {
     }
 }
 
-fn sibling_store_root(
-    session_store_root: &Path,
-    sibling_store_dir: &str,
-) -> PathBuf {
+fn sibling_store_root(session_store_root: &Path, sibling_store_dir: &str) -> PathBuf {
     let workspace = sibling_store_base(session_store_root);
-    memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
-        &workspace,
-        sibling_store_dir,
-    )
+    memory_kernel::workspace::resolve_store_root_at_fixed_workspace(&workspace, sibling_store_dir)
 }
 
 /// Resolves a URN workspace slug to a sibling store root. The literal slug
@@ -327,10 +253,12 @@ fn resolve_workspace_store_root(
         ));
     }
     let workspace_root = sibling_store_base(session_store_root).join(workspace.as_ref());
-    Ok(memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
-        &workspace_root,
-        sibling_store_dir,
-    ))
+    Ok(
+        memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
+            &workspace_root,
+            sibling_store_dir,
+        ),
+    )
 }
 
 /// RAII guard that releases the runtime mutation lock on drop.
@@ -415,8 +343,7 @@ impl DefaultTicketStateResolver {
             // the session's own store is expected to already exist (or be
             // absent, in which case sessions with no spec nodes never pay
             // the open cost until a spec URN actually needs resolving).
-            let store =
-                SpecStore::open(&root).map_err(|error| error.to_string())?;
+            let store = SpecStore::open(&root).map_err(|error| error.to_string())?;
             stores.insert(root.clone(), store);
         }
         f(stores.get(&root).expect("just inserted"))
@@ -424,19 +351,13 @@ impl DefaultTicketStateResolver {
 }
 
 impl SessionTicketStateResolver for DefaultTicketStateResolver {
-    fn resolve_ticket_state(
-        &self,
-        ticket_urn: &str,
-    ) -> Result<Option<String>, String> {
-        let parsed =
-            parse_entity_urn(ticket_urn).map_err(|error| error.to_string())?;
+    fn resolve_ticket_state(&self, ticket_urn: &str) -> Result<Option<String>, String> {
+        let parsed = parse_entity_urn(ticket_urn).map_err(|error| error.to_string())?;
         if parsed.kind != SessionPinnedEntityKind::Ticket {
             return Err(format!("not a ticket URN: {ticket_urn}"));
         }
-        let ticket_id =
-            Uuid::parse_str(&parsed.entity_id).map_err(|error| {
-                format!("invalid ticket id in URN {ticket_urn}: {error}")
-            })?;
+        let ticket_id = Uuid::parse_str(&parsed.entity_id)
+            .map_err(|error| format!("invalid ticket id in URN {ticket_urn}: {error}"))?;
         self.with_ticket_store(&parsed.workspace_path, |store| {
             match store
                 .get_indexed(&ticket_id)
@@ -451,12 +372,8 @@ impl SessionTicketStateResolver for DefaultTicketStateResolver {
         })
     }
 
-    fn resolve_spec_state(
-        &self,
-        spec_urn: &str,
-    ) -> Result<Option<String>, String> {
-        let parsed =
-            parse_entity_urn(spec_urn).map_err(|error| error.to_string())?;
+    fn resolve_spec_state(&self, spec_urn: &str) -> Result<Option<String>, String> {
+        let parsed = parse_entity_urn(spec_urn).map_err(|error| error.to_string())?;
         if parsed.kind != SessionPinnedEntityKind::Spec {
             return Err(format!("not a spec URN: {spec_urn}"));
         }
@@ -605,12 +522,7 @@ fn render_handoff_record_markdown(
                     .target_tickets
                     .iter()
                     .map(|ticket| {
-                        resolve_handoff_ticket_display(
-                            record,
-                            ticket,
-                            ticket_store,
-                        )
-                        .reference
+                        resolve_handoff_ticket_display(record, ticket, ticket_store).reference
                     })
                     .collect::<Vec<_>>()
                     .join(", "),
@@ -628,8 +540,7 @@ fn render_handoff_record_markdown(
     if !record.objective.is_empty() {
         sections.push(format!("- **Objective**: {}", record.objective));
     }
-    let implementation_ready =
-        !record.objective.is_empty() && record.open_escalations.is_empty();
+    let implementation_ready = !record.objective.is_empty() && record.open_escalations.is_empty();
     sections.push(format!(
         "- **Implementation Ready**: {}",
         implementation_ready
@@ -649,16 +560,12 @@ fn render_handoff_record_markdown(
         sections.push("| Ticket | What it does | Why |".to_string());
         sections.push("| --- | --- | --- |".to_string());
         for ticket in &record.target_tickets {
-            let display =
-                resolve_handoff_ticket_display(record, ticket, ticket_store);
+            let display = resolve_handoff_ticket_display(record, ticket, ticket_store);
             sections.push(format!(
                 "| {} | {} | {} |",
                 display.reference,
                 markdown_table_cell(&display.what),
-                markdown_table_cell(&linkify_handoff_prose(
-                    &ticket.why,
-                    ticket_store
-                )),
+                markdown_table_cell(&linkify_handoff_prose(&ticket.why, ticket_store)),
             ));
         }
         sections.push(String::new());
@@ -701,10 +608,7 @@ fn render_handoff_record_markdown(
     if !record.context_anchors.is_empty() {
         sections.push("## Context Anchors".to_string());
         for anchor in &record.context_anchors {
-            sections.push(format!(
-                "- {}",
-                linkify_handoff_prose(anchor, ticket_store)
-            ));
+            sections.push(format!("- {}", linkify_handoff_prose(anchor, ticket_store)));
         }
         sections.push(String::new());
     }
@@ -872,10 +776,7 @@ fn resolve_handoff_ticket(
     Some(ResolvedHandoffTicket { id, title, what })
 }
 
-fn handoff_ticket_reference(
-    ticket_id: &str,
-    title: &str,
-) -> String {
+fn handoff_ticket_reference(ticket_id: &str, title: &str) -> String {
     format!(
         "[{} {}](.ticket/tickets/{ticket_id}/ticket.toml)",
         ticket_id.chars().take(8).collect::<String>(),
@@ -883,9 +784,7 @@ fn handoff_ticket_reference(
     )
 }
 
-fn render_handoff_upward_context_entry(
-    entry: &crate::SessionHandoffUpwardContextEntry
-) -> String {
+fn render_handoff_upward_context_entry(entry: &crate::SessionHandoffUpwardContextEntry) -> String {
     let title = parse_entity_urn(&entry.entity_urn)
         .ok()
         .filter(|parsed| parsed.kind == SessionPinnedEntityKind::Ticket)
@@ -896,10 +795,7 @@ fn render_handoff_upward_context_entry(
 
 const MAX_HANDOFF_PROSE_TICKET_REFERENCES: usize = 128;
 
-fn linkify_handoff_prose(
-    value: &str,
-    ticket_store: Option<&TicketStore>,
-) -> String {
+fn linkify_handoff_prose(value: &str, ticket_store: Option<&TicketStore>) -> String {
     let Some(ticket_store) = ticket_store else {
         return value.to_string();
     };
@@ -953,14 +849,10 @@ fn linkify_handoff_prose_line(
         }
         if *replacements < MAX_HANDOFF_PROSE_TICKET_REFERENCES
             && let Some(ticket_id) = bare_ticket_id_at(line, index)
-            && let Some(resolved) =
-                resolve_handoff_ticket(ticket_store, ticket_id)
+            && let Some(resolved) = resolve_handoff_ticket(ticket_store, ticket_id)
             && let Some(title) = resolved.title
         {
-            output.push_str(&handoff_ticket_reference(
-                &resolved.id.to_string(),
-                &title,
-            ));
+            output.push_str(&handoff_ticket_reference(&resolved.id.to_string(), &title));
             index += ticket_id.len();
             *replacements += 1;
             continue;
@@ -972,10 +864,7 @@ fn linkify_handoff_prose_line(
     output
 }
 
-fn bare_ticket_id_at(
-    value: &str,
-    index: usize,
-) -> Option<&str> {
+fn bare_ticket_id_at(value: &str, index: usize) -> Option<&str> {
     let bytes = value.as_bytes();
     if index > 0 && is_ticket_id_word_byte(bytes[index - 1]) {
         return None;
@@ -983,9 +872,7 @@ fn bare_ticket_id_at(
     let remaining = &value[index..];
     let length = if remaining.len() >= 36 && is_uuid_token(&remaining[..36]) {
         36
-    } else if remaining.len() >= 8
-        && remaining[..8].bytes().all(|byte| byte.is_ascii_hexdigit())
-    {
+    } else if remaining.len() >= 8 && remaining[..8].bytes().all(|byte| byte.is_ascii_hexdigit()) {
         8
     } else {
         return None;
@@ -1022,9 +909,7 @@ fn sort_workflow_graph(graph: &mut crate::SessionWorkflowGraph) {
         left.from
             .cmp(&right.from)
             .then_with(|| left.to.cmp(&right.to))
-            .then_with(|| {
-                format!("{:?}", left.kind).cmp(&format!("{:?}", right.kind))
-            })
+            .then_with(|| format!("{:?}", left.kind).cmp(&format!("{:?}", right.kind)))
     });
 }
 
@@ -1130,15 +1015,11 @@ impl SessionStorePlan {
             .session_dir
             .parent()
             .and_then(Path::parent)
-            .ok_or_else(|| {
-                SessionError::InvalidStorePath(self.paths.session_dir.clone())
-            })?;
+            .ok_or_else(|| SessionError::InvalidStorePath(self.paths.session_dir.clone()))?;
         ensure_local_gitignore(store_root)?;
-        fs::create_dir_all(&self.paths.session_dir).map_err(|source| {
-            SessionError::Io {
-                path: self.paths.session_dir.clone(),
-                source,
-            }
+        fs::create_dir_all(&self.paths.session_dir).map_err(|source| SessionError::Io {
+            path: self.paths.session_dir.clone(),
+            source,
         })?;
 
         let manifest = merge_manifest(
@@ -1195,8 +1076,7 @@ impl SessionStorePlan {
         );
         // Create the sidecar lazily: a session with no observed tool call must
         // not leave an empty `tool-metrics.json` behind.
-        let tool_metrics_path =
-            self.paths.session_dir.join("tool-metrics.json");
+        let tool_metrics_path = self.paths.session_dir.join("tool-metrics.json");
         if summary.is_empty() {
             remove_file_if_exists(&tool_metrics_path)?;
         } else {

@@ -10,43 +10,20 @@
 
 use std::{
     collections::HashMap,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
     process::Stdio,
     sync::{
         Arc,
-        atomic::{
-            AtomicBool,
-            AtomicU64,
-            Ordering,
-        },
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Duration,
 };
 
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 use tokio::{
-    io::{
-        AsyncBufReadExt,
-        AsyncWriteExt,
-        BufReader,
-    },
-    process::{
-        Child,
-        ChildStdin,
-        ChildStdout,
-        Command,
-    },
-    sync::{
-        Mutex,
-        Notify,
-        RwLock,
-    },
+    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    process::{Child, ChildStdin, ChildStdout, Command},
+    sync::{Mutex, Notify, RwLock},
 };
 
 use crate::shadow;
@@ -119,10 +96,7 @@ struct ChildHandles {
 }
 
 impl ChildHandles {
-    async fn write_line(
-        &self,
-        line: &str,
-    ) -> bool {
+    async fn write_line(&self, line: &str) -> bool {
         let mut guard = self.stdin.lock().await;
         let Some(stdin) = guard.as_mut() else {
             return false;
@@ -145,7 +119,7 @@ impl ChildHandles {
                     }
                 }
                 Some(buf)
-            },
+            }
         }
     }
 
@@ -169,10 +143,7 @@ impl ChildHandles {
     }
 }
 
-fn resolve_shadow_exe(
-    command: &[String],
-    root: &Path,
-) -> (PathBuf, Option<PathBuf>) {
+fn resolve_shadow_exe(command: &[String], root: &Path) -> (PathBuf, Option<PathBuf>) {
     match shadow::resolve_canonical(&command[0]) {
         Ok(canonical) => match shadow::make_shadow_copy(&canonical, root) {
             Ok(shadow_exe) => (shadow_exe.clone(), Some(shadow_exe)),
@@ -182,7 +153,7 @@ fn resolve_shadow_exe(
                     canonical.display()
                 );
                 (canonical, None)
-            },
+            }
         },
         Err(e) => {
             eprintln!(
@@ -190,7 +161,7 @@ fn resolve_shadow_exe(
                 command[0]
             );
             (PathBuf::from(&command[0]), None)
-        },
+        }
     }
 }
 
@@ -215,10 +186,7 @@ fn spawn_exe(
     })
 }
 
-fn spawn_handles(
-    command: &[String],
-    root: &Path,
-) -> std::io::Result<ChildHandles> {
+fn spawn_handles(command: &[String], root: &Path) -> std::io::Result<ChildHandles> {
     let (exe, shadow_path) = resolve_shadow_exe(command, root);
     spawn_exe(&exe, &command[1..], shadow_path)
 }
@@ -233,10 +201,7 @@ fn spawn_handles(
 /// file. Left unguarded, a failed respawn attempt would overwrite the last
 /// known-good shadow copy with corrupt bytes before we could fall back to
 /// it, defeating R7. This snapshot is what makes the fallback durable.
-fn snapshot_last_known_good(
-    shadow_exe: &Path,
-    root: &Path,
-) -> std::io::Result<PathBuf> {
+fn snapshot_last_known_good(shadow_exe: &Path, root: &Path) -> std::io::Result<PathBuf> {
     let pid = std::process::id();
     let dir = root.join(format!("lastgood-{pid}"));
     std::fs::create_dir_all(&dir)?;
@@ -290,10 +255,7 @@ struct HandshakeCache {
 /// Compare `field` (`protocolVersion` / `capabilities` / `serverInfo`) of a
 /// new child's `initialize` result against the cached original baseline;
 /// log a warning per differing field. Divergence is never fatal (R5).
-fn log_capability_divergence(
-    original: Option<&Value>,
-    new_response: &Value,
-) {
+fn log_capability_divergence(original: Option<&Value>, new_response: &Value) {
     let Some(original) = original else {
         return;
     };
@@ -423,10 +385,7 @@ impl Supervisor {
     /// Record a client→server request id as in-flight, so that a swap
     /// occurring before its response arrives can synthesize a failure for it
     /// (R6). Notifications (no id, or a JSON `null` id) are not tracked.
-    pub async fn record_pending(
-        &self,
-        id: &Value,
-    ) {
+    pub async fn record_pending(&self, id: &Value) {
         if id.is_null() {
             return;
         }
@@ -435,10 +394,7 @@ impl Supervisor {
 
     /// Mark a request id as resolved (its response arrived from the child)
     /// so it is no longer a candidate for synthesized-error failure.
-    pub async fn resolve_pending(
-        &self,
-        id: &Value,
-    ) {
+    pub async fn resolve_pending(&self, id: &Value) {
         let mut pending = self.pending.lock().await;
         if pending.remove(&id_key(id)).is_some() {
             drop(pending);
@@ -449,20 +405,13 @@ impl Supervisor {
     /// If `id` is still pending, remove it and return a synthesized
     /// reload-interruption error for it regardless (used when a write to the
     /// child fails outright, e.g. no healthy child is currently running).
-    pub async fn synthesize_and_clear(
-        &self,
-        id: &Value,
-    ) -> Value {
+    pub async fn synthesize_and_clear(&self, id: &Value) -> Value {
         self.pending.lock().await.remove(&id_key(id));
         synthesize_error(id)
     }
 
-    async fn drain(
-        &self,
-        drain_ms: u64,
-    ) {
-        let deadline =
-            tokio::time::Instant::now() + Duration::from_millis(drain_ms);
+    async fn drain(&self, drain_ms: u64) {
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(drain_ms);
         loop {
             let notified = self.pending_notify.notified();
             if self.pending.lock().await.is_empty() {
@@ -494,10 +443,7 @@ impl Supervisor {
     /// request and `notifications/initialized` notification the first time
     /// each passes through, caching them verbatim for replay into future
     /// child generations.
-    pub async fn write_line(
-        &self,
-        line: &str,
-    ) -> bool {
+    pub async fn write_line(&self, line: &str) -> bool {
         self.maybe_cache_client_handshake(line).await;
         let handles = { self.current.read().await.clone() };
         match handles {
@@ -509,10 +455,7 @@ impl Supervisor {
     /// Cache `line` if it is the client's `initialize` request or
     /// `notifications/initialized` notification and one has not already
     /// been observed (first-observation-only, per R5: "cache verbatim").
-    async fn maybe_cache_client_handshake(
-        &self,
-        line: &str,
-    ) {
+    async fn maybe_cache_client_handshake(&self, line: &str) {
         let Ok(msg) = serde_json::from_str::<Value>(line) else {
             return;
         };
@@ -524,14 +467,14 @@ impl Supervisor {
                     hs.init_request_id = msg.get("id").cloned();
                     hs.init_request = Some(msg);
                 }
-            },
+            }
             "notifications/initialized" => {
                 let mut hs = self.handshake.lock().await;
                 if hs.initialized_notif.is_none() {
                     hs.initialized_notif = Some(msg);
                 }
-            },
-            _ => {},
+            }
+            _ => {}
         }
     }
 
@@ -565,7 +508,7 @@ impl Supervisor {
                     Some(l) => {
                         self.maybe_cache_original_response(&l).await;
                         return Some(l);
-                    },
+                    }
                     None => {
                         if self.shutting_down.load(Ordering::SeqCst) {
                             return None;
@@ -574,8 +517,7 @@ impl Supervisor {
                             "[mcp-toolmon] child exited unexpectedly (not a triggered swap); attempting automatic recovery"
                         );
                         self.throttle_crash_recovery().await;
-                        let synthesized =
-                            self.swap_child_with_drain_ms(0).await;
+                        let synthesized = self.swap_child_with_drain_ms(0).await;
                         if !synthesized.is_empty() {
                             let mut q = self.outgoing_queue.lock().await;
                             for err in synthesized {
@@ -585,14 +527,14 @@ impl Supervisor {
                             }
                         }
                         continue;
-                    },
+                    }
                 },
                 None => {
                     if self.shutting_down.load(Ordering::SeqCst) {
                         return None;
                     }
                     tokio::time::sleep(Duration::from_millis(50)).await;
-                },
+                }
             }
         }
     }
@@ -605,8 +547,7 @@ impl Supervisor {
         let should_cooldown = {
             let mut t = self.crash_throttle.lock().await;
             let now = tokio::time::Instant::now();
-            if now.duration_since(t.window_start)
-                > Duration::from_millis(CRASH_THROTTLE_WINDOW_MS)
+            if now.duration_since(t.window_start) > Duration::from_millis(CRASH_THROTTLE_WINDOW_MS)
             {
                 t.window_start = now;
                 t.count = 0;
@@ -618,10 +559,7 @@ impl Supervisor {
             eprintln!(
                 "[mcp-toolmon] child has crashed repeatedly within {CRASH_THROTTLE_WINDOW_MS}ms; throttling automatic recovery"
             );
-            tokio::time::sleep(Duration::from_millis(
-                CRASH_THROTTLE_COOLDOWN_MS,
-            ))
-            .await;
+            tokio::time::sleep(Duration::from_millis(CRASH_THROTTLE_COOLDOWN_MS)).await;
         }
     }
 
@@ -642,10 +580,7 @@ impl Supervisor {
     /// If `line` is a response whose id matches the cached `initialize`
     /// request id, and no baseline has been captured yet, cache it as the
     /// original-child baseline for future divergence comparisons.
-    async fn maybe_cache_original_response(
-        &self,
-        line: &str,
-    ) {
+    async fn maybe_cache_original_response(&self, line: &str) {
         let Ok(msg) = serde_json::from_str::<Value>(line) else {
             return;
         };
@@ -682,10 +617,7 @@ impl Supervisor {
     /// If no handshake has been observed yet (a swap raced ahead of the
     /// client's `initialize`), this is a clean no-op (R5 "swap before
     /// handshake" case) rather than sending a malformed replay.
-    async fn replay_handshake(
-        &self,
-        handles: &ChildHandles,
-    ) {
+    async fn replay_handshake(&self, handles: &ChildHandles) {
         let (init_request, initialized_notif, original_response) = {
             let hs = self.handshake.lock().await;
             (
@@ -705,36 +637,27 @@ impl Supervisor {
             return;
         };
         if !handles.write_line(&req_line).await {
-            eprintln!(
-                "[mcp-toolmon] handshake replay: failed to write initialize to new child"
-            );
+            eprintln!("[mcp-toolmon] handshake replay: failed to write initialize to new child");
             return;
         }
         match handles.read_line().await {
-            Some(resp_line) =>
-                match serde_json::from_str::<Value>(&resp_line) {
-                    Ok(resp) => {
-                        log_capability_divergence(
-                            original_response.as_ref(),
-                            &resp,
-                        );
-                        self.record_divergence(
-                            original_response.as_ref(),
-                            &resp,
-                        )
+            Some(resp_line) => match serde_json::from_str::<Value>(&resp_line) {
+                Ok(resp) => {
+                    log_capability_divergence(original_response.as_ref(), &resp);
+                    self.record_divergence(original_response.as_ref(), &resp)
                         .await;
-                    },
-                    Err(_) => {
-                        eprintln!(
-                            "[mcp-toolmon] handshake replay: new child's initialize response was not valid JSON"
-                        );
-                    },
-                },
+                }
+                Err(_) => {
+                    eprintln!(
+                        "[mcp-toolmon] handshake replay: new child's initialize response was not valid JSON"
+                    );
+                }
+            },
             None => {
                 eprintln!(
                     "[mcp-toolmon] handshake replay: new child closed stdout before responding to replayed initialize"
                 );
-            },
+            }
         }
 
         if let Some(notif) = initialized_notif {
@@ -747,11 +670,7 @@ impl Supervisor {
     /// Record divergence-log entries (test/observability hook; see
     /// `divergence_log` field doc) mirroring [`log_capability_divergence`]'s
     /// stderr output.
-    async fn record_divergence(
-        &self,
-        original: Option<&Value>,
-        new_response: &Value,
-    ) {
+    async fn record_divergence(&self, original: Option<&Value>, new_response: &Value) {
         let Some(original) = original else {
             return;
         };
@@ -795,10 +714,7 @@ impl Supervisor {
     /// Like [`Supervisor::swap_child`] but with an explicit drain window,
     /// bypassing `TOOLMON_DRAIN_MS` — used by tests to keep the drain bound
     /// tight without racing the env var across parallel test threads.
-    pub async fn swap_child_with_drain_ms(
-        &self,
-        drain_ms: u64,
-    ) -> Vec<Value> {
+    pub async fn swap_child_with_drain_ms(&self, drain_ms: u64) -> Vec<Value> {
         self.drain(drain_ms).await;
         let synthesized = self.fail_all_pending().await;
 
@@ -812,10 +728,7 @@ impl Supervisor {
         loop {
             match spawn_handles(&self.command, &self.shadow_root) {
                 Ok(handles) => {
-                    tokio::time::sleep(Duration::from_millis(
-                        LIVENESS_CHECK_MS,
-                    ))
-                    .await;
+                    tokio::time::sleep(Duration::from_millis(LIVENESS_CHECK_MS)).await;
                     if !handles.has_exited().await {
                         self.replay_handshake(&handles).await;
                         self.adopt_healthy(handles).await;
@@ -824,12 +737,10 @@ impl Supervisor {
                     eprintln!(
                         "[mcp-toolmon] respawned child exited immediately (attempt {attempt}); retrying"
                     );
-                },
+                }
                 Err(e) => {
-                    eprintln!(
-                        "[mcp-toolmon] respawn attempt {attempt} failed to spawn: {e}"
-                    );
-                },
+                    eprintln!("[mcp-toolmon] respawn attempt {attempt} failed to spawn: {e}");
+                }
             }
             self.retry_count.fetch_add(1, Ordering::SeqCst);
             attempt += 1;
@@ -851,12 +762,12 @@ impl Supervisor {
                     eprintln!(
                         "[mcp-toolmon] restored service from last-known-good shadow copy after {attempt} failed respawn attempt(s)"
                     );
-                },
+                }
                 Err(e) => {
                     eprintln!(
                         "[mcp-toolmon] last-known-good fallback spawn failed too ({e}); no healthy child until the next swap"
                     );
-                },
+                }
             }
         } else {
             eprintln!(
@@ -869,16 +780,12 @@ impl Supervisor {
         synthesized
     }
 
-    async fn adopt_healthy(
-        &self,
-        handles: ChildHandles,
-    ) {
+    async fn adopt_healthy(&self, handles: ChildHandles) {
         if let Some(p) = &handles.shadow_path {
             if let Some(dir) = p.parent() {
                 self.shadow_dirs.lock().await.push(dir.to_path_buf());
             }
-            if let Ok(snapshot) = snapshot_last_known_good(p, &self.shadow_root)
-            {
+            if let Ok(snapshot) = snapshot_last_known_good(p, &self.shadow_root) {
                 if let Some(dir) = snapshot.parent() {
                     self.shadow_dirs.lock().await.push(dir.to_path_buf());
                 }

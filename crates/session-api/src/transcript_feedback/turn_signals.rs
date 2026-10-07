@@ -1,21 +1,13 @@
-use crate::{
-    SessionRole,
-    SessionTurn,
-};
+use crate::{SessionRole, SessionTurn};
 
-use super::{
-    FeedbackSignalKind,
-    StructuredFeedbackSignal,
-};
+use super::{FeedbackSignalKind, StructuredFeedbackSignal};
 
 /// Extract structured feedback signals from a session's turns.
 ///
 /// This is a pure, side-effect-free classification over structured metadata.
 /// It performs no store writes and creates no tickets; callers decide how to
 /// act on the returned signals.
-pub fn mine_structured_feedback_signals(
-    turns: &[SessionTurn]
-) -> Vec<StructuredFeedbackSignal> {
+pub fn mine_structured_feedback_signals(turns: &[SessionTurn]) -> Vec<StructuredFeedbackSignal> {
     turns.iter().filter_map(detect_signal).collect()
 }
 

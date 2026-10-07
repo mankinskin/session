@@ -8,38 +8,18 @@
 
 use std::{
     fs,
-    io::{
-        BufRead,
-        BufReader,
-        Write,
-    },
-    path::{
-        Path,
-        PathBuf,
-    },
-    process::{
-        Command,
-        Stdio,
-    },
+    io::{BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::{
-        Arc,
-        Mutex,
-        atomic::{
-            AtomicBool,
-            Ordering,
-        },
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
     thread,
-    time::{
-        Duration,
-        Instant,
-    },
+    time::{Duration, Instant},
 };
 
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 
 fn get_binary_path() -> PathBuf {
@@ -58,10 +38,7 @@ fn canonical_exe_name() -> &'static str {
     }
 }
 
-fn write_exe(
-    path: &Path,
-    bytes: &[u8],
-) {
+fn write_exe(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
     #[cfg(unix)]
     {
@@ -89,21 +66,15 @@ fn spawn_collector(stdout: std::process::ChildStdout) -> Transcript {
                 Ok(0) | Err(_) => {
                     eof2.store(true, Ordering::SeqCst);
                     break;
-                },
-                Ok(_) =>
-                    lines2.lock().unwrap().push(line.trim_end().to_string()),
+                }
+                Ok(_) => lines2.lock().unwrap().push(line.trim_end().to_string()),
             }
         }
     });
     Transcript { lines, eof }
 }
 
-fn wait_until<F: Fn(&[String]) -> bool>(
-    t: &Transcript,
-    timeout: Duration,
-    msg: &str,
-    pred: F,
-) {
+fn wait_until<F: Fn(&[String]) -> bool>(t: &Transcript, timeout: Duration, msg: &str, pred: F) {
     let deadline = Instant::now() + timeout;
     loop {
         if pred(&t.lines.lock().unwrap()) {
@@ -123,10 +94,7 @@ fn parsed(lines: &[String]) -> Vec<Value> {
         .collect()
 }
 
-fn find_response(
-    lines: &[String],
-    id: i64,
-) -> Option<Value> {
+fn find_response(lines: &[String], id: i64) -> Option<Value> {
     parsed(lines)
         .into_iter()
         .find(|v| v.get("id").and_then(Value::as_i64) == Some(id))
@@ -135,10 +103,7 @@ fn find_response(
 /// Find the immediate child PID of `parent_pid` (the shadow-copied fake-mcp
 /// process mcp-toolmon spawned), retrying up to `timeout` since the spawn
 /// races the test's own polling.
-fn find_child_pid(
-    parent_pid: u32,
-    timeout: Duration,
-) -> Option<u32> {
+fn find_child_pid(parent_pid: u32, timeout: Duration) -> Option<u32> {
     let deadline = Instant::now() + timeout;
     loop {
         #[cfg(windows)]

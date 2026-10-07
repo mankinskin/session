@@ -6,16 +6,10 @@ use std::path::PathBuf;
 
 use toolmon_policy_api::Decision;
 
-use crate::gate::{
-    Gate,
-    ModelBudgetCalibration,
-};
+use crate::gate::{Gate, ModelBudgetCalibration};
 
 /// Parse a flag value: --flag <value>
-fn parse_flag<'a>(
-    argv: &'a [String],
-    flag: &str,
-) -> Option<&'a str> {
+fn parse_flag<'a>(argv: &'a [String], flag: &str) -> Option<&'a str> {
     argv.iter()
         .position(|arg| arg == flag)
         .and_then(|pos| argv.get(pos + 1))
@@ -49,7 +43,7 @@ pub fn run_verdict(argv: &[String]) {
         Err(e) => {
             eprintln!("error loading gate: {e}");
             std::process::exit(1);
-        },
+        }
     };
 
     let decision = gate.evaluate(model, tool, grant_id);

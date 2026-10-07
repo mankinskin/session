@@ -1,30 +1,16 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{
-        BufRead,
-        BufReader,
-    },
+    io::{BufRead, BufReader},
     path::Path,
 };
 
-use chrono::{
-    DateTime,
-    Utc,
-};
+use chrono::{DateTime, Utc};
 
 use super::{
-    CopilotHookMessage,
-    CopilotHookPayload,
-    CopilotRuntimeMetadata,
-    SessionError,
-    SessionRole,
-    ToolExecutionContext,
-    TranscriptEventEnvelope,
-    build_tool_execution_result_event,
-    capture_tool_execution_context,
-    deserialize_transcript_event,
-    hydrate_tool_execution_complete,
+    CopilotHookMessage, CopilotHookPayload, CopilotRuntimeMetadata, SessionError, SessionRole,
+    ToolExecutionContext, TranscriptEventEnvelope, build_tool_execution_result_event,
+    capture_tool_execution_context, deserialize_transcript_event, hydrate_tool_execution_complete,
 };
 
 /// Hook-invocation-scoped tool output size, carried in the PostToolUse hook
@@ -60,11 +46,10 @@ pub fn copilot_payload_from_transcript_path_with_tool_response_override(
     tool_response_override: Option<ToolResponseOverride>,
 ) -> Result<CopilotHookPayload, SessionError> {
     let transcript_path = transcript_path.as_ref();
-    let file =
-        File::open(transcript_path).map_err(|source| SessionError::Io {
-            path: transcript_path.to_path_buf(),
-            source,
-        })?;
+    let file = File::open(transcript_path).map_err(|source| SessionError::Io {
+        path: transcript_path.to_path_buf(),
+        source,
+    })?;
     let reader = BufReader::new(file);
 
     copilot_payload_from_transcript_reader_with_path(
@@ -109,8 +94,7 @@ fn copilot_payload_from_transcript_reader_with_path<R: BufRead>(
     };
     let mut messages = vec![];
     let mut events = vec![];
-    let mut tool_execution_contexts: HashMap<String, ToolExecutionContext> =
-        HashMap::new();
+    let mut tool_execution_contexts: HashMap<String, ToolExecutionContext> = HashMap::new();
     // Sub-agent span attribution (ticket b7c61f0e): maps an event's own
     // `event_id` to the `tool_call_id` of the nearest enclosing `runSubagent`
     // invocation, derived from true `parent_event_id` ancestry as each event
@@ -118,8 +102,7 @@ fn copilot_payload_from_transcript_reader_with_path<R: BufRead>(
     // sub-agent spans without the double-counting that naive event-index
     // overlap produces, because every event has exactly one ancestor chain
     // regardless of how spans interleave in the flat event stream.
-    let mut span_owner_by_event_id: HashMap<String, Option<String>> =
-        HashMap::new();
+    let mut span_owner_by_event_id: HashMap<String, Option<String>> = HashMap::new();
 
     for line in reader.lines() {
         let line = line.map_err(|source| SessionError::Io {
@@ -146,12 +129,9 @@ fn copilot_payload_from_transcript_reader_with_path<R: BufRead>(
         let parent_owner = event
             .parent_event_id
             .as_ref()
-            .and_then(|parent_id| {
-                span_owner_by_event_id.get(parent_id.as_str()).cloned()
-            })
+            .and_then(|parent_id| span_owner_by_event_id.get(parent_id.as_str()).cloned())
             .flatten();
-        let is_subagent_start = event.tool_name.as_deref()
-            == Some("runSubagent")
+        let is_subagent_start = event.tool_name.as_deref() == Some("runSubagent")
             && matches!(
                 event.event_type.as_deref(),
                 Some("tool.execution_start") | Some("tool_execution_start")
@@ -167,46 +147,35 @@ fn copilot_payload_from_transcript_reader_with_path<R: BufRead>(
         }
 
         events.push(event.captured_event());
-        if let Some(result_event) =
-            build_tool_execution_result_event(&event, context)
-        {
+        if let Some(result_event) = build_tool_execution_result_event(&event, context) {
             events.push(result_event);
         }
 
         match event.event_type.as_deref() {
-            Some("session.start")
-            | Some("session_start")
-            | Some("sessionStart") => handle_session_start_event(
+            Some("session.start") | Some("session_start") | Some("sessionStart") => {
+                handle_session_start_event(
+                    &event,
+                    &mut session_id,
+                    &mut agent_id,
+                    &mut started_at,
+                    &mut captured_at,
+                    &mut runtime,
+                )?
+            }
+            Some("user.message") | Some("user_message") => {
+                handle_message_event(&event, SessionRole::User, &mut captured_at, &mut messages)?
+            }
+            Some("assistant.message") | Some("assistant_message") => handle_message_event(
                 &event,
-                &mut session_id,
-                &mut agent_id,
-                &mut started_at,
+                SessionRole::Assistant,
                 &mut captured_at,
-                &mut runtime,
+                &mut messages,
             )?,
-            Some("user.message") | Some("user_message") =>
-                handle_message_event(
-                    &event,
-                    SessionRole::User,
-                    &mut captured_at,
-                    &mut messages,
-                )?,
-            Some("assistant.message") | Some("assistant_message") =>
-                handle_message_event(
-                    &event,
-                    SessionRole::Assistant,
-                    &mut captured_at,
-                    &mut messages,
-                )?,
-            _ =>
+            _ => {
                 if let Some(role) = event.role_hint.clone() {
-                    handle_message_event(
-                        &event,
-                        role,
-                        &mut captured_at,
-                        &mut messages,
-                    )?;
-                },
+                    handle_message_event(&event, role, &mut captured_at, &mut messages)?;
+                }
+            }
         }
     }
 
@@ -261,14 +230,12 @@ fn apply_tool_response_override(
         if !is_terminal {
             continue;
         }
-        if event.tool_call_id.as_deref()
-            != Some(override_value.tool_call_id.as_str())
-        {
+        if event.tool_call_id.as_deref() != Some(override_value.tool_call_id.as_str()) {
             continue;
         }
-        let data = event.data_json.get_or_insert_with(|| {
-            serde_json::Value::Object(Default::default())
-        });
+        let data = event
+            .data_json
+            .get_or_insert_with(|| serde_json::Value::Object(Default::default()));
         if let Some(map) = data.as_object_mut() {
             map.insert(
                 "output_chars".to_string(),
@@ -293,12 +260,9 @@ fn handle_session_start_event(
     runtime: &mut CopilotRuntimeMetadata,
 ) -> Result<(), SessionError> {
     let data = &event.data;
-    let session_id_value =
-        super::json_string(data, &["sessionId", "session_id", "id"]);
-    let producer_value =
-        super::json_string(data, &["producer", "agentId", "agent_id"]);
-    let start_time_value =
-        super::json_timestamp(data, &["startTime", "start_time"]);
+    let session_id_value = super::json_string(data, &["sessionId", "session_id", "id"]);
+    let producer_value = super::json_string(data, &["producer", "agentId", "agent_id"]);
+    let start_time_value = super::json_timestamp(data, &["startTime", "start_time"]);
 
     if session_id.is_none() {
         *session_id = session_id_value;
@@ -316,12 +280,10 @@ fn handle_session_start_event(
         runtime.producer = producer_value;
     }
     if runtime.copilot_version.is_none() {
-        runtime.copilot_version =
-            super::json_string(data, &["copilotVersion", "copilot_version"]);
+        runtime.copilot_version = super::json_string(data, &["copilotVersion", "copilot_version"]);
     }
     if runtime.vscode_version.is_none() {
-        runtime.vscode_version =
-            super::json_string(data, &["vscodeVersion", "vscode_version"]);
+        runtime.vscode_version = super::json_string(data, &["vscodeVersion", "vscode_version"]);
     }
     if runtime.protocol_version.is_none() {
         runtime.protocol_version = data

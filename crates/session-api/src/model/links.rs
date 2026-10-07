@@ -1,7 +1,4 @@
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct SessionLinks {
@@ -20,17 +17,11 @@ pub struct SessionLinks {
 }
 
 impl SessionLinks {
-    pub fn links_to_ticket(
-        &self,
-        ticket_id: &str,
-    ) -> bool {
+    pub fn links_to_ticket(&self, ticket_id: &str) -> bool {
         self.ticket_ids.iter().any(|id| id == ticket_id)
     }
 
-    pub fn links_to_spec(
-        &self,
-        spec_id: &str,
-    ) -> bool {
+    pub fn links_to_spec(&self, spec_id: &str) -> bool {
         self.spec_ids.iter().any(|id| id == spec_id)
     }
 }

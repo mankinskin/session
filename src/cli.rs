@@ -1,41 +1,19 @@
 use std::path::PathBuf;
 
-use clap::{
-    Args,
-    Parser,
-    Subcommand,
-};
+use clap::{Args, Parser, Subcommand};
 use serde::Deserialize;
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use memory_kernel::workspace;
 use session_api::{
-    DEFAULT_PROMPT_SUMMARIZE_THRESHOLD_CHARS,
-    DEFAULT_SKELETON_PREVIEW_CHARS,
-    PromptPackOptions,
-    RelationStrength,
-    SessionAuditSelector,
-    SessionError,
-    SessionHandoffPackage,
-    SessionHandoffTargetTicket,
-    SessionHandoffUpwardContextEntry,
-    SessionQuery,
-    SessionRuntimeInitRequest,
-    SessionStoreConfig,
-    SessionTerminalCreateRequest,
-    SessionValidationGate,
-    SessionWorkflowEdge,
-    SessionWorkflowEdgeKind,
-    SessionWorkflowNodeDraft,
-    SessionWorkflowNodeKind,
-    SessionWorkflowNodeRequirement,
-    SessionWorkflowNodeStatus,
-    SessionWorktreeCheckInRequest,
-    ToolMetricsWindow,
+    DEFAULT_PROMPT_SUMMARIZE_THRESHOLD_CHARS, DEFAULT_SKELETON_PREVIEW_CHARS, PromptPackOptions,
+    RelationStrength, SessionAuditSelector, SessionError, SessionHandoffPackage,
+    SessionHandoffTargetTicket, SessionHandoffUpwardContextEntry, SessionQuery,
+    SessionRuntimeInitRequest, SessionStoreConfig, SessionTerminalCreateRequest,
+    SessionValidationGate, SessionWorkflowEdge, SessionWorkflowEdgeKind, SessionWorkflowNodeDraft,
+    SessionWorkflowNodeKind, SessionWorkflowNodeRequirement, SessionWorkflowNodeStatus,
+    SessionWorktreeCheckInRequest, ToolMetricsWindow,
 };
 
 mod write_policy;
@@ -740,14 +718,14 @@ pub fn run(mut cli: SessionCli) -> Result<CliOutput, CliRunError> {
     let store_root = match cli.store_root.as_deref() {
         Some(store_root) => store_root.to_path_buf(),
         None => match cli.workspace_root.as_deref() {
-        Some(workspace_root) => workspace::resolve_store_root_for_initialization_from(
-            workspace_root,
-            SESSION_STORE_DIR,
-        ),
-        None => workspace::resolve_session_store_root_from(
-            workspace::working_dir().as_deref(),
-            SESSION_STORE_DIR,
-        ),
+            Some(workspace_root) => workspace::resolve_store_root_for_initialization_from(
+                workspace_root,
+                SESSION_STORE_DIR,
+            ),
+            None => workspace::resolve_session_store_root_from(
+                workspace::working_dir().as_deref(),
+                SESSION_STORE_DIR,
+            ),
         },
     };
     let config = SessionStoreConfig::new(store_root);
@@ -760,29 +738,23 @@ pub fn run(mut cli: SessionCli) -> Result<CliOutput, CliRunError> {
     }
 }
 
-fn dispatch(
-    config: &SessionStoreConfig,
-    command: SessionCommand,
-) -> Result<Value, CliRunError> {
+fn dispatch(config: &SessionStoreConfig, command: SessionCommand) -> Result<Value, CliRunError> {
     match command {
         SessionCommand::Init(args) => {
-            let result =
-                config.init_runtime_context(SessionRuntimeInitRequest {
-                    session_id: Some(args.session_id),
-                    predecessor_run_id: args.predecessor_run_id,
-                    force_new_run: args.force_new_run,
-                })?;
+            let result = config.init_runtime_context(SessionRuntimeInitRequest {
+                session_id: Some(args.session_id),
+                predecessor_run_id: args.predecessor_run_id,
+                force_new_run: args.force_new_run,
+            })?;
             let handle = result.context.session_id.clone();
             to_value_with_handle(&handle, &result)
-        },
+        }
         SessionCommand::Resume(args) => {
-            let result = config.resume_workspace_context(
-                &args.session_id,
-                &args.predecessor_run_id,
-            )?;
+            let result =
+                config.resume_workspace_context(&args.session_id, &args.predecessor_run_id)?;
             let handle = result.context.session_id.clone();
             to_value_with_handle(&handle, &result)
-        },
+        }
         SessionCommand::Pin(args) => {
             let context = config.pin_runtime_entity(
                 &args.session_id,
@@ -791,44 +763,44 @@ fn dispatch(
                 args.reason,
             )?;
             to_value(&context)
-        },
+        }
         SessionCommand::Unpin(args) => {
-            let context = config
-                .unpin_runtime_entity(&args.session_id, &args.entity_urn)?;
+            let context = config.unpin_runtime_entity(&args.session_id, &args.entity_urn)?;
             to_value(&context)
-        },
+        }
         SessionCommand::View(args) => {
             let view = config.view_runtime_context(&args.session_id)?;
             to_value(&view)
-        },
+        }
         SessionCommand::RenderInstructions(args) => {
-            let render =
-                config.render_pinned_rule_instructions(&args.session_id)?;
+            let render = config.render_pinned_rule_instructions(&args.session_id)?;
             to_value(&json!({"render": render}))
-        },
-        SessionCommand::Workflow { command } =>
-            handle_workflow_command(&config, command),
-        SessionCommand::WorkflowAddNode(args) =>
-            handle_workflow_command(&config, WorkflowCommand::AddNode(args)),
-        SessionCommand::WorkflowAddNodes(args) =>
-            handle_workflow_command(&config, WorkflowCommand::AddNodes(args)),
-        SessionCommand::WorkflowAddEdge(args) =>
-            handle_workflow_command(&config, WorkflowCommand::AddEdge(args)),
-        SessionCommand::WorkflowAddEdges(args) =>
-            handle_workflow_command(&config, WorkflowCommand::AddEdges(args)),
-        SessionCommand::WorkflowSetStatus(args) =>
-            handle_workflow_command(&config, WorkflowCommand::SetStatus(args)),
-        SessionCommand::WorkflowPromote(args) =>
-            handle_workflow_command(&config, WorkflowCommand::Promote(args)),
-        SessionCommand::WorkflowRenderTerminal(args) =>
-            handle_workflow_command(
-                &config,
-                WorkflowCommand::RenderTerminal(args),
-            ),
-        SessionCommand::WorkflowRenderMermaid(args) => handle_workflow_command(
-            &config,
-            WorkflowCommand::RenderMermaid(args),
-        ),
+        }
+        SessionCommand::Workflow { command } => handle_workflow_command(&config, command),
+        SessionCommand::WorkflowAddNode(args) => {
+            handle_workflow_command(&config, WorkflowCommand::AddNode(args))
+        }
+        SessionCommand::WorkflowAddNodes(args) => {
+            handle_workflow_command(&config, WorkflowCommand::AddNodes(args))
+        }
+        SessionCommand::WorkflowAddEdge(args) => {
+            handle_workflow_command(&config, WorkflowCommand::AddEdge(args))
+        }
+        SessionCommand::WorkflowAddEdges(args) => {
+            handle_workflow_command(&config, WorkflowCommand::AddEdges(args))
+        }
+        SessionCommand::WorkflowSetStatus(args) => {
+            handle_workflow_command(&config, WorkflowCommand::SetStatus(args))
+        }
+        SessionCommand::WorkflowPromote(args) => {
+            handle_workflow_command(&config, WorkflowCommand::Promote(args))
+        }
+        SessionCommand::WorkflowRenderTerminal(args) => {
+            handle_workflow_command(&config, WorkflowCommand::RenderTerminal(args))
+        }
+        SessionCommand::WorkflowRenderMermaid(args) => {
+            handle_workflow_command(&config, WorkflowCommand::RenderMermaid(args))
+        }
         SessionCommand::Handoff(args) => {
             let package = handoff_package_from_args(&args)?;
             let result = config.create_handoff_result(
@@ -838,7 +810,7 @@ fn dispatch(
                 None,
             )?;
             to_value(&result)
-        },
+        }
         SessionCommand::Finish(args) => {
             let result = config.finish_workflow(
                 &args.session_id,
@@ -847,23 +819,22 @@ fn dispatch(
                 None,
             )?;
             to_value(&result)
-        },
+        }
         SessionCommand::CheckIn(args) => {
-            let receipt =
-                config.check_in_worktree(SessionWorktreeCheckInRequest {
-                    session_id: args.session_id,
-                    owner_id: args.owner_id,
-                    ticket_id: args.ticket_id,
-                    worktree_path: args.worktree_path,
-                    branch: args.branch,
-                    predecessor_session_id: args.predecessor_session_id,
-                })?;
+            let receipt = config.check_in_worktree(SessionWorktreeCheckInRequest {
+                session_id: args.session_id,
+                owner_id: args.owner_id,
+                ticket_id: args.ticket_id,
+                worktree_path: args.worktree_path,
+                branch: args.branch,
+                predecessor_session_id: args.predecessor_session_id,
+            })?;
             to_value(&receipt)
-        },
+        }
         SessionCommand::Lookup(args) => {
             let receipt = config.lookup_worktree(&args.session_id)?;
             to_value(&receipt)
-        },
+        }
         SessionCommand::Query(args) => {
             let query = SessionQuery {
                 session_id_prefix: args.session_id_prefix,
@@ -878,31 +849,28 @@ fn dispatch(
                 "sessions": result.sessions,
                 "diagnostics": result.diagnostics,
             }))
-        },
+        }
         SessionCommand::SessionsForTicket(args) => {
             let strength = parse_relation_strength(&args.strength)?;
-            let sessions =
-                config.sessions_for_ticket(&args.ticket_id, strength)?;
+            let sessions = config.sessions_for_ticket(&args.ticket_id, strength)?;
             to_value(&json!({
                 "count": sessions.len(),
                 "sessions": sessions,
             }))
-        },
+        }
         SessionCommand::BackfillTicketLinks(args) => {
             let report = config.backfill_ticket_links(args.write)?;
             to_value(&report)
-        },
+        }
         SessionCommand::Move(args) => move_command(config, args),
         SessionCommand::PeekRange(args) => {
-            let range =
-                config.peek_range(&args.session_id, args.start, args.end)?;
+            let range = config.peek_range(&args.session_id, args.start, args.end)?;
             to_value(&range)
-        },
+        }
         SessionCommand::PeekSkeleton(args) => {
-            let skeleton =
-                config.peek_skeleton(&args.session_id, args.preview_chars)?;
+            let skeleton = config.peek_skeleton(&args.session_id, args.preview_chars)?;
             to_value(&skeleton)
-        },
+        }
         SessionCommand::PeekPromptPack(args) => {
             let pack = config.peek_prompt_pack(
                 &args.session_id,
@@ -912,30 +880,24 @@ fn dispatch(
                 },
             )?;
             to_value(&pack)
-        },
+        }
         SessionCommand::TerminalCreate(args) => {
-            let manifest = config.create_terminal_observer(
-                SessionTerminalCreateRequest {
-                    session_id: args.session_id,
-                    label: args.label,
-                    cwd: args.cwd,
-                },
-            )?;
+            let manifest = config.create_terminal_observer(SessionTerminalCreateRequest {
+                session_id: args.session_id,
+                label: args.label,
+                cwd: args.cwd,
+            })?;
             to_value(&manifest)
-        },
+        }
         SessionCommand::TerminalAppendOutput(args) => {
-            let event = config.append_terminal_output(
-                &args.session_id,
-                &args.terminal_id,
-                args.output,
-            )?;
+            let event =
+                config.append_terminal_output(&args.session_id, &args.terminal_id, args.output)?;
             to_value(&event)
-        },
+        }
         SessionCommand::TerminalStatus(args) => {
-            let manifest =
-                config.terminal_status(&args.session_id, &args.terminal_id)?;
+            let manifest = config.terminal_status(&args.session_id, &args.terminal_id)?;
             to_value(&manifest)
-        },
+        }
         SessionCommand::TerminalPeek(args) => {
             let result = config.peek_terminal_output(
                 &args.session_id,
@@ -944,12 +906,11 @@ fn dispatch(
                 args.limit,
             )?;
             to_value(&result)
-        },
+        }
         SessionCommand::TerminalClose(args) => {
-            let manifest = config
-                .close_terminal_observer(&args.session_id, &args.terminal_id)?;
+            let manifest = config.close_terminal_observer(&args.session_id, &args.terminal_id)?;
             to_value(&manifest)
-        },
+        }
         SessionCommand::ToolMetrics(args) => {
             let window = ToolMetricsWindow {
                 max_age_days: args.days,
@@ -964,21 +925,18 @@ fn dispatch(
             }
 
             to_value(&report)
-        },
+        }
         SessionCommand::SubagentRollups(args) => {
             let rollups = config.subagent_rollups(&args.session_id)?;
             to_value(&rollups)
-        },
+        }
         SessionCommand::DelegationCost(args) => {
-            let report = config.delegation_cost_report(
-                SessionAuditSelector::SessionId(args.session_id),
-            )?;
+            let report =
+                config.delegation_cost_report(SessionAuditSelector::SessionId(args.session_id))?;
             to_value(&report)
-        },
-        SessionCommand::Grant { command } =>
-            handle_grant_command(config, command),
-        SessionCommand::Escalation { command } =>
-            handle_escalation_command(config, command),
+        }
+        SessionCommand::Grant { command } => handle_grant_command(config, command),
+        SessionCommand::Escalation { command } => handle_escalation_command(config, command),
     }
 }
 
@@ -1006,40 +964,34 @@ fn handle_workflow_command(
                 },
             )?;
             to_value(&context)
-        },
+        }
         WorkflowCommand::AddNodes(args) => {
-            let nodes = serde_json::from_str::<Vec<WorkflowNodeDraftJson>>(
-                &args.nodes_json,
-            )
-            .map_err(|error| {
-                CliRunError::BadRequest(format!(
-                    "invalid --nodes-json payload: {error}"
-                ))
-            })?
-            .into_iter()
-            .enumerate()
-            .map(|(index, node)| {
-                Ok(SessionWorkflowNodeDraft {
-                    node_id: node.node_id,
-                    kind: parse_node_kind(&node.kind).map_err(|error| {
-                        indexed_cli_error("nodes", index, error)
-                    })?,
-                    requirement: parse_requirement(&node.requirement).map_err(
-                        |error| indexed_cli_error("nodes", index, error),
-                    )?,
-                    title: node.title,
-                    ticket_urn: node.ticket_urn,
-                    spec_urn: node.spec_urn,
-                    anchor_urn: node.anchor_urn,
-                    category: node.category,
-                    cached_ticket_title: node.cached_ticket_title,
-                    validation_spec_id: node.validation_spec_id,
+            let nodes = serde_json::from_str::<Vec<WorkflowNodeDraftJson>>(&args.nodes_json)
+                .map_err(|error| {
+                    CliRunError::BadRequest(format!("invalid --nodes-json payload: {error}"))
+                })?
+                .into_iter()
+                .enumerate()
+                .map(|(index, node)| {
+                    Ok(SessionWorkflowNodeDraft {
+                        node_id: node.node_id,
+                        kind: parse_node_kind(&node.kind)
+                            .map_err(|error| indexed_cli_error("nodes", index, error))?,
+                        requirement: parse_requirement(&node.requirement)
+                            .map_err(|error| indexed_cli_error("nodes", index, error))?,
+                        title: node.title,
+                        ticket_urn: node.ticket_urn,
+                        spec_urn: node.spec_urn,
+                        anchor_urn: node.anchor_urn,
+                        category: node.category,
+                        cached_ticket_title: node.cached_ticket_title,
+                        validation_spec_id: node.validation_spec_id,
+                    })
                 })
-            })
-            .collect::<Result<Vec<_>, CliRunError>>()?;
+                .collect::<Result<Vec<_>, CliRunError>>()?;
             let context = config.workflow_add_nodes(&args.session_id, nodes)?;
             to_value(&context)
-        },
+        }
         WorkflowCommand::AddEdge(args) => {
             let context = config.workflow_add_edge(
                 &args.session_id,
@@ -1048,31 +1000,26 @@ fn handle_workflow_command(
                 parse_edge_kind(&args.kind)?,
             )?;
             to_value(&context)
-        },
+        }
         WorkflowCommand::AddEdges(args) => {
-            let edges = serde_json::from_str::<Vec<WorkflowEdgeDraftJson>>(
-                &args.edges_json,
-            )
-            .map_err(|error| {
-                CliRunError::BadRequest(format!(
-                    "invalid --edges-json payload: {error}"
-                ))
-            })?
-            .into_iter()
-            .enumerate()
-            .map(|(index, edge)| {
-                Ok(SessionWorkflowEdge {
-                    from: edge.from,
-                    to: edge.to,
-                    kind: parse_edge_kind(&edge.kind).map_err(|error| {
-                        indexed_cli_error("edges", index, error)
-                    })?,
+            let edges = serde_json::from_str::<Vec<WorkflowEdgeDraftJson>>(&args.edges_json)
+                .map_err(|error| {
+                    CliRunError::BadRequest(format!("invalid --edges-json payload: {error}"))
+                })?
+                .into_iter()
+                .enumerate()
+                .map(|(index, edge)| {
+                    Ok(SessionWorkflowEdge {
+                        from: edge.from,
+                        to: edge.to,
+                        kind: parse_edge_kind(&edge.kind)
+                            .map_err(|error| indexed_cli_error("edges", index, error))?,
+                    })
                 })
-            })
-            .collect::<Result<Vec<_>, CliRunError>>()?;
+                .collect::<Result<Vec<_>, CliRunError>>()?;
             let context = config.workflow_add_edges(&args.session_id, edges)?;
             to_value(&context)
-        },
+        }
         WorkflowCommand::SetStatus(args) => {
             let context = config.workflow_update_node_status(
                 &args.session_id,
@@ -1081,7 +1028,7 @@ fn handle_workflow_command(
                 args.deferred_reason,
             )?;
             to_value(&context)
-        },
+        }
         WorkflowCommand::Promote(args) => {
             let context = config.workflow_promote_node_to_ticket(
                 &args.session_id,
@@ -1090,17 +1037,15 @@ fn handle_workflow_command(
                 args.cached_ticket_title,
             )?;
             to_value(&context)
-        },
+        }
         WorkflowCommand::RenderTerminal(args) => {
-            let rendered =
-                config.workflow_render_terminal(&args.session_id, None)?;
+            let rendered = config.workflow_render_terminal(&args.session_id, None)?;
             to_value(&json!({"render": rendered}))
-        },
+        }
         WorkflowCommand::RenderMermaid(args) => {
-            let rendered =
-                config.workflow_render_mermaid(&args.session_id, None)?;
+            let rendered = config.workflow_render_mermaid(&args.session_id, None)?;
             to_value(&json!({"render": rendered}))
-        },
+        }
     }
 }
 
@@ -1109,27 +1054,20 @@ fn handle_grant_command(
     config: &SessionStoreConfig,
     command: GrantCommand,
 ) -> Result<Value, CliRunError> {
-    use chrono::{
-        DateTime,
-        Utc,
-    };
-    use session_api::{
-        BudgetGrantScope,
-        create_grant,
-        list_grants,
-        revoke_grant,
-    };
+    use chrono::{DateTime, Utc};
+    use session_api::{BudgetGrantScope, create_grant, list_grants, revoke_grant};
 
     match command {
         GrantCommand::Create(args) => {
             let scope = match args.scope.to_lowercase().as_str() {
                 "session" => BudgetGrantScope::Session,
                 "subagent" => BudgetGrantScope::Subagent,
-                _ =>
+                _ => {
                     return Err(CliRunError::BadRequest(format!(
                         "invalid scope: {}. allowed values: session, subagent",
                         args.scope
-                    ))),
+                    )));
+                }
             };
 
             // Handle expiry: prefer TTL, fall back to explicit expires_at
@@ -1137,12 +1075,9 @@ fn handle_grant_command(
                 Some(ttl)
             } else if let Some(expires_at) = &args.expires_at {
                 // Convert RFC3339 to TTL from now
-                let expires = DateTime::parse_from_rfc3339(expires_at)
-                    .map_err(|e| {
-                        CliRunError::BadRequest(format!(
-                            "invalid expires-at timestamp: {e}"
-                        ))
-                    })?;
+                let expires = DateTime::parse_from_rfc3339(expires_at).map_err(|e| {
+                    CliRunError::BadRequest(format!("invalid expires-at timestamp: {e}"))
+                })?;
                 let now = Utc::now();
                 let duration = expires.signed_duration_since(now);
                 if duration.num_seconds() < 0 {
@@ -1155,26 +1090,20 @@ fn handle_grant_command(
                 None
             };
 
-            let grant = create_grant(
-                config,
-                scope,
-                args.offset,
-                args.model,
-                ttl_seconds,
-            )?;
+            let grant = create_grant(config, scope, args.offset, args.model, ttl_seconds)?;
             to_value(&grant)
-        },
+        }
         GrantCommand::List => {
             let grants = list_grants(config)?;
             to_value(&grants)
-        },
+        }
         GrantCommand::Revoke(args) => {
             let revoked = revoke_grant(config, &args.grant_id)?;
             to_value(&json!({
                 "revoked": revoked,
                 "grant_id": args.grant_id,
             }))
-        },
+        }
     }
 }
 
@@ -1184,14 +1113,8 @@ fn handle_escalation_command(
 ) -> Result<Value, CliRunError> {
     use chrono::Utc;
     use session_api::{
-        EscalationAction,
-        EscalationResolution,
-        EscalationStatus,
-        create_escalation,
-        escalation_marker,
-        get_escalation,
-        list_escalations,
-        resolve_escalation,
+        EscalationAction, EscalationResolution, EscalationStatus, create_escalation,
+        escalation_marker, get_escalation, list_escalations, resolve_escalation,
     };
 
     match command {
@@ -1207,34 +1130,29 @@ fn handle_escalation_command(
             )?;
 
             // Include the marker in the response
-            let mut result =
-                serde_json::to_value(&escalation).map_err(|e| {
-                    CliRunError::Serialization(format!(
-                        "serialization error: {e}"
-                    ))
-                })?;
+            let mut result = serde_json::to_value(&escalation)
+                .map_err(|e| CliRunError::Serialization(format!("serialization error: {e}")))?;
 
             if let Some(obj) = result.as_object_mut() {
                 obj.insert(
                     "marker".to_string(),
-                    serde_json::Value::String(escalation_marker(
-                        &escalation.escalation_id,
-                    )),
+                    serde_json::Value::String(escalation_marker(&escalation.escalation_id)),
                 );
             }
 
             Ok(result)
-        },
+        }
         EscalationCommand::List(args) => {
             let status_filter = if let Some(status_str) = args.status {
                 match status_str.to_lowercase().as_str() {
                     "open" => Some(EscalationStatus::Open),
                     "resolved" => Some(EscalationStatus::Resolved),
-                    _ =>
+                    _ => {
                         return Err(CliRunError::BadRequest(format!(
                             "invalid status: {}. allowed values: open, resolved",
                             status_str
-                        ))),
+                        )));
+                    }
                 }
             } else {
                 None
@@ -1242,28 +1160,25 @@ fn handle_escalation_command(
 
             let escalations = list_escalations(config, status_filter)?;
             to_value(&escalations)
-        },
+        }
         EscalationCommand::Get(args) => {
-            let escalation = get_escalation(config, &args.escalation_id)
-                .ok_or_else(|| {
-                    CliRunError::BadRequest(format!(
-                        "escalation not found: {}",
-                        args.escalation_id
-                    ))
-                })?;
+            let escalation = get_escalation(config, &args.escalation_id).ok_or_else(|| {
+                CliRunError::BadRequest(format!("escalation not found: {}", args.escalation_id))
+            })?;
             to_value(&escalation)
-        },
+        }
         EscalationCommand::Resolve(args) => {
             let action = match args.action.to_lowercase().as_str() {
                 "handled" => EscalationAction::Handled,
                 "granted-offset" => EscalationAction::GrantedOffset,
                 "escalated-to-user" => EscalationAction::EscalatedToUser,
                 "spawned-session" => EscalationAction::SpawnedSession,
-                _ =>
+                _ => {
                     return Err(CliRunError::BadRequest(format!(
                         "invalid action: {}. allowed values: handled, granted-offset, escalated-to-user, spawned-session",
                         args.action
-                    ))),
+                    )));
+                }
             };
 
             let resolution = EscalationResolution {
@@ -1274,28 +1189,22 @@ fn handle_escalation_command(
                 resolved_at: Utc::now(),
             };
 
-            let escalation =
-                resolve_escalation(config, &args.escalation_id, resolution)?;
+            let escalation = resolve_escalation(config, &args.escalation_id, resolution)?;
             to_value(&escalation)
-        },
+        }
     }
 }
 
-fn parse_validation_gates(
-    raw: Option<&str>
-) -> Result<Vec<SessionValidationGate>, CliRunError> {
+fn parse_validation_gates(raw: Option<&str>) -> Result<Vec<SessionValidationGate>, CliRunError> {
     let Some(raw) = raw else {
         return Ok(vec![]);
     };
-    serde_json::from_str::<Vec<SessionValidationGate>>(raw).map_err(|err| {
-        CliRunError::BadRequest(format!(
-            "invalid --validation-json payload: {err}"
-        ))
-    })
+    serde_json::from_str::<Vec<SessionValidationGate>>(raw)
+        .map_err(|err| CliRunError::BadRequest(format!("invalid --validation-json payload: {err}")))
 }
 
 fn handoff_package_from_args(
-    args: &HandoffArgs
+    args: &HandoffArgs,
 ) -> Result<Option<SessionHandoffPackage>, CliRunError> {
     let target_tickets = args
         .target_tickets
@@ -1321,17 +1230,13 @@ fn handoff_package_from_args(
         .upward_context
         .iter()
         .map(|raw| {
-            serde_json::from_str::<SessionHandoffUpwardContextEntry>(raw)
-                .map_err(|error| {
-                    CliRunError::BadRequest(format!(
-                        "invalid --upward-context JSON payload: {error}"
-                    ))
-                })
+            serde_json::from_str::<SessionHandoffUpwardContextEntry>(raw).map_err(|error| {
+                CliRunError::BadRequest(format!("invalid --upward-context JSON payload: {error}"))
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     let objective = args.objective.clone().unwrap_or_default();
-    let higher_level_objective =
-        args.higher_level_objective.clone().unwrap_or_default();
+    let higher_level_objective = args.higher_level_objective.clone().unwrap_or_default();
     let has_package = !objective.is_empty()
         || !target_tickets.is_empty()
         || !higher_level_objective.is_empty()
@@ -1358,9 +1263,7 @@ fn handoff_package_from_args(
     }))
 }
 
-fn parse_relation_strength(
-    value: &str
-) -> Result<RelationStrength, CliRunError> {
+fn parse_relation_strength(value: &str) -> Result<RelationStrength, CliRunError> {
     match value {
         "strict" => Ok(RelationStrength::Strict),
         "linked" => Ok(RelationStrength::Linked),
@@ -1372,17 +1275,14 @@ fn parse_relation_strength(
     }
 }
 
-fn parse_node_kind(
-    value: &str
-) -> Result<SessionWorkflowNodeKind, CliRunError> {
+fn parse_node_kind(value: &str) -> Result<SessionWorkflowNodeKind, CliRunError> {
     match value {
         "ticket" => Ok(SessionWorkflowNodeKind::Ticket),
         "validation" => Ok(SessionWorkflowNodeKind::Validation),
         "spec" => Ok(SessionWorkflowNodeKind::Spec),
         // `task` is the generic descriptive bucket; legacy cosmetic kinds are
         // accepted as back-compat aliases.
-        "task" | "action" | "decision" | "checkpoint" =>
-            Ok(SessionWorkflowNodeKind::Task),
+        "task" | "action" | "decision" | "checkpoint" => Ok(SessionWorkflowNodeKind::Task),
         _ => Err(CliRunError::BadRequest(format!(
             "invalid workflow node kind: {value}. allowed values: \
              ticket, validation, spec, task \
@@ -1392,9 +1292,7 @@ fn parse_node_kind(
     }
 }
 
-fn parse_requirement(
-    value: &str
-) -> Result<SessionWorkflowNodeRequirement, CliRunError> {
+fn parse_requirement(value: &str) -> Result<SessionWorkflowNodeRequirement, CliRunError> {
     match value {
         "required" => Ok(SessionWorkflowNodeRequirement::Required),
         "optional" => Ok(SessionWorkflowNodeRequirement::Optional),
@@ -1405,9 +1303,7 @@ fn parse_requirement(
     }
 }
 
-fn parse_edge_kind(
-    value: &str
-) -> Result<SessionWorkflowEdgeKind, CliRunError> {
+fn parse_edge_kind(value: &str) -> Result<SessionWorkflowEdgeKind, CliRunError> {
     match value {
         "depends-on" | "depends_on" => Ok(SessionWorkflowEdgeKind::DependsOn),
         "order" => Ok(SessionWorkflowEdgeKind::Order),
@@ -1419,13 +1315,10 @@ fn parse_edge_kind(
     }
 }
 
-fn parse_node_status(
-    value: &str
-) -> Result<SessionWorkflowNodeStatus, CliRunError> {
+fn parse_node_status(value: &str) -> Result<SessionWorkflowNodeStatus, CliRunError> {
     match value {
         "pending" => Ok(SessionWorkflowNodeStatus::Pending),
-        "in-progress" | "in_progress" =>
-            Ok(SessionWorkflowNodeStatus::InProgress),
+        "in-progress" | "in_progress" => Ok(SessionWorkflowNodeStatus::InProgress),
         "blocked" => Ok(SessionWorkflowNodeStatus::Blocked),
         "done" => Ok(SessionWorkflowNodeStatus::Done),
         "deferred" => Ok(SessionWorkflowNodeStatus::Deferred),
@@ -1437,11 +1330,7 @@ fn parse_node_status(
     }
 }
 
-fn indexed_cli_error(
-    collection: &str,
-    index: usize,
-    error: CliRunError,
-) -> CliRunError {
+fn indexed_cli_error(collection: &str, index: usize, error: CliRunError) -> CliRunError {
     let message = match error {
         CliRunError::BadRequest(message) => message,
         other => other.to_string(),
@@ -1449,10 +1338,7 @@ fn indexed_cli_error(
     CliRunError::BadRequest(format!("{collection}[{index}]: {message}"))
 }
 
-fn move_command(
-    config: &SessionStoreConfig,
-    args: MoveArgs,
-) -> Result<Value, CliRunError> {
+fn move_command(config: &SessionStoreConfig, args: MoveArgs) -> Result<Value, CliRunError> {
     let source_config = args
         .source_store_root
         .as_ref()
@@ -1467,9 +1353,7 @@ fn move_command(
 
     if let Some(journal_id) = args.resume.as_deref() {
         let journal_id = journal_id.parse::<Uuid>().map_err(|error| {
-            CliRunError::BadRequest(format!(
-                "invalid --resume journal UUID: {error}"
-            ))
+            CliRunError::BadRequest(format!("invalid --resume journal UUID: {error}"))
         })?;
         let outcome = config.resume_move_with_journal(journal_id)?;
         return to_value(&json!({
@@ -1484,9 +1368,7 @@ fn move_command(
 
     if let Some(journal_id) = args.rollback.as_deref() {
         let journal_id = journal_id.parse::<Uuid>().map_err(|error| {
-            CliRunError::BadRequest(format!(
-                "invalid --rollback journal UUID: {error}"
-            ))
+            CliRunError::BadRequest(format!("invalid --rollback journal UUID: {error}"))
         })?;
         let outcome = config.rollback_move_with_journal(journal_id)?;
         return to_value(&json!({
@@ -1500,35 +1382,28 @@ fn move_command(
     }
 
     let id = args.id.as_deref().ok_or_else(|| {
+        CliRunError::BadRequest("move requires <id> unless --resume/--rollback is used".to_string())
+    })?;
+    let target_selector = args.to_workspace_root.as_deref().ok_or_else(|| {
         CliRunError::BadRequest(
-            "move requires <id> unless --resume/--rollback is used".to_string(),
+            "move requires --to-workspace-root in plan/execute mode".to_string(),
         )
     })?;
-    let target_selector =
-        args.to_workspace_root.as_deref().ok_or_else(|| {
-            CliRunError::BadRequest(
-                "move requires --to-workspace-root in plan/execute mode"
-                    .to_string(),
-            )
-        })?;
 
     let target_selector = target_selector.to_string_lossy();
-    let target_selector =
-        workspace::normalize_explicit_workspace_selector(Some(&target_selector))
-            .map_err(|error| CliRunError::BadRequest(error.to_string()))?;
-    let session_id = id.parse::<Uuid>().map_err(|error| {
-        CliRunError::BadRequest(format!("invalid session UUID: {error}"))
-    })?;
-    let target_workspace_root =
-        workspace::canonicalize_workspace_root_strict(&target_selector)
-            .map_err(|error| {
-                CliRunError::BadRequest(format!(
-                    "workspace root canonicalization failed for '{}': {error}",
-                    target_selector.display()
-                ))
-            })?;
-    let report =
-        config.plan_move_preflight(&session_id, &target_workspace_root)?;
+    let target_selector = workspace::normalize_explicit_workspace_selector(Some(&target_selector))
+        .map_err(|error| CliRunError::BadRequest(error.to_string()))?;
+    let session_id = id
+        .parse::<Uuid>()
+        .map_err(|error| CliRunError::BadRequest(format!("invalid session UUID: {error}")))?;
+    let target_workspace_root = workspace::canonicalize_workspace_root_strict(&target_selector)
+        .map_err(|error| {
+            CliRunError::BadRequest(format!(
+                "workspace root canonicalization failed for '{}': {error}",
+                target_selector.display()
+            ))
+        })?;
+    let report = config.plan_move_preflight(&session_id, &target_workspace_root)?;
 
     if args.dry_run || !report.supported() {
         return to_value(&json!({
@@ -1555,7 +1430,7 @@ fn move_command(
 }
 
 fn move_plan_json(
-    report: &memory_kernel::storage::move_kernel::MovePlan
+    report: &memory_kernel::storage::move_kernel::MovePlan,
 ) -> Result<Value, CliRunError> {
     Ok(json!({
         "supported": report.supported(),
@@ -1585,7 +1460,7 @@ fn move_plan_json(
 }
 
 fn move_outcome_json(
-    outcome: &memory_kernel::storage::move_kernel::MoveOutcome
+    outcome: &memory_kernel::storage::move_kernel::MoveOutcome,
 ) -> Result<Value, CliRunError> {
     Ok(json!({
         "resumed": outcome.resumed,
@@ -1629,8 +1504,7 @@ fn path_display(path: &std::path::Path) -> Result<String, CliRunError> {
 }
 
 fn to_value<T: serde::Serialize>(value: &T) -> Result<Value, CliRunError> {
-    serde_json::to_value(value)
-        .map_err(|err| CliRunError::Serialization(err.to_string()))
+    serde_json::to_value(value).map_err(|err| CliRunError::Serialization(err.to_string()))
 }
 
 /// Serialize `value` and guarantee the Copilot session UUID is present as a
@@ -1651,21 +1525,15 @@ fn to_value_with_handle<T: serde::Serialize>(
 }
 
 fn render_human(payload: &Value) -> String {
-    serde_json::to_string_pretty(payload)
-        .unwrap_or_else(|_| format!("{payload:?}"))
+    serde_json::to_string_pretty(payload).unwrap_or_else(|_| format!("{payload:?}"))
 }
 
-pub fn error_output(
-    message: &str,
-    format: Option<MachineOutputFormat>,
-) -> String {
+pub fn error_output(message: &str, format: Option<MachineOutputFormat>) -> String {
     let payload = json!({"status": "error", "message": message});
     match format {
         Some(MachineOutputFormat::Json) => payload.to_string(),
-        Some(MachineOutputFormat::Toon) =>
-            toon_format::encode_default(&payload).unwrap_or_else(|_| {
-                format!("status: error\nmessage: {message}")
-            }),
+        Some(MachineOutputFormat::Toon) => toon_format::encode_default(&payload)
+            .unwrap_or_else(|_| format!("status: error\nmessage: {message}")),
         None => message.to_string(),
     }
 }
@@ -1675,17 +1543,16 @@ pub fn render_machine_output(
     format: MachineOutputFormat,
 ) -> Result<String, String> {
     match format {
-        MachineOutputFormat::Json =>
-            serde_json::to_string_pretty(payload).map_err(|err| err.to_string()),
-        MachineOutputFormat::Toon =>
-            toon_format::encode_default(payload).map_err(|err| err.to_string()),
+        MachineOutputFormat::Json => {
+            serde_json::to_string_pretty(payload).map_err(|err| err.to_string())
+        }
+        MachineOutputFormat::Toon => {
+            toon_format::encode_default(payload).map_err(|err| err.to_string())
+        }
     }
 }
 
-pub fn machine_output_format(
-    as_json: bool,
-    as_toon: bool,
-) -> Option<MachineOutputFormat> {
+pub fn machine_output_format(as_json: bool, as_toon: bool) -> Option<MachineOutputFormat> {
     if as_json {
         Some(MachineOutputFormat::Json)
     } else if as_toon {
@@ -1695,8 +1562,7 @@ pub fn machine_output_format(
     }
 }
 
-pub fn requested_machine_output_format_from_args() -> Option<MachineOutputFormat>
-{
+pub fn requested_machine_output_format_from_args() -> Option<MachineOutputFormat> {
     machine_output_format(
         std::env::args().any(|arg| arg == "--json"),
         std::env::args().any(|arg| arg == "--toon"),
@@ -1716,10 +1582,7 @@ mod tests {
     use super::*;
     use chrono::Utc;
     use session_api::{
-        CopilotHookMessage,
-        CopilotHookPayload,
-        SessionCaptureRequest,
-        SessionRole,
+        CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest, SessionRole,
         SessionRuntimeInitRequest,
     };
     use std::process::Command;
@@ -1746,13 +1609,10 @@ mod tests {
         assert!(cli.workspace_root.is_none());
         match cli.command {
             SessionCommand::CheckIn(args) => {
-                assert_eq!(
-                    args.session_id,
-                    "11111111-1111-4111-8111-111111111111"
-                );
+                assert_eq!(args.session_id, "11111111-1111-4111-8111-111111111111");
                 assert_eq!(args.branch, "feature/x");
                 assert!(args.predecessor_session_id.is_none());
-            },
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -1827,14 +1687,11 @@ mod tests {
             SessionCommand::Workflow {
                 command: WorkflowCommand::AddNode(args),
             } => {
-                assert_eq!(
-                    args.session_id,
-                    "77777777-7777-4777-8777-777777777777"
-                );
+                assert_eq!(args.session_id, "77777777-7777-4777-8777-777777777777");
                 assert_eq!(args.kind, "action");
                 assert_eq!(args.requirement, "required");
                 assert_eq!(args.title, "do the thing");
-            },
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -1842,13 +1699,10 @@ mod tests {
     #[test]
     fn workflow_batch_commands_dispatch_atomically() {
         let dir = tempfile::tempdir().unwrap();
-        let config =
-            SessionStoreConfig::new(dir.path().join(".session"));
+        let config = SessionStoreConfig::new(dir.path().join(".session"));
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
-                session_id: Some(
-                    "11111111-1111-4111-8111-111111111111".to_string(),
-                ),
+                session_id: Some("11111111-1111-4111-8111-111111111111".to_string()),
                 predecessor_run_id: None,
                 force_new_run: false,
             })
@@ -1918,11 +1772,8 @@ mod tests {
 
         match cli.command {
             SessionCommand::RenderInstructions(args) => {
-                assert_eq!(
-                    args.session_id,
-                    "77777777-7777-4777-8777-777777777777"
-                );
-            },
+                assert_eq!(args.session_id, "77777777-7777-4777-8777-777777777777");
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -1934,16 +1785,12 @@ mod tests {
         let config = SessionStoreConfig::new(&session_root);
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
-                session_id: Some(
-                    "22222222-2222-4222-8222-222222222222".to_string(),
-                ),
+                session_id: Some("22222222-2222-4222-8222-222222222222".to_string()),
                 predecessor_run_id: None,
                 force_new_run: false,
             })
             .unwrap();
-        let mut rule_store =
-            rule_api::RuleStore::open_or_init(&dir.path().join(".rule"))
-                .unwrap();
+        let mut rule_store = rule_api::RuleStore::open_or_init(&dir.path().join(".rule")).unwrap();
         let rule = rule_api::RuleManifest::new(
             "session/cli/render",
             "CLI render",
@@ -1994,12 +1841,9 @@ mod tests {
 
         match cli.command {
             SessionCommand::WorkflowAddNode(args) => {
-                assert_eq!(
-                    args.session_id,
-                    "77777777-7777-4777-8777-777777777777"
-                );
+                assert_eq!(args.session_id, "77777777-7777-4777-8777-777777777777");
                 assert_eq!(args.title, "do the thing");
-            },
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -2037,7 +1881,7 @@ mod tests {
             SessionCommand::PeekRange(args) => {
                 assert_eq!(args.start, 0);
                 assert!(args.end.is_none());
-            },
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -2072,11 +1916,8 @@ mod tests {
                     args.id.as_deref(),
                     Some("7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71")
                 );
-                assert_eq!(
-                    args.to_workspace_root,
-                    Some(PathBuf::from("/repo/target"))
-                );
-            },
+                assert_eq!(args.to_workspace_root, Some(PathBuf::from("/repo/target")));
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -2121,7 +1962,7 @@ mod tests {
             SessionCommand::SessionsForTicket(args) => {
                 assert_eq!(args.ticket_id, "ticket-abc");
                 assert_eq!(args.strength, "linked");
-            },
+            }
             other => panic!("unexpected command: {other:?}"),
         }
     }
@@ -2143,10 +1984,7 @@ mod tests {
         let source_store_root = repo_root.join(".workflow-tools/session");
         std::fs::create_dir_all(&source_store_root).unwrap();
         let target_workspace_root = repo_root.join("target-workspace");
-        std::fs::create_dir_all(
-            target_workspace_root.join(".workflow-tools/session"),
-        )
-            .unwrap();
+        std::fs::create_dir_all(target_workspace_root.join(".workflow-tools/session")).unwrap();
 
         let session_id = "7b3a7c62-1f3f-45d6-b8a1-f2b83e3d9f71";
         let config = SessionStoreConfig::new(source_store_root.clone());
@@ -2192,13 +2030,12 @@ mod tests {
                 assert_eq!(value["status"], "ok");
                 assert_eq!(value["mode"], "execute");
                 assert!(value["outcome"]["journal"]["id"].is_string());
-            },
+            }
             other => panic!("unexpected output: {other:?}"),
         }
 
-        let target_config = SessionStoreConfig::new(
-            target_workspace_root.join(".workflow-tools/session"),
-        );
+        let target_config =
+            SessionStoreConfig::new(target_workspace_root.join(".workflow-tools/session"));
         assert!(matches!(
             config.read_session(session_id),
             Err(SessionError::NotFound { .. })
@@ -2216,9 +2053,7 @@ mod tests {
 
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
-                session_id: Some(
-                    "33333333-3333-4333-8333-333333333333".to_string(),
-                ),
+                session_id: Some("33333333-3333-4333-8333-333333333333".to_string()),
                 predecessor_run_id: None,
                 force_new_run: false,
             })
@@ -2230,8 +2065,7 @@ mod tests {
                 &session_id,
                 None,
                 vec![session_api::SessionValidationGate {
-                    validation_spec_id: "val-handoff-reference-completeness"
-                        .to_string(),
+                    validation_spec_id: "val-handoff-reference-completeness".to_string(),
                     required: true,
                     outcome: Some("passed".to_string()),
                     command: None,

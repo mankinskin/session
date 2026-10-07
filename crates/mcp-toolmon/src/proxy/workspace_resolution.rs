@@ -1,27 +1,15 @@
 //! Validates caller-supplied paths against the session checkout without
 //! substituting paths or selecting a different execution directory.
 
-use std::path::{
-    Path,
-    PathBuf,
-};
 use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 
-use session_api::{
-    SessionError,
-    store::SessionStoreConfig,
-};
+use session_api::{SessionError, store::SessionStoreConfig};
 use session_workspace_resolver::{
-    ResolutionError,
-    ResolveRequest,
-    ResolverConfig,
-    SessionWorkspaceResolver,
+    ResolutionError, ResolveRequest, ResolverConfig, SessionWorkspaceResolver,
 };
 
-use super::gating::{
-    ToolAccess,
-    tool_access,
-};
+use super::gating::{ToolAccess, tool_access};
 
 pub(crate) const MAIN_CHECKOUT_ENV: &str = "MCP_MAIN_CHECKOUT";
 pub(crate) const DEFAULT_STORE_DIR: &str = ".session";
@@ -45,8 +33,7 @@ pub(crate) fn anchored_resolver() -> Result<SessionWorkspaceResolver, String> {
             main_checkout: PathBuf::from(override_path),
             workspace_path: "default".to_string(),
         },
-        None => ResolverConfig::from_working_dir("default")
-            .map_err(|error| error.to_string())?,
+        None => ResolverConfig::from_working_dir("default").map_err(|error| error.to_string())?,
     };
     SessionWorkspaceResolver::new(config).map_err(|error| error.to_string())
 }
@@ -80,9 +67,10 @@ fn resolve_workspace(
                     )
                 })?;
             (canonical_target_root, store_root)
-        },
-        Err(ResolutionError::MissingSessionWorktree { .. }) =>
-            resolve_unassigned_session_target(&resolver, session_id, &store_dir, access)?,
+        }
+        Err(ResolutionError::MissingSessionWorktree { .. }) => {
+            resolve_unassigned_session_target(&resolver, session_id, &store_dir, access)?
+        }
         Err(other) => return Err(other.to_string()),
     };
     let target_root = workspace
@@ -122,21 +110,31 @@ pub(crate) fn canonicalize_tool_path(path: &Path) -> Result<PathBuf, String> {
         Ok(canonical) => Ok(canonical),
         Err(error) if error.kind() == ErrorKind::NotFound => {
             match std::fs::symlink_metadata(&absolute_path) {
-                Err(metadata_error) if metadata_error.kind() == ErrorKind::NotFound => {},
-                _ => return Err(format!(
-                    "cannot validate path '{}': {error}", absolute_path.display()
-                )),
+                Err(metadata_error) if metadata_error.kind() == ErrorKind::NotFound => {}
+                _ => {
+                    return Err(format!(
+                        "cannot validate path '{}': {error}",
+                        absolute_path.display()
+                    ));
+                }
             }
             let parent = absolute_path.parent().ok_or_else(|| {
-                format!("cannot validate path '{}': {error}", absolute_path.display())
+                format!(
+                    "cannot validate path '{}': {error}",
+                    absolute_path.display()
+                )
             })?;
             let name = absolute_path.file_name().ok_or_else(|| {
-                format!("cannot validate path '{}': {error}", absolute_path.display())
+                format!(
+                    "cannot validate path '{}': {error}",
+                    absolute_path.display()
+                )
             })?;
             Ok(canonicalize_tool_path(parent)?.join(name))
-        },
+        }
         Err(error) => Err(format!(
-            "cannot validate path '{}': {error}", absolute_path.display()
+            "cannot validate path '{}': {error}",
+            absolute_path.display()
         )),
     }
 }
@@ -200,9 +198,7 @@ fn repository_root_target(
         .map_err(|error| error.to_string())?
         .into_iter()
         .next()
-        .ok_or_else(|| {
-            "workspace resolution could not derive repository anchor".to_string()
-        })?;
+        .ok_or_else(|| "workspace resolution could not derive repository anchor".to_string())?;
     let target_root = store_root.parent().ok_or_else(|| {
         format!(
             "repository store root '{}' has no repository parent",
@@ -220,34 +216,26 @@ fn repository_root_target(
 
 /// A legacy assignment to the main checkout is not worktree isolation.
 /// A missing assigned worktree remains assigned and blocks mutation fallback.
-fn session_is_unassigned(
-    repository_root: &Path,
-    session_id: &str,
-) -> Result<bool, String> {
+fn session_is_unassigned(repository_root: &Path, session_id: &str) -> Result<bool, String> {
     let config = SessionStoreConfig::new(canonical_session_store_root(repository_root));
     match config.read_session(session_id) {
         Ok(record) => Ok(match record.metadata.worktree {
             None => true,
             Some(assignment) => {
                 assignment_targets_repository_root(repository_root, &assignment.path)
-            },
+            }
         }),
         Err(SessionError::NotFound { .. }) => Ok(true),
         Err(error) => Err(error.to_string()),
     }
 }
 
-fn assignment_targets_repository_root(
-    repository_root: &Path,
-    assignment_path: &Path,
-) -> bool {
+fn assignment_targets_repository_root(repository_root: &Path, assignment_path: &Path) -> bool {
     match (
         std::fs::canonicalize(repository_root),
         std::fs::canonicalize(assignment_path),
     ) {
-        (Ok(repository_root), Ok(assignment_path)) => {
-            repository_root == assignment_path
-        },
+        (Ok(repository_root), Ok(assignment_path)) => repository_root == assignment_path,
         _ => false,
     }
 }
@@ -272,21 +260,19 @@ fn try_resolve_session_check_in_bootstrap_workspace(
     }
 
     let resolver = anchored_resolver()?;
-    let canonical_workspace =
-        std::fs::canonicalize(&workspace_path).map_err(|error| {
-            format!(
-                "workspace '{}' could not be canonicalized: {error}",
-                workspace_path.display()
-            )
-        })?;
+    let canonical_workspace = std::fs::canonicalize(&workspace_path).map_err(|error| {
+        format!(
+            "workspace '{}' could not be canonicalized: {error}",
+            workspace_path.display()
+        )
+    })?;
     let anchor_candidate = resolver
         .refused_candidates(DEFAULT_STORE_DIR)
         .map_err(|error| error.to_string())?
         .into_iter()
         .next()
         .ok_or_else(|| {
-            "session_check_in bootstrap could not derive repository anchor"
-                .to_string()
+            "session_check_in bootstrap could not derive repository anchor".to_string()
         })?;
     let repository = anchor_candidate
         .parent()
@@ -308,10 +294,8 @@ fn try_resolve_session_check_in_bootstrap_workspace(
     }
     let canonical_worktrees = canonical_repository.join(".worktrees");
     let canonical_nested_parent = canonical_worktrees.join(session_id);
-    let is_nested_child =
-        canonical_workspace.parent() == Some(canonical_nested_parent.as_path());
-    let is_legacy_flat_child =
-        canonical_workspace.parent() == Some(canonical_worktrees.as_path());
+    let is_nested_child = canonical_workspace.parent() == Some(canonical_nested_parent.as_path());
+    let is_legacy_flat_child = canonical_workspace.parent() == Some(canonical_worktrees.as_path());
     if !is_nested_child && !is_legacy_flat_child {
         return Err(format!(
             "session_check_in bootstrap workspace '{}' must be a direct child of '{}' or '{}'; received '{}'.",

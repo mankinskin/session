@@ -4,10 +4,7 @@ use serde_json::Value;
 
 use super::super::super::*;
 
-fn feedback_ingest_result_event(
-    tool_success: Option<bool>,
-    arguments: Value,
-) -> CopilotHookEvent {
+fn feedback_ingest_result_event(tool_success: Option<bool>, arguments: Value) -> CopilotHookEvent {
     CopilotHookEvent {
         event_id: Some("evt-ingest-1".to_string()),
         parent_event_id: None,
@@ -62,8 +59,7 @@ fn detects_explicit_ingestion_tool_call_from_events() {
 
 #[test]
 fn detects_explicit_ingestion_from_execution_complete_event() {
-    let mut event =
-        feedback_ingest_result_event(Some(false), ingest_arguments());
+    let mut event = feedback_ingest_result_event(Some(false), ingest_arguments());
     event.event_type = Some("tool.execution_complete".to_string());
 
     let signals = mine_explicit_ingestion_signals(&[event]);
@@ -74,8 +70,7 @@ fn detects_explicit_ingestion_from_execution_complete_event() {
 
 #[test]
 fn deduplicates_explicit_ingestion_when_complete_and_result_overlap() {
-    let mut complete =
-        feedback_ingest_result_event(Some(false), ingest_arguments());
+    let mut complete = feedback_ingest_result_event(Some(false), ingest_arguments());
     complete.event_type = Some("tool.execution_complete".to_string());
     let mut result = complete.clone();
     result.event_id = Some("evt-ingest-2".to_string());
@@ -89,15 +84,12 @@ fn deduplicates_explicit_ingestion_when_complete_and_result_overlap() {
 
 #[test]
 fn ignores_non_ingest_tool_calls_and_non_result_events() {
-    let mut other_tool =
-        feedback_ingest_result_event(Some(true), ingest_arguments());
+    let mut other_tool = feedback_ingest_result_event(Some(true), ingest_arguments());
     other_tool.tool_name = Some("mcp_rmcp5_feedback_inbox".to_string());
-    let mut wrong_event_type =
-        feedback_ingest_result_event(Some(false), ingest_arguments());
+    let mut wrong_event_type = feedback_ingest_result_event(Some(false), ingest_arguments());
     wrong_event_type.event_type = Some("tool.execution_start".to_string());
 
-    let signals =
-        mine_explicit_ingestion_signals(&[other_tool, wrong_event_type]);
+    let signals = mine_explicit_ingestion_signals(&[other_tool, wrong_event_type]);
 
     assert!(signals.is_empty());
 }
@@ -130,8 +122,7 @@ fn does_not_duplicate_a_successfully_persisted_ingestion_call() {
     let event = feedback_ingest_result_event(Some(true), ingest_arguments());
     let signals = mine_explicit_ingestion_signals(&[event]);
 
-    let recovered =
-        recover_feedback_entry_from_signal(&signals[0], None).unwrap();
+    let recovered = recover_feedback_entry_from_signal(&signals[0], None).unwrap();
     assert!(recovered.is_none());
 }
 
@@ -142,7 +133,6 @@ fn skips_recovery_when_required_arguments_are_missing() {
     let event = feedback_ingest_result_event(Some(false), arguments);
     let signals = mine_explicit_ingestion_signals(&[event]);
 
-    let recovered =
-        recover_feedback_entry_from_signal(&signals[0], None).unwrap();
+    let recovered = recover_feedback_entry_from_signal(&signals[0], None).unwrap();
     assert!(recovered.is_none());
 }

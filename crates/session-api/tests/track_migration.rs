@@ -1,9 +1,4 @@
-use session_api::{
-    PersistedSessionManifest,
-    SessionLinks,
-    SessionMetadata,
-    SessionRecord,
-};
+use session_api::{PersistedSessionManifest, SessionLinks, SessionMetadata, SessionRecord};
 use std::path::PathBuf;
 
 /// AC1: Existing sessions load without error
@@ -13,8 +8,7 @@ use std::path::PathBuf;
 /// to verify that pre-existing sessions (without track fields) deserialize successfully
 /// and report track_id = None.
 #[test]
-fn test_existing_sessions_load_without_error_real_data()
--> Result<(), Box<dyn std::error::Error>> {
+fn test_existing_sessions_load_without_error_real_data() -> Result<(), Box<dyn std::error::Error>> {
     // Use the real repo-root session store
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let repo_root = manifest_dir
@@ -27,9 +21,7 @@ fn test_existing_sessions_load_without_error_real_data()
 
     // Skip if the store doesn't exist (CI or fresh clone)
     if !sessions_dir.exists() {
-        eprintln!(
-            "Skipping real-data test: .session/sessions/ not found at repo root"
-        );
+        eprintln!("Skipping real-data test: .session/sessions/ not found at repo root");
         return Ok(());
     }
 
@@ -46,8 +38,7 @@ fn test_existing_sessions_load_without_error_real_data()
 
         // AC1: Session deserializes without error
         let manifest_bytes = std::fs::read(&manifest_path)?;
-        let manifest: PersistedSessionManifest =
-            serde_json::from_slice(&manifest_bytes)?;
+        let manifest: PersistedSessionManifest = serde_json::from_slice(&manifest_bytes)?;
 
         // AC2: track_id should be None for pre-existing sessions
         assert_eq!(
@@ -69,9 +60,7 @@ fn test_existing_sessions_load_without_error_real_data()
     }
 
     if sessions_loaded == 0 {
-        eprintln!(
-            "Warning: No sessions found in real store, cannot fully verify AC1/AC2"
-        );
+        eprintln!("Warning: No sessions found in real store, cannot fully verify AC1/AC2");
         return Ok(());
     }
 
@@ -86,8 +75,7 @@ fn test_existing_sessions_load_without_error_real_data()
 
 /// Test PersistedSessionManifest serialization/deserialization with track fields
 #[test]
-fn test_manifest_roundtrip_with_track_fields()
--> Result<(), Box<dyn std::error::Error>> {
+fn test_manifest_roundtrip_with_track_fields() -> Result<(), Box<dyn std::error::Error>> {
     use chrono::Utc;
 
     let now = Utc::now();
@@ -158,8 +146,7 @@ fn test_manifest_roundtrip_with_track_fields()
 
 /// Test that manifest without track fields deserializes with None values
 #[test]
-fn test_legacy_manifest_deserialization()
--> Result<(), Box<dyn std::error::Error>> {
+fn test_legacy_manifest_deserialization() -> Result<(), Box<dyn std::error::Error>> {
     // JSON without track fields (old format)
     let legacy_json = r#"{
         "schema_version": 1,
@@ -188,9 +175,7 @@ fn test_legacy_manifest_deserialization()
     assert_eq!(manifest.parent_session_id, None);
     assert_eq!(manifest.spawned_session_id, None);
 
-    println!(
-        "✓ Legacy manifest (without track fields) deserializes with None values"
-    );
+    println!("✓ Legacy manifest (without track fields) deserializes with None values");
 
     Ok(())
 }
@@ -241,7 +226,5 @@ fn test_session_record_track_field_conversion() {
     assert_eq!(manifest.parent_session_id, Some("parent-789".to_string()));
     assert_eq!(manifest.spawned_session_id, Some("spawned-abc".to_string()));
 
-    println!(
-        "✓ SessionRecord -> PersistedSessionManifest preserves track fields"
-    );
+    println!("✓ SessionRecord -> PersistedSessionManifest preserves track fields");
 }

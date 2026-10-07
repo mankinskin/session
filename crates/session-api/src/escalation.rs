@@ -8,26 +8,14 @@
 
 use std::{
     fs,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
 };
 
-use chrono::{
-    DateTime,
-    Utc,
-};
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    SessionError,
-    SessionStoreConfig,
-};
+use crate::{SessionError, SessionStoreConfig};
 
 /// Status of an escalation record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,11 +138,9 @@ pub fn create_escalation(
     })?;
 
     let path = dir.join(format!("{}.json", escalation.escalation_id));
-    let json = serde_json::to_string_pretty(&escalation).map_err(|e| {
-        SessionError::Serialize {
-            path: path.clone(),
-            source: e,
-        }
+    let json = serde_json::to_string_pretty(&escalation).map_err(|e| SessionError::Serialize {
+        path: path.clone(),
+        source: e,
     })?;
 
     fs::write(&path, json).map_err(|e| SessionError::Io {
@@ -196,12 +182,8 @@ pub fn list_escalations(
         }
 
         if let Ok(content) = fs::read_to_string(&path) {
-            if let Ok(escalation) =
-                serde_json::from_str::<EscalationRecord>(&content)
-            {
-                if status_filter.is_none()
-                    || status_filter == Some(escalation.status)
-                {
+            if let Ok(escalation) = serde_json::from_str::<EscalationRecord>(&content) {
+                if status_filter.is_none() || status_filter == Some(escalation.status) {
                     escalations.push(escalation);
                 }
             }
@@ -218,8 +200,7 @@ pub fn get_escalation(
     config: &SessionStoreConfig,
     escalation_id: &str,
 ) -> Option<EscalationRecord> {
-    let path =
-        escalations_dir(&config.root).join(format!("{}.json", escalation_id));
+    let path = escalations_dir(&config.root).join(format!("{}.json", escalation_id));
 
     if !path.exists() {
         return None;
@@ -241,8 +222,7 @@ pub fn resolve_escalation(
     escalation_id: &str,
     resolution: EscalationResolution,
 ) -> Result<EscalationRecord, SessionError> {
-    let path =
-        escalations_dir(&config.root).join(format!("{}.json", escalation_id));
+    let path = escalations_dir(&config.root).join(format!("{}.json", escalation_id));
 
     if !path.exists() {
         return Err(SessionError::NotFound { path });
@@ -253,8 +233,8 @@ pub fn resolve_escalation(
         source: e,
     })?;
 
-    let mut escalation: EscalationRecord = serde_json::from_str(&content)
-        .map_err(|e| SessionError::Deserialize {
+    let mut escalation: EscalationRecord =
+        serde_json::from_str(&content).map_err(|e| SessionError::Deserialize {
             path: path.clone(),
             source: e,
         })?;
@@ -262,11 +242,9 @@ pub fn resolve_escalation(
     escalation.status = EscalationStatus::Resolved;
     escalation.resolution = Some(resolution);
 
-    let json = serde_json::to_string_pretty(&escalation).map_err(|e| {
-        SessionError::Serialize {
-            path: path.clone(),
-            source: e,
-        }
+    let json = serde_json::to_string_pretty(&escalation).map_err(|e| SessionError::Serialize {
+        path: path.clone(),
+        source: e,
     })?;
 
     fs::write(&path, json).map_err(|e| SessionError::Io {
@@ -339,8 +317,7 @@ mod tests {
         .unwrap();
 
         // Read the written file
-        let path = escalations_dir(&config.root)
-            .join(format!("{}.json", escalation.escalation_id));
+        let path = escalations_dir(&config.root).join(format!("{}.json", escalation.escalation_id));
         let content = fs::read_to_string(&path).unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
 
@@ -415,15 +392,12 @@ mod tests {
         assert_eq!(all.len(), 2);
 
         // List only open escalations
-        let open =
-            list_escalations(&config, Some(EscalationStatus::Open)).unwrap();
+        let open = list_escalations(&config, Some(EscalationStatus::Open)).unwrap();
         assert_eq!(open.len(), 1);
         assert_eq!(open[0].escalation_id, open_esc.escalation_id);
 
         // List only resolved escalations
-        let resolved =
-            list_escalations(&config, Some(EscalationStatus::Resolved))
-                .unwrap();
+        let resolved = list_escalations(&config, Some(EscalationStatus::Resolved)).unwrap();
         assert_eq!(resolved.len(), 1);
         assert_eq!(resolved[0].escalation_id, to_resolve.escalation_id);
     }
@@ -445,8 +419,7 @@ mod tests {
         .unwrap();
 
         // Simulate: different reader (orchestrator) picks it up later
-        let found =
-            list_escalations(&config, Some(EscalationStatus::Open)).unwrap();
+        let found = list_escalations(&config, Some(EscalationStatus::Open)).unwrap();
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].escalation_id, created.escalation_id);
         assert_eq!(found[0].session_id, Some("session-xyz".to_string()));
@@ -467,8 +440,7 @@ mod tests {
         )
         .unwrap();
 
-        let retrieved =
-            get_escalation(&config, &created.escalation_id).unwrap();
+        let retrieved = get_escalation(&config, &created.escalation_id).unwrap();
         assert_eq!(retrieved.escalation_id, created.escalation_id);
         assert_eq!(retrieved.status, EscalationStatus::Open);
 
@@ -631,7 +603,7 @@ mod tests {
         match result {
             Err(SessionError::NotFound { path }) => {
                 assert!(path.to_string_lossy().contains("nonexistent"));
-            },
+            }
             _ => panic!("Expected NotFound error"),
         }
     }

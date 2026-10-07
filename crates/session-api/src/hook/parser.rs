@@ -1,26 +1,17 @@
 use std::path::Path;
 
-use chrono::{
-    DateTime,
-    Utc,
-};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use super::{
-    SessionError,
-    SessionRole,
-    TranscriptEventEnvelope,
-};
+use super::{SessionError, SessionRole, TranscriptEventEnvelope};
 
 pub(super) fn deserialize_transcript_event(
     line: &str,
     transcript_path: &Path,
 ) -> Result<TranscriptEventEnvelope, SessionError> {
-    let value: Value = serde_json::from_str(line).map_err(|source| {
-        SessionError::Deserialize {
-            path: transcript_path.to_path_buf(),
-            source,
-        }
+    let value: Value = serde_json::from_str(line).map_err(|source| SessionError::Deserialize {
+        path: transcript_path.to_path_buf(),
+        source,
     })?;
     let value = normalize_embedded_json_strings(value);
     let data = value.get("data").cloned().unwrap_or_else(|| value.clone());
@@ -58,10 +49,7 @@ pub(super) fn deserialize_transcript_event(
         tool_call_id: json_string(&data, &["toolCallId", "tool_call_id"]),
         tool_name: json_string(&data, &["toolName", "tool_name"]),
         tool_success: data.get("success").and_then(Value::as_bool),
-        reasoning_text: json_string(
-            &data,
-            &["reasoningText", "reasoning_text"],
-        ),
+        reasoning_text: json_string(&data, &["reasoningText", "reasoning_text"]),
         tool_requests_json: json_value(&data, "toolRequests"),
         tool_arguments_json: json_value(&data, "arguments"),
         data_json: Some(data.clone()),
@@ -71,10 +59,7 @@ pub(super) fn deserialize_transcript_event(
     })
 }
 
-pub(super) fn json_string(
-    value: &Value,
-    keys: &[&str],
-) -> Option<String> {
+pub(super) fn json_string(value: &Value, keys: &[&str]) -> Option<String> {
     keys.iter()
         .find_map(|key| value.get(*key).and_then(Value::as_str))
         .map(str::trim)
@@ -82,19 +67,13 @@ pub(super) fn json_string(
         .map(ToString::to_string)
 }
 
-pub(super) fn json_timestamp(
-    value: &Value,
-    keys: &[&str],
-) -> Option<DateTime<Utc>> {
+pub(super) fn json_timestamp(value: &Value, keys: &[&str]) -> Option<DateTime<Utc>> {
     keys.iter()
         .find_map(|key| value.get(*key))
         .and_then(parse_timestamp_value)
 }
 
-fn json_value(
-    value: &Value,
-    key: &str,
-) -> Option<Value> {
+fn json_value(value: &Value, key: &str) -> Option<Value> {
     value.get(key).cloned()
 }
 
@@ -109,9 +88,7 @@ fn normalize_embedded_json_strings(value: Value) -> Value {
         Value::Object(entries) => Value::Object(
             entries
                 .into_iter()
-                .map(|(key, value)| {
-                    (key, normalize_embedded_json_strings(value))
-                })
+                .map(|(key, value)| (key, normalize_embedded_json_strings(value)))
                 .collect(),
         ),
         Value::String(text) => parse_stringified_json_value(&text)
@@ -123,9 +100,7 @@ fn normalize_embedded_json_strings(value: Value) -> Value {
 
 fn parse_stringified_json_value(text: &str) -> Option<Value> {
     let trimmed = text.trim();
-    if trimmed.is_empty()
-        || (!trimmed.starts_with('{') && !trimmed.starts_with('['))
-    {
+    if trimmed.is_empty() || (!trimmed.starts_with('{') && !trimmed.starts_with('[')) {
         return None;
     }
     serde_json::from_str(trimmed).ok()

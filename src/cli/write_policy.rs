@@ -1,9 +1,4 @@
-use super::{
-    EscalationCommand,
-    GrantCommand,
-    SessionCommand,
-    WorkflowCommand,
-};
+use super::{EscalationCommand, GrantCommand, SessionCommand, WorkflowCommand};
 
 pub(super) fn command_writes_store(command: &SessionCommand) -> bool {
     match command {
@@ -24,8 +19,7 @@ pub(super) fn command_writes_store(command: &SessionCommand) -> bool {
             | WorkflowCommand::AddEdges(_)
             | WorkflowCommand::SetStatus(_)
             | WorkflowCommand::Promote(_) => true,
-            WorkflowCommand::RenderTerminal(_)
-            | WorkflowCommand::RenderMermaid(_) => false,
+            WorkflowCommand::RenderTerminal(_) | WorkflowCommand::RenderMermaid(_) => false,
         },
         SessionCommand::WorkflowAddNode(_)
         | SessionCommand::WorkflowAddNodes(_)
@@ -33,8 +27,9 @@ pub(super) fn command_writes_store(command: &SessionCommand) -> bool {
         | SessionCommand::WorkflowAddEdges(_)
         | SessionCommand::WorkflowSetStatus(_)
         | SessionCommand::WorkflowPromote(_) => true,
-        SessionCommand::WorkflowRenderTerminal(_)
-        | SessionCommand::WorkflowRenderMermaid(_) => false,
+        SessionCommand::WorkflowRenderTerminal(_) | SessionCommand::WorkflowRenderMermaid(_) => {
+            false
+        }
         SessionCommand::BackfillTicketLinks(args) => args.write,
         SessionCommand::Move(args) => {
             args.resume.is_some() || args.rollback.is_some() || !args.dry_run

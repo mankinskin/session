@@ -32,9 +32,7 @@ pub(super) struct ParsedEntityUrn {
     pub(super) entity_id: String,
 }
 
-pub(super) fn parse_entity_urn(
-    entity_urn: &str
-) -> Result<ParsedEntityUrn, SessionError> {
+pub(super) fn parse_entity_urn(entity_urn: &str) -> Result<ParsedEntityUrn, SessionError> {
     let trimmed = entity_urn.trim();
     let urn = EntityUrn::from_str(trimmed).map_err(|err| {
         SessionError::InvalidEntityUrn(format!(
@@ -53,8 +51,8 @@ pub(super) fn parse_entity_urn(
         _ => {
             return Err(SessionError::InvalidEntityUrn(format!(
                 "'{trimmed}' has unsupported store '{store}' (expected ticket|spec|rule|dossier)"
-            )))
-        },
+            )));
+        }
     };
 
     Ok(ParsedEntityUrn {
@@ -65,7 +63,7 @@ pub(super) fn parse_entity_urn(
 }
 
 pub(super) fn parse_entity_urn_kind(
-    entity_urn: &str
+    entity_urn: &str,
 ) -> Result<SessionPinnedEntityKind, SessionError> {
     Ok(parse_entity_urn(entity_urn)?.kind)
 }
@@ -99,16 +97,25 @@ mod tests {
         assert_eq!(parsed_dossier.kind, SessionPinnedEntityKind::Dossier);
         assert_eq!(parsed_dossier.entity_id, "13-09-2026_my-slug");
 
-        let parsed_transcript = parse_entity_urn("ce://default/transcripts/13-09-2026_transcript-slug").unwrap();
+        let parsed_transcript =
+            parse_entity_urn("ce://default/transcripts/13-09-2026_transcript-slug").unwrap();
         assert_eq!(parsed_transcript.kind, SessionPinnedEntityKind::Dossier);
     }
 
     #[test]
     fn parse_entity_urn_rejects_raw_paths_and_unsupported_stores() {
         let err_path = parse_entity_urn("path:transcripts/13-09-2026_my-slug").unwrap_err();
-        assert!(err_path.to_string().contains("expected ce://<workspace>/<store>/<entity>"));
+        assert!(
+            err_path
+                .to_string()
+                .contains("expected ce://<workspace>/<store>/<entity>")
+        );
 
         let err_store = parse_entity_urn("ce://default/unknown_store/entity-1").unwrap_err();
-        assert!(err_store.to_string().contains("unsupported store 'unknown_store'"));
+        assert!(
+            err_store
+                .to_string()
+                .contains("unsupported store 'unknown_store'")
+        );
     }
 }

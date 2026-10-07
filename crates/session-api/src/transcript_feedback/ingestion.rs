@@ -1,23 +1,13 @@
 use std::str::FromStr;
 
 use feedback_api::{
-    EntityUrn,
-    FeedbackEntry,
-    FeedbackNoteKind,
-    FeedbackProvenance,
-    FeedbackRating,
-    FeedbackSource,
+    EntityUrn, FeedbackEntry, FeedbackNoteKind, FeedbackProvenance, FeedbackRating, FeedbackSource,
 };
 use serde_json::Value;
 
 use super::{
-    ExplicitIngestionArgs,
-    FeedbackSignalKind,
-    StructuredFeedbackSignal,
-    event_outcomes::{
-        canonicalize_outcome_events,
-        is_tool_execution_outcome,
-    },
+    ExplicitIngestionArgs, FeedbackSignalKind, StructuredFeedbackSignal,
+    event_outcomes::{canonicalize_outcome_events, is_tool_execution_outcome},
 };
 use crate::CopilotHookEvent;
 
@@ -25,7 +15,7 @@ const FEEDBACK_INGEST_TOOL_SUFFIX: &str = "feedback_ingest";
 
 /// Extract explicit feedback-ingestion signals from captured tool outcomes.
 pub fn mine_explicit_ingestion_signals(
-    events: &[CopilotHookEvent]
+    events: &[CopilotHookEvent],
 ) -> Vec<StructuredFeedbackSignal> {
     canonicalize_outcome_events(events)
         .iter()
@@ -39,9 +29,7 @@ pub fn recover_feedback_entry_from_signal(
     signal: &StructuredFeedbackSignal,
     fallback_session_id: Option<String>,
 ) -> Result<Option<FeedbackEntry>, String> {
-    if signal.kind != FeedbackSignalKind::ExplicitIngestion
-        || signal.tool_success == Some(true)
-    {
+    if signal.kind != FeedbackSignalKind::ExplicitIngestion || signal.tool_success == Some(true) {
         return Ok(None);
     }
     let Some(ingestion) = signal.ingestion.as_ref() else {
@@ -84,9 +72,7 @@ pub fn recover_feedback_entry_from_signal(
     .map(Some)
 }
 
-fn detect_explicit_ingestion(
-    event: &CopilotHookEvent
-) -> Option<StructuredFeedbackSignal> {
+fn detect_explicit_ingestion(event: &CopilotHookEvent) -> Option<StructuredFeedbackSignal> {
     if !is_tool_execution_outcome(event.event_type.as_deref()) {
         return None;
     }
@@ -116,9 +102,6 @@ fn detect_explicit_ingestion(
     })
 }
 
-fn json_str(
-    value: Option<&Value>,
-    key: &str,
-) -> Option<String> {
+fn json_str(value: Option<&Value>, key: &str) -> Option<String> {
     value?.get(key)?.as_str().map(str::to_string)
 }

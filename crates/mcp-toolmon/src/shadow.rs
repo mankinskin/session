@@ -7,15 +7,9 @@
 
 use std::{
     collections::hash_map::DefaultHasher,
-    hash::{
-        Hash,
-        Hasher,
-    },
+    hash::{Hash, Hasher},
     io,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
 };
 
 /// Resolve `name` to an absolute canonical path.
@@ -36,8 +30,8 @@ pub fn resolve_canonical(name: &str) -> io::Result<PathBuf> {
             return std::fs::canonicalize(plain);
         }
         if cfg!(windows) && Path::new(name).extension().is_none() {
-            let pathext = std::env::var("PATHEXT")
-                .unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".to_string());
+            let pathext =
+                std::env::var("PATHEXT").unwrap_or_else(|_| ".EXE;.CMD;.BAT;.COM".to_string());
             for ext in pathext.split(';') {
                 if ext.is_empty() {
                     continue;
@@ -85,10 +79,7 @@ pub fn shadow_root(override_dir: Option<&Path>) -> PathBuf {
 /// into the SAME destination on purpose. `AlreadyExists` is therefore only
 /// treated as a real error if the existing path isn't a plain directory we
 /// own (guards the symlink-planting case `create_dir` exists to prevent).
-pub fn make_shadow_copy(
-    canonical: &Path,
-    root: &Path,
-) -> io::Result<PathBuf> {
+pub fn make_shadow_copy(canonical: &Path, root: &Path) -> io::Result<PathBuf> {
     std::fs::create_dir_all(root)?;
 
     let pid = std::process::id();
@@ -102,10 +93,10 @@ pub fn make_shadow_copy(
 
     let dir = root.join(format!("{name}-{pid}-{hash:x}"));
     match std::fs::create_dir(&dir) {
-        Ok(()) => {},
+        Ok(()) => {}
         Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
             verify_reusable_shadow_dir(&dir)?;
-        },
+        }
         Err(e) => return Err(e),
     }
 
@@ -209,8 +200,7 @@ fn is_process_alive(pid: u32) -> bool {
         .args(["/FI", &format!("PID eq {pid}"), "/NH"])
         .output()
     {
-        Ok(out) =>
-            String::from_utf8_lossy(&out.stdout).contains(&pid.to_string()),
+        Ok(out) => String::from_utf8_lossy(&out.stdout).contains(&pid.to_string()),
         // Command failed to run: assume alive so we never delete a live shadow.
         Err(_) => true,
     }

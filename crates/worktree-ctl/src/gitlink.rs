@@ -1,10 +1,6 @@
 use std::path::Path;
 
-use git2::{
-    BranchType,
-    Oid,
-    Repository,
-};
+use git2::{BranchType, Oid, Repository};
 use session_worktree_provision::WorktreeGit;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,11 +20,8 @@ pub(crate) struct GitlinkStatus {
     pub(crate) state: GitlinkState,
 }
 
-pub(crate) fn verify_gitlink_containment(
-    repo_root: &Path
-) -> Result<Vec<GitlinkStatus>, String> {
-    let superproject =
-        Repository::open(repo_root).map_err(|error| error.to_string())?;
+pub(crate) fn verify_gitlink_containment(repo_root: &Path) -> Result<Vec<GitlinkStatus>, String> {
+    let superproject = Repository::open(repo_root).map_err(|error| error.to_string())?;
     let head = superproject.head().map_err(|error| error.to_string())?;
     let commit = head.peel_to_commit().map_err(|error| error.to_string())?;
     let tree = commit.tree().map_err(|error| error.to_string())?;
@@ -45,21 +38,16 @@ pub(crate) fn verify_gitlink_containment(
                 .map_err(|error| error.to_string())?
                 .id();
             let submodule = Repository::open(repo_root.join(&submodule_path))
-                .map_err(|error| {
-                    format!(
-                        "failed to open submodule {submodule_path}: {error}"
-                    )
-                })?;
+                .map_err(|error| format!("failed to open submodule {submodule_path}: {error}"))?;
             let main = submodule
                 .find_branch("main", BranchType::Local)
                 .map_err(|error| {
-                    format!(
-                        "submodule {submodule_path} has no local main branch: {error}"
-                    )
+                    format!("submodule {submodule_path} has no local main branch: {error}")
                 })?;
-            let main_sha = main.get().target().ok_or_else(|| {
-                format!("submodule {submodule_path} main has no target")
-            })?;
+            let main_sha = main
+                .get()
+                .target()
+                .ok_or_else(|| format!("submodule {submodule_path} main has no target"))?;
             let state = match submodule.find_commit(recorded_sha) {
                 Ok(_) => {
                     let contained_in_main = main_sha == recorded_sha
@@ -93,9 +81,7 @@ pub(crate) fn verify_gitlink_containment(
         .collect()
 }
 
-pub(crate) fn reject_violations(
-    statuses: &[GitlinkStatus]
-) -> Result<(), String> {
+pub(crate) fn reject_violations(statuses: &[GitlinkStatus]) -> Result<(), String> {
     let violations = statuses
         .iter()
         .filter(|status| matches!(
@@ -150,9 +136,8 @@ pub(crate) fn partition_statuses(
         ) {
             continue;
         }
-        let submodule =
-            Repository::open(repo_root.join(&status.submodule_path))
-                .map_err(|error| error.to_string())?;
+        let submodule = Repository::open(repo_root.join(&status.submodule_path))
+            .map_err(|error| error.to_string())?;
         let fast_forwardable = status.main_sha == status.recorded_sha
             || submodule
                 .graph_descendant_of(status.recorded_sha, status.main_sha)
@@ -166,10 +151,7 @@ pub(crate) fn partition_statuses(
     Ok((fixable, blocking))
 }
 
-fn branch_contains(
-    repository: &Repository,
-    commit: Oid,
-) -> Result<bool, String> {
+fn branch_contains(repository: &Repository, commit: Oid) -> Result<bool, String> {
     for branch in repository
         .branches(Some(BranchType::Local))
         .map_err(|error| error.to_string())?

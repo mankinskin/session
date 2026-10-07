@@ -1,30 +1,14 @@
-use std::{
-    path::PathBuf,
-    process::Command,
-};
+use std::{path::PathBuf, process::Command};
 
 use chrono::Utc;
 use tempfile::tempdir;
 
+use session::cli::{CliOutput, machine_output_format, parse_cli_from, run};
 use session_api::{
-    CopilotHookMessage,
-    CopilotHookPayload,
-    SessionCaptureRequest,
-    SessionRole,
-    SessionStoreConfig,
-};
-use session::cli::{
-    CliOutput,
-    machine_output_format,
-    parse_cli_from,
-    run,
+    CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest, SessionRole, SessionStoreConfig,
 };
 
-fn seed_session(
-    config: &SessionStoreConfig,
-    session_id: &str,
-    agent: &str,
-) {
+fn seed_session(config: &SessionStoreConfig, session_id: &str, agent: &str) {
     let payload = CopilotHookPayload {
         session_id: session_id.to_string(),
         workspace_path: "default".to_string(),
@@ -58,11 +42,7 @@ fn seed_session(
         .expect("seed session");
 }
 
-fn seed_compaction_session(
-    config: &SessionStoreConfig,
-    session_id: &str,
-    agent: &str,
-) {
+fn seed_compaction_session(config: &SessionStoreConfig, session_id: &str, agent: &str) {
     let payload = CopilotHookPayload {
         session_id: session_id.to_string(),
         workspace_path: "default".to_string(),
@@ -123,9 +103,8 @@ fn run_machine(args: &[&str]) -> serde_json::Value {
         CliOutput::Machine(value, format) => {
             assert_eq!(format, machine_output_format(true, false).unwrap());
             value
-        },
-        CliOutput::Text(text) =>
-            panic!("expected machine output, got text: {text}"),
+        }
+        CliOutput::Text(text) => panic!("expected machine output, got text: {text}"),
     }
 }
 
@@ -281,8 +260,7 @@ fn query_returns_seeded_session() {
     let dir = tempdir().unwrap();
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
-    let config =
-        SessionStoreConfig::new(store_root.clone());
+    let config = SessionStoreConfig::new(store_root.clone());
     seed_session(&config, "22222222-2222-4222-8222-222222222222", "agent-q");
     let unreadable_id = "f3333333-3333-4333-8333-333333333333";
     let unreadable_dir = store_root.join("sessions").join(unreadable_id);
@@ -387,8 +365,7 @@ fn peek_range_and_skeleton() {
     let dir = tempdir().unwrap();
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
-    let config =
-        SessionStoreConfig::new(store_root.clone());
+    let config = SessionStoreConfig::new(store_root.clone());
     seed_session(&config, "44444444-4444-4444-8444-444444444444", "agent-p");
 
     let range = run_machine(&[
@@ -425,8 +402,7 @@ fn terminal_observer_cli_round_trip() {
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
     let session_id = "77777777-7777-4777-8777-777777777777";
-    let config =
-        SessionStoreConfig::new(store_root.clone());
+    let config = SessionStoreConfig::new(store_root.clone());
     config
         .init_runtime_context(session_api::SessionRuntimeInitRequest {
             session_id: Some(session_id.to_string()),
@@ -494,13 +470,8 @@ fn peek_prompt_pack_reports_guarded_entries() {
     let dir = tempdir().unwrap();
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
-    let config =
-        SessionStoreConfig::new(store_root.clone());
-    seed_compaction_session(
-        &config,
-        "55555555-5555-4555-8555-555555555555",
-        "agent-c",
-    );
+    let config = SessionStoreConfig::new(store_root.clone());
+    seed_compaction_session(&config, "55555555-5555-4555-8555-555555555555", "agent-c");
 
     let pack = run_machine(&[
         "session",
@@ -538,8 +509,7 @@ fn peek_prompt_pack_meets_quantitative_compactness_gate() {
     let dir = tempdir().unwrap();
     let store_root = dir.path().join(".session");
     let store_root_str = store_root.to_string_lossy().to_string();
-    let config =
-        SessionStoreConfig::new(store_root.clone());
+    let config = SessionStoreConfig::new(store_root.clone());
     seed_compaction_session(
         &config,
         "66666666-6666-4666-8666-666666666666",

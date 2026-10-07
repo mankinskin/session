@@ -8,46 +8,22 @@
 //! - Unknown model → Reject
 //! - Missing price table → fail-open (Gate::load error)
 
-use mcp_toolmon::proxy::{
-    ClientAction,
-    PendingCalls,
-    PendingList,
-    handle_client_message,
-};
-use serde_json::{
-    Value,
-    json,
-};
-use session_api::{
-    SessionStoreConfig,
-    SessionWorktreeCheckInRequest,
-};
-use session_workspace_resolver::{
-    ResolverConfig,
-    SessionWorkspaceResolver,
-};
+use mcp_toolmon::proxy::{ClientAction, PendingCalls, PendingList, handle_client_message};
+use serde_json::{Value, json};
+use session_api::{SessionStoreConfig, SessionWorktreeCheckInRequest};
+use session_workspace_resolver::{ResolverConfig, SessionWorkspaceResolver};
 use std::{
     ffi::OsString,
     fs,
-    io::{
-        BufRead,
-        BufReader,
-        Write,
-    },
+    io::{BufRead, BufReader, Write},
     path::PathBuf,
-    process::{
-        Command,
-        Stdio,
-    },
+    process::{Command, Stdio},
     sync::Mutex,
 };
 use tempfile::TempDir;
 use toolmon_costgate::{
     CostGatePolicy,
-    gate::{
-        Gate,
-        ModelBudgetCalibration,
-    },
+    gate::{Gate, ModelBudgetCalibration},
 };
 use toolmon_policy_api::Decision;
 
@@ -55,11 +31,7 @@ static ENV_LOCK: Mutex<()> = Mutex::new(());
 const TEST_SESSION_ID: &str = "77777777-7777-4777-8777-777777777777";
 
 /// Helper: write JSON to a temp file.
-fn write_json(
-    dir: &TempDir,
-    name: &str,
-    value: &Value,
-) -> PathBuf {
+fn write_json(dir: &TempDir, name: &str, value: &Value) -> PathBuf {
     let path = dir.path().join(name);
     fs::write(&path, serde_json::to_string_pretty(value).unwrap()).unwrap();
     path
@@ -174,11 +146,7 @@ fn get_binary_path() -> PathBuf {
 }
 
 /// Helper: construct a tools/call JSON-RPC request.
-fn tools_call_request(
-    id: u32,
-    tool: &str,
-    caller_model: &str,
-) -> Value {
+fn tools_call_request(id: u32, tool: &str, caller_model: &str) -> Value {
     json!({
         "jsonrpc": "2.0",
         "id": id,
@@ -249,7 +217,7 @@ fn test_expensive_model_expensive_tool_delegate() {
         Decision::Delegate { guidance } => {
             assert!(guidance.contains("expensive_tool"));
             assert!(guidance.contains("cost 50"));
-        },
+        }
         _ => panic!("Expected Delegate, got {:?}", decision),
     }
 }
@@ -375,7 +343,7 @@ fn test_unknown_model_reject() {
     match decision {
         Decision::Reject { guidance } => {
             assert!(guidance.to_lowercase().contains("unrecognized"));
-        },
+        }
         _ => panic!("Expected Reject, got {:?}", decision),
     }
 }
@@ -435,16 +403,11 @@ fn test_handle_client_message_expensive_model_refused() {
     .unwrap();
 
     let policy = CostGatePolicy::new(gate);
-    let msg =
-        tools_call_request(1, "get_ticket_description", "claude-opus-4-8");
+    let msg = tools_call_request(1, "get_ticket_description", "claude-opus-4-8");
     let mut pending = PendingList::default();
     let mut pending_calls = PendingCalls::default();
-    let (action, _telemetry) = handle_client_message(
-        msg,
-        Some(&policy),
-        &mut pending,
-        &mut pending_calls,
-    );
+    let (action, _telemetry) =
+        handle_client_message(msg, Some(&policy), &mut pending, &mut pending_calls);
 
     // Should be refused with Delegate guidance.
     let error_text = extract_error_text(action);
@@ -490,26 +453,21 @@ fn test_handle_client_message_cheap_model_allowed() {
     .unwrap();
 
     let policy = CostGatePolicy::new(gate);
-    let msg =
-        tools_call_request(1, "get_ticket_description", "claude-haiku-3-7");
+    let msg = tools_call_request(1, "get_ticket_description", "claude-haiku-3-7");
     let mut pending = PendingList::default();
     let mut pending_calls = PendingCalls::default();
-    let (action, _telemetry) = handle_client_message(
-        msg,
-        Some(&policy),
-        &mut pending,
-        &mut pending_calls,
-    );
+    let (action, _telemetry) =
+        handle_client_message(msg, Some(&policy), &mut pending, &mut pending_calls);
 
     // Should be forwarded (allowed).
     match action {
         ClientAction::Forward(val) => {
             assert!(val["params"]["arguments"].get("caller_model").is_none());
             assert!(val["params"]["arguments"].get("session_id").is_some());
-        },
+        }
         ClientAction::Respond(val) => {
             panic!("Expected Forward, got Respond: {:?}", val);
-        },
+        }
     }
 }
 
@@ -518,18 +476,14 @@ fn test_handle_client_message_no_gate_fail_open() {
     let msg = tools_call_request(1, "some_tool", "claude-opus-4-8");
     let mut pending = PendingList::default();
     let mut pending_calls = PendingCalls::default();
-    let (action, _telemetry) =
-        handle_client_message(msg, None, &mut pending, &mut pending_calls);
+    let (action, _telemetry) = handle_client_message(msg, None, &mut pending, &mut pending_calls);
 
     // No gate (fail-open) → should forward unchanged.
     match action {
-        ClientAction::Forward(_) => {},
+        ClientAction::Forward(_) => {}
         ClientAction::Respond(val) => {
-            panic!(
-                "Expected Forward in fail-open mode, got Respond: {:?}",
-                val
-            );
-        },
+            panic!("Expected Forward in fail-open mode, got Respond: {:?}", val);
+        }
     }
 }
 
@@ -610,8 +564,7 @@ fn test_stdio_expensive_model_refused() {
     // Read the response.
     line.clear();
     reader.read_line(&mut line).unwrap();
-    let response: Value =
-        serde_json::from_str(&line).expect("Failed to parse response JSON");
+    let response: Value = serde_json::from_str(&line).expect("Failed to parse response JSON");
 
     // Verify it's a refusal response with the correct structure.
     assert_eq!(response["jsonrpc"], "2.0");
@@ -712,8 +665,7 @@ fn test_stdio_cheap_model_allowed() {
     // Read the response - should be forwarded to the cat command, which echoes it.
     line.clear();
     reader.read_line(&mut line).unwrap();
-    let response: Value =
-        serde_json::from_str(&line).expect("Failed to parse response JSON");
+    let response: Value = serde_json::from_str(&line).expect("Failed to parse response JSON");
 
     // Verify the call was forwarded (not refused).
     // The cat command will echo the forwarded request.
@@ -800,14 +752,14 @@ fn test_stdio_telemetry_recorded_for_allowed_call() {
     drop(stdin);
     let _ = child.wait();
 
-    let contents = fs::read_to_string(&telemetry_path)
-        .expect("expected telemetry JSONL file to be written");
+    let contents =
+        fs::read_to_string(&telemetry_path).expect("expected telemetry JSONL file to be written");
     let last_line = contents
         .lines()
         .last()
         .expect("expected at least one telemetry line");
-    let telemetry: Value = serde_json::from_str(last_line)
-        .expect("telemetry line should be valid JSON");
+    let telemetry: Value =
+        serde_json::from_str(last_line).expect("telemetry line should be valid JSON");
 
     assert_eq!(telemetry["tool_name"], "expensive_tool");
     assert_eq!(telemetry["decision"], "allow");
@@ -898,15 +850,15 @@ fn test_stdio_tokens_estimated_increases_with_larger_payload() {
     drop(stdin);
     let _ = child.wait();
 
-    let contents = fs::read_to_string(&telemetry_path)
-        .expect("expected telemetry JSONL file to be written");
+    let contents =
+        fs::read_to_string(&telemetry_path).expect("expected telemetry JSONL file to be written");
     let lines: Vec<&str> = contents.lines().collect();
     assert!(lines.len() >= 2, "expected at least two telemetry lines");
 
-    let first: Value = serde_json::from_str(lines[0])
-        .expect("first telemetry line should be valid JSON");
-    let second: Value = serde_json::from_str(lines[1])
-        .expect("second telemetry line should be valid JSON");
+    let first: Value =
+        serde_json::from_str(lines[0]).expect("first telemetry line should be valid JSON");
+    let second: Value =
+        serde_json::from_str(lines[1]).expect("second telemetry line should be valid JSON");
 
     let first_tokens = first["tokens_estimated"]
         .as_u64()

@@ -4,10 +4,7 @@
 use std::time::Duration;
 
 use mcp_toolmon::supervisor::Supervisor;
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 
 fn fake_v1_bytes() -> Vec<u8> {
@@ -18,10 +15,7 @@ fn fake_v2_bytes() -> Vec<u8> {
     std::fs::read(env!("CARGO_BIN_EXE_fake-mcp-v2")).unwrap()
 }
 
-fn write_exe(
-    path: &std::path::Path,
-    bytes: &[u8],
-) {
+fn write_exe(path: &std::path::Path, bytes: &[u8]) {
     std::fs::write(path, bytes).unwrap();
     #[cfg(unix)]
     {
@@ -40,10 +34,7 @@ fn canonical_exe_name() -> &'static str {
     }
 }
 
-async fn do_handshake(
-    supervisor: &Supervisor,
-    init_id: i64,
-) -> Value {
+async fn do_handshake(supervisor: &Supervisor, init_id: i64) -> Value {
     let init = json!({
         "jsonrpc": "2.0",
         "id": init_id,
@@ -59,8 +50,7 @@ async fn do_handshake(
         .await
         .expect("child closed without responding to initialize");
     let resp: Value = serde_json::from_str(&line).unwrap();
-    let notif =
-        json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
+    let notif = json!({ "jsonrpc": "2.0", "method": "notifications/initialized" });
     assert!(
         supervisor.write_line(&notif.to_string()).await,
         "write notifications/initialized failed"
@@ -68,11 +58,7 @@ async fn do_handshake(
     resp
 }
 
-async fn call_generation(
-    supervisor: &Supervisor,
-    id: i64,
-    timeout: Duration,
-) -> Value {
+async fn call_generation(supervisor: &Supervisor, id: i64, timeout: Duration) -> Value {
     let req = json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"generation","arguments":{}}});
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
@@ -90,14 +76,10 @@ async fn call_generation(
     }
 }
 
-fn spawn_v1(
-    shadow_root: &TempDir,
-    canonical: &std::path::Path,
-) -> Supervisor {
+fn spawn_v1(shadow_root: &TempDir, canonical: &std::path::Path) -> Supervisor {
     write_exe(canonical, &fake_v1_bytes());
     let command = vec![canonical.to_string_lossy().to_string()];
-    Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-        .unwrap()
+    Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap()
 }
 
 /// R5 ordering: after a direct `swap_child()` call, the very next

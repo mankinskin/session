@@ -1,13 +1,6 @@
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    SessionRecord,
-    SessionRole,
-    SessionTurn,
-};
+use crate::{SessionRecord, SessionRole, SessionTurn};
 
 use super::preview_line;
 
@@ -57,10 +50,7 @@ pub fn peek_turn_range(
     }
 }
 
-pub fn peek_skeleton(
-    record: &SessionRecord,
-    preview_chars: usize,
-) -> SessionSkeleton {
+pub fn peek_skeleton(record: &SessionRecord, preview_chars: usize) -> SessionSkeleton {
     let entries = record
         .turns
         .iter()

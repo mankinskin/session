@@ -1,19 +1,12 @@
 use std::{
     collections::HashMap,
     fs,
-    path::{
-        Component,
-        Path,
-        PathBuf,
-    },
+    path::{Component, Path, PathBuf},
     sync::Mutex,
 };
 
 use memory_kernel::workspace::{
-    WorkspacePathError,
-    canonicalize_workspace_root_strict,
-    normalize_slashes,
-    working_dir,
+    WorkspacePathError, canonicalize_workspace_root_strict, normalize_slashes, working_dir,
 };
 use session_api::SessionWorktreeStatus;
 use thiserror::Error;
@@ -91,10 +84,7 @@ impl ResolvedWorkspace {
     /// bare `<store_dir>` layout (delegated to
     /// [`memory_kernel::workspace::resolve_store_root_at_fixed_workspace`],
     /// bounded to this fixed target so resolution never escapes it).
-    pub fn store_root(
-        &self,
-        store_dir: &str,
-    ) -> Result<PathBuf, ResolutionError> {
+    pub fn store_root(&self, store_dir: &str) -> Result<PathBuf, ResolutionError> {
         validate_store_dir(store_dir)?;
         let store_root = memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
             &self.target_root,
@@ -111,10 +101,7 @@ impl ResolvedWorkspace {
     }
 
     /// Returns a validated store root only when the resolved target permits mutation.
-    pub fn mutation_store_root(
-        &self,
-        store_dir: &str,
-    ) -> Result<PathBuf, ResolutionError> {
+    pub fn mutation_store_root(&self, store_dir: &str) -> Result<PathBuf, ResolutionError> {
         self.require_mutation_target()?;
         self.store_root(store_dir)
     }
@@ -147,9 +134,7 @@ impl ResolverConfig {
     /// `git --git-common-dir` walk would escape to the superproject, and an
     /// environment variable would only restate what the working directory
     /// already says.
-    pub fn from_working_dir(
-        workspace_path: impl Into<String>
-    ) -> Result<Self, ResolutionError> {
+    pub fn from_working_dir(workspace_path: impl Into<String>) -> Result<Self, ResolutionError> {
         let main_checkout = working_dir().ok_or_else(|| {
             ResolutionError::InvalidConfiguration(
                 "unable to determine the process working directory".to_string(),
@@ -201,19 +186,17 @@ impl SessionWorkspaceResolver {
         validate_session_id(request.session_id)?;
         validate_store_dir(request.store_dir)?;
         let repository = self.main_checkout.clone();
-        let discovered = self
-            .discover_worktree(request.session_id)?
-            .ok_or_else(|| ResolutionError::MissingSessionWorktree {
+        let discovered = self.discover_worktree(request.session_id)?.ok_or_else(|| {
+            ResolutionError::MissingSessionWorktree {
                 session_id: request.session_id.to_string(),
-            })?;
-        let worktree_root =
-            canonicalize(&discovered.root).map_err(|error| match error {
-                ResolutionError::InvalidConfiguration(_) =>
-                    ResolutionError::SessionWorktreeMissing {
-                        path: discovered.root.clone(),
-                    },
-                other => other,
-            })?;
+            }
+        })?;
+        let worktree_root = canonicalize(&discovered.root).map_err(|error| match error {
+            ResolutionError::InvalidConfiguration(_) => ResolutionError::SessionWorktreeMissing {
+                path: discovered.root.clone(),
+            },
+            other => other,
+        })?;
         if !worktree_root.starts_with(repository.as_path()) {
             return Err(ResolutionError::SessionWorktreeOutsideRepository {
                 path: worktree_root,
@@ -225,16 +208,13 @@ impl SessionWorkspaceResolver {
                 path: worktree_root,
             });
         }
-        let relative_path =
-            resolve_relative_path(&worktree_root, request.relative_workspace)?;
+        let relative_path = resolve_relative_path(&worktree_root, request.relative_workspace)?;
         let invocation_is_linked_worktree = repository
             .as_path()
             .parent()
             .and_then(Path::file_name)
             .is_some_and(|name| name == ".worktrees");
-        let checkout = if worktree_root == repository.as_path()
-            && !invocation_is_linked_worktree
-        {
+        let checkout = if worktree_root == repository.as_path() && !invocation_is_linked_worktree {
             CheckoutScope::MainCheckout {
                 checkout_root: worktree_root.clone(),
             }
@@ -280,10 +260,9 @@ impl SessionWorkspaceResolver {
                     session_id: session_id.to_string(),
                     candidates: nested,
                 });
-            },
+            }
             _ => {
-                let Some(entries) = read_worktree_entries(&worktrees_dir)?
-                else {
+                let Some(entries) = read_worktree_entries(&worktrees_dir)? else {
                     return Ok(None);
                 };
                 let prefix = format!("{}-", session_short_id(session_id));
@@ -303,16 +282,16 @@ impl SessionWorkspaceResolver {
                     })
                     .collect::<Vec<_>>();
                 match legacy.len() {
-                    1 =>
-                        legacy.into_iter().next().expect("one legacy worktree"),
-                    2.. =>
+                    1 => legacy.into_iter().next().expect("one legacy worktree"),
+                    2.. => {
                         return Err(ResolutionError::AmbiguousSessionWorktree {
                             session_id: session_id.to_string(),
                             candidates: legacy,
-                        }),
+                        });
+                    }
                     _ => return Ok(None),
                 }
-            },
+            }
         };
 
         let discovered = DiscoveredWorktree {
@@ -327,10 +306,7 @@ impl SessionWorkspaceResolver {
     }
 
     /// Returns only the invocation checkout's store for diagnostics.
-    pub fn refused_candidates(
-        &self,
-        store_dir: &str,
-    ) -> Result<Vec<PathBuf>, ResolutionError> {
+    pub fn refused_candidates(&self, store_dir: &str) -> Result<Vec<PathBuf>, ResolutionError> {
         validate_store_dir(store_dir)?;
         Ok(vec![self.main_checkout.as_path().join(store_dir)])
     }
@@ -342,13 +318,9 @@ pub enum ResolutionError {
     InvalidConfiguration(String),
     #[error("session id is required")]
     MissingSessionId,
-    #[error(
-        "session id '{session_id}' must be a UUID from the Copilot hook payload"
-    )]
+    #[error("session id '{session_id}' must be a UUID from the Copilot hook payload")]
     InvalidSessionId { session_id: String },
-    #[error(
-        "session '{session_id}' has no worktree assignment in the session store"
-    )]
+    #[error("session '{session_id}' has no worktree assignment in the session store")]
     MissingSessionWorktree { session_id: String },
     #[error(
         "session '{session_id}' matches {} worktrees; refusing to choose: {}",
@@ -359,10 +331,7 @@ pub enum ResolutionError {
         session_id: String,
         candidates: Vec<PathBuf>,
     },
-    #[error(
-        "assigned session worktree is missing: {}",
-        normalize_slashes(path)
-    )]
+    #[error("assigned session worktree is missing: {}", normalize_slashes(path))]
     SessionWorktreeMissing { path: PathBuf },
     #[error(
         "assigned session worktree {} is outside repository {}",
@@ -375,9 +344,7 @@ pub enum ResolutionError {
         normalize_slashes(path)
     )]
     SessionWorktreeNotGitCheckout { path: PathBuf },
-    #[error(
-        "session '{session_id}' has inactive worktree assignment: {status:?}"
-    )]
+    #[error("session '{session_id}' has inactive worktree assignment: {status:?}")]
     InactiveSessionWorktree {
         session_id: String,
         status: SessionWorktreeStatus,
@@ -414,10 +381,9 @@ pub enum ResolutionError {
 
 fn canonicalize(path: &Path) -> Result<PathBuf, ResolutionError> {
     canonicalize_workspace_root_strict(path).map_err(|error| match error {
-        WorkspacePathError::CanonicalizeFailed { input, .. } =>
-            ResolutionError::InvalidConfiguration(format!(
-                "unable to canonicalize '{input}'"
-            )),
+        WorkspacePathError::CanonicalizeFailed { input, .. } => {
+            ResolutionError::InvalidConfiguration(format!("unable to canonicalize '{input}'"))
+        }
         other => ResolutionError::InvalidConfiguration(other.to_string()),
     })
 }
@@ -434,18 +400,16 @@ fn session_short_id(session_id: &str) -> &str {
 
 /// Lists the directories directly under `.worktrees`, or `None` when that
 /// directory does not exist. A missing `.worktrees` is ordinary, not an error.
-fn read_worktree_entries(
-    worktrees_dir: &Path
-) -> Result<Option<Vec<PathBuf>>, ResolutionError> {
+fn read_worktree_entries(worktrees_dir: &Path) -> Result<Option<Vec<PathBuf>>, ResolutionError> {
     let entries = match fs::read_dir(worktrees_dir) {
         Ok(entries) => entries,
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound =>
-            return Ok(None),
-        Err(source) =>
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
             return Err(ResolutionError::Io {
                 path: worktrees_dir.to_path_buf(),
                 source,
-            }),
+            });
+        }
     };
     let mut directories = Vec::new();
     for entry in entries {
@@ -468,24 +432,19 @@ fn read_worktree_entries(
 /// worktree's own `HEAD`. A detached head has no branch name, which is
 /// reported as an empty string rather than an error, matching how the session
 /// store records an unnamed branch.
-fn read_checked_out_branch(
-    worktree_root: &Path
-) -> Result<String, ResolutionError> {
+fn read_checked_out_branch(worktree_root: &Path) -> Result<String, ResolutionError> {
     let git_entry = worktree_root.join(".git");
-    let metadata =
-        fs::metadata(&git_entry).map_err(|source| ResolutionError::Io {
-            path: git_entry.clone(),
-            source,
-        })?;
+    let metadata = fs::metadata(&git_entry).map_err(|source| ResolutionError::Io {
+        path: git_entry.clone(),
+        source,
+    })?;
 
     let git_dir = if metadata.is_dir() {
         git_entry
     } else {
-        let contents = fs::read_to_string(&git_entry).map_err(|source| {
-            ResolutionError::Io {
-                path: git_entry.clone(),
-                source,
-            }
+        let contents = fs::read_to_string(&git_entry).map_err(|source| ResolutionError::Io {
+            path: git_entry.clone(),
+            source,
         })?;
         let pointer = contents
             .lines()
@@ -503,11 +462,9 @@ fn read_checked_out_branch(
     };
 
     let head_path = git_dir.join("HEAD");
-    let head = fs::read_to_string(&head_path).map_err(|source| {
-        ResolutionError::Io {
-            path: head_path,
-            source,
-        }
+    let head = fs::read_to_string(&head_path).map_err(|source| ResolutionError::Io {
+        path: head_path,
+        source,
     })?;
     Ok(head
         .trim()
@@ -536,9 +493,7 @@ fn validate_store_dir(store_dir: &str) -> Result<(), ResolutionError> {
         || path.components().any(|component| {
             matches!(
                 component,
-                Component::ParentDir
-                    | Component::RootDir
-                    | Component::Prefix(_)
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
             )
         })
     {
@@ -549,9 +504,7 @@ fn validate_store_dir(store_dir: &str) -> Result<(), ResolutionError> {
     Ok(())
 }
 
-fn canonicalize_existing_ancestor(
-    path: &Path
-) -> Result<PathBuf, ResolutionError> {
+fn canonicalize_existing_ancestor(path: &Path) -> Result<PathBuf, ResolutionError> {
     let mut ancestor = path;
     while !ancestor.exists() {
         ancestor = ancestor.parent().ok_or_else(|| {
@@ -605,11 +558,10 @@ fn resolve_relative_path(
         });
     }
     let target = worktree_root.join(relative_workspace);
-    let canonical_target = canonicalize(&target).map_err(|_| {
-        ResolutionError::RelativeWorkspaceEscapesWorktree {
+    let canonical_target =
+        canonicalize(&target).map_err(|_| ResolutionError::RelativeWorkspaceEscapesWorktree {
             path: relative_workspace.to_path_buf(),
-        }
-    })?;
+        })?;
     if !canonical_target.starts_with(worktree_root) {
         return Err(ResolutionError::RelativeWorkspaceEscapesWorktree {
             path: relative_workspace.to_path_buf(),
@@ -825,8 +777,7 @@ mod tests {
             .join(SESSION_ID)
             .join("linked");
         fs::create_dir_all(&worktree).unwrap();
-        let private_git_dir =
-            repository.join(".git").join("worktrees").join("linked");
+        let private_git_dir = repository.join(".git").join("worktrees").join("linked");
         fs::create_dir_all(&private_git_dir).unwrap();
         fs::write(
             private_git_dir.join("HEAD"),
@@ -928,18 +879,12 @@ mod tests {
     }
 
     #[cfg(unix)]
-    fn create_dir_symlink(
-        target: &Path,
-        link: &Path,
-    ) -> std::io::Result<()> {
+    fn create_dir_symlink(target: &Path, link: &Path) -> std::io::Result<()> {
         std::os::unix::fs::symlink(target, link)
     }
 
     #[cfg(windows)]
-    fn create_dir_symlink(
-        target: &Path,
-        link: &Path,
-    ) -> std::io::Result<()> {
+    fn create_dir_symlink(target: &Path, link: &Path) -> std::io::Result<()> {
         std::os::windows::fs::symlink_dir(target, link)
     }
 
@@ -952,11 +897,7 @@ mod tests {
 
     /// Creates a worktree directory whose `.git` is a real directory, as an
     /// ordinary repository has.
-    fn make_worktree(
-        repository: &Path,
-        name: &str,
-        branch: &str,
-    ) -> PathBuf {
+    fn make_worktree(repository: &Path, name: &str, branch: &str) -> PathBuf {
         let root = repository.join(".worktrees").join(name);
         fs::create_dir_all(root.join(".git")).unwrap();
         fs::write(
@@ -985,10 +926,7 @@ mod tests {
 
     /// Writes a session record into a worktree's own `.session` store, which
     /// is what the scan fallback looks for.
-    fn seed_session_record(
-        worktree: &Path,
-        session_id: &str,
-    ) {
+    fn seed_session_record(worktree: &Path, session_id: &str) {
         let dir = worktree.join(".session").join("sessions").join(session_id);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("session.json"), "{}").unwrap();
@@ -997,8 +935,7 @@ mod tests {
     #[test]
     fn matching_session_prefix_discovers_worktree() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let worktree =
-            make_worktree(&repository, "70abae1b-some-slug", "agent/some-slug");
+        let worktree = make_worktree(&repository, "70abae1b-some-slug", "agent/some-slug");
         seed_session_record(&worktree, SESSION);
 
         let resolved = resolver
@@ -1018,8 +955,7 @@ mod tests {
     #[test]
     fn nested_worktree_discovers_without_main_checkout_registry() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let worktree =
-            repository.join(".worktrees").join(SESSION).join("nested");
+        let worktree = repository.join(".worktrees").join(SESSION).join("nested");
         fs::create_dir_all(worktree.join(".git")).unwrap();
         fs::write(
             worktree.join(".git").join("HEAD"),
@@ -1054,8 +990,7 @@ mod tests {
     #[test]
     fn sibling_session_record_is_not_discovered() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let worktree =
-            make_worktree(&repository, "a1b911ab-by-ticket-id", "agent/ticket");
+        let worktree = make_worktree(&repository, "a1b911ab-by-ticket-id", "agent/ticket");
         seed_session_record(&worktree, "sibling-session");
 
         assert!(matches!(
@@ -1067,8 +1002,7 @@ mod tests {
     #[test]
     fn legacy_worktree_requires_matching_local_session_record() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let worktree =
-            make_worktree(&repository, "70abae1b-some-slug", "agent/ticket");
+        let worktree = make_worktree(&repository, "70abae1b-some-slug", "agent/ticket");
         seed_session_record(&worktree, "other-session");
 
         assert!(matches!(
@@ -1081,8 +1015,7 @@ mod tests {
     fn sibling_prefix_matches_are_ambiguous() {
         let (_temp, repository, _worktree, resolver) = fixture();
         let first = make_worktree(&repository, "70abae1b-first", "agent/first");
-        let second =
-            make_worktree(&repository, "70abae1b-second", "agent/second");
+        let second = make_worktree(&repository, "70abae1b-second", "agent/second");
         seed_session_record(&first, SESSION);
         seed_session_record(&second, SESSION);
 
@@ -1106,8 +1039,7 @@ mod tests {
     #[test]
     fn new_sibling_worktrees_do_not_change_root_resolution() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let first =
-            make_worktree(&repository, "70abae1b-some-slug", "agent/some-slug");
+        let first = make_worktree(&repository, "70abae1b-some-slug", "agent/some-slug");
         seed_session_record(&first, SESSION);
         assert_eq!(
             resolve_root(&resolver, SESSION).unwrap().target_root(),
@@ -1127,8 +1059,7 @@ mod tests {
         let (_temp, repository, _worktree, resolver) = fixture();
         // A linked worktree's `.git` is a file pointing at its private git
         // directory under the main checkout, which holds its own HEAD.
-        let private_git_dir =
-            repository.join(".git").join("worktrees").join("linked");
+        let private_git_dir = repository.join(".git").join("worktrees").join("linked");
         fs::create_dir_all(&private_git_dir).unwrap();
         fs::write(
             private_git_dir.join("HEAD"),
@@ -1163,14 +1094,8 @@ mod tests {
     #[test]
     fn nested_worktree_wins_over_legacy_worktree() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let nested = make_nested_worktree(
-            &repository,
-            SESSION,
-            "nested",
-            "agent/nested",
-        );
-        let legacy =
-            make_worktree(&repository, "70abae1b-legacy", "agent/legacy");
+        let nested = make_nested_worktree(&repository, SESSION, "nested", "agent/nested");
+        let legacy = make_worktree(&repository, "70abae1b-legacy", "agent/legacy");
         seed_session_record(&legacy, SESSION);
 
         assert_eq!(
@@ -1182,10 +1107,8 @@ mod tests {
     #[test]
     fn nested_slug_candidates_are_ambiguous_in_lexicographic_order() {
         let (_temp, repository, _worktree, resolver) = fixture();
-        let first =
-            make_nested_worktree(&repository, SESSION, "alpha", "agent/alpha");
-        let second =
-            make_nested_worktree(&repository, SESSION, "zeta", "agent/zeta");
+        let first = make_nested_worktree(&repository, SESSION, "alpha", "agent/alpha");
+        let second = make_nested_worktree(&repository, SESSION, "zeta", "agent/zeta");
 
         assert!(matches!(
             resolve_root(&resolver, SESSION),

@@ -34,14 +34,10 @@ pub(super) fn captured_event_key(event: &CopilotHookEvent) -> String {
 /// corresponding `tool.execution_complete`, or any other event type) are
 /// **retained** unchanged — deduplication only collapses true structural
 /// duplicates.
-pub(super) fn canonicalize_captured_events(
-    events: Vec<CopilotHookEvent>
-) -> Vec<CopilotHookEvent> {
+pub(super) fn canonicalize_captured_events(events: Vec<CopilotHookEvent>) -> Vec<CopilotHookEvent> {
     let mut complete_ids = std::collections::BTreeSet::<String>::new();
-    let mut results = std::collections::BTreeMap::<
-        String,
-        serde_json::Map<String, serde_json::Value>,
-    >::new();
+    let mut results =
+        std::collections::BTreeMap::<String, serde_json::Map<String, serde_json::Value>>::new();
     for event in &events {
         if is_complete(event.event_type.as_deref()) {
             if let Some(tool_call_id) = event.tool_call_id.as_ref() {
@@ -71,9 +67,7 @@ pub(super) fn canonicalize_captured_events(
                 return None;
             }
             if is_complete(event.event_type.as_deref()) {
-                if let Some(data) =
-                    event.tool_call_id.as_ref().and_then(|id| results.get(id))
-                {
+                if let Some(data) = event.tool_call_id.as_ref().and_then(|id| results.get(id)) {
                     merge_result_data(&mut event, data);
                 }
             }
@@ -105,10 +99,8 @@ fn merge_result_data(
             for (key, value) in result_data {
                 existing.entry(key.clone()).or_insert_with(|| value.clone());
             }
-        },
-        _ =>
-            event.data_json =
-                Some(serde_json::Value::Object(result_data.clone())),
+        }
+        _ => event.data_json = Some(serde_json::Value::Object(result_data.clone())),
     }
 }
 

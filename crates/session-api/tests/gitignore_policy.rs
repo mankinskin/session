@@ -1,10 +1,7 @@
 // Test gitignore rules for session artifacts (ticket 4817a5cc AC5)
 
 use std::{
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -23,9 +20,7 @@ fn runtime_init_writes_an_idempotent_store_local_ignore_rule() {
     let session_id = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
     run_git(repo_root, ["init"]);
 
-    let config = session_api::SessionStoreConfig::new(
-        repo_root.join(".session"),
-    );
+    let config = session_api::SessionStoreConfig::new(repo_root.join(".session"));
     for _ in 0..2 {
         config
             .init_runtime_context(session_api::SessionRuntimeInitRequest {
@@ -68,10 +63,7 @@ fn runtime_init_writes_an_idempotent_store_local_ignore_rule() {
 /// Check if a path is ignored by git using `git check-ignore`.
 ///
 /// Returns true if the path is ignored, false if it would be tracked.
-fn check_git_ignore(
-    repo_root: &Path,
-    path: &str,
-) -> bool {
+fn check_git_ignore(repo_root: &Path, path: &str) -> bool {
     let output = Command::new("git")
         .arg("check-ignore")
         .arg("-q") // Quiet mode: exit code only
@@ -85,10 +77,7 @@ fn check_git_ignore(
     output.status.code() == Some(0)
 }
 
-fn run_git<const N: usize>(
-    repo_root: &std::path::Path,
-    args: [&str; N],
-) {
+fn run_git<const N: usize>(repo_root: &std::path::Path, args: [&str; N]) {
     let output = Command::new("git")
         .args(args)
         .current_dir(repo_root)

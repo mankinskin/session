@@ -2,12 +2,8 @@ use feedback_api::EntityUrn;
 use serde_json::Value;
 
 use super::{
-    FeedbackSignalKind,
-    StructuredFeedbackSignal,
-    event_outcomes::{
-        canonicalize_outcome_events,
-        is_tool_execution_outcome,
-    },
+    FeedbackSignalKind, StructuredFeedbackSignal,
+    event_outcomes::{canonicalize_outcome_events, is_tool_execution_outcome},
 };
 use crate::CopilotHookEvent;
 
@@ -24,9 +20,7 @@ pub enum FailedToolCallMapping {
 }
 
 /// Why a failed tool call could not be mapped to one entity.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum UnmappedReason {
     UnknownTool,
@@ -119,8 +113,7 @@ fn detect_failed_tool_call(
     event: &CopilotHookEvent,
     workspace_path: &str,
 ) -> Option<StructuredFeedbackSignal> {
-    if !is_tool_execution_outcome(event.event_type.as_deref())
-        || event.tool_success != Some(false)
+    if !is_tool_execution_outcome(event.event_type.as_deref()) || event.tool_success != Some(false)
     {
         return None;
     }
@@ -157,10 +150,7 @@ fn ticket_id_key(tool_name: &str) -> Option<&'static str> {
     }
 }
 
-fn json_str(
-    value: Option<&Value>,
-    key: &str,
-) -> Option<String> {
+fn json_str(value: Option<&Value>, key: &str) -> Option<String> {
     value?.get(key)?.as_str().map(str::to_string)
 }
 

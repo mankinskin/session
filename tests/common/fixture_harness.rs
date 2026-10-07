@@ -1,14 +1,8 @@
 use std::{
     fs,
-    path::{
-        Path,
-        PathBuf,
-    },
+    path::{Path, PathBuf},
     process::Command,
-    time::{
-        SystemTime,
-        UNIX_EPOCH,
-    },
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use tempfile::TempDir;
@@ -28,8 +22,7 @@ pub fn local_fixture_c() -> &'static str {
     include_str!("../fixtures/local_parse_fixture_c.jsonl")
 }
 
-pub fn local_fixture_scenarios()
--> [(&'static str, &'static str, &'static str); 3] {
+pub fn local_fixture_scenarios() -> [(&'static str, &'static str, &'static str); 3] {
     [
         ("fixture-a.jsonl", local_fixture_a(), "fixture-local-a"),
         ("fixture-b.jsonl", local_fixture_b(), "fixture-local-b"),
@@ -125,14 +118,9 @@ pub fn shell_single_quote(input: &str) -> String {
     format!("'{}'", input.replace('\'', "'\"'\"'"))
 }
 
-pub fn write_fixture_transcript(
-    dir: &Path,
-    name: &str,
-    content: &str,
-) -> PathBuf {
+pub fn write_fixture_transcript(dir: &Path, name: &str, content: &str) -> PathBuf {
     let path = dir.join(name);
-    fs::write(&path, content)
-        .expect("write local deterministic fixture transcript");
+    fs::write(&path, content).expect("write local deterministic fixture transcript");
     path
 }
 
@@ -144,19 +132,15 @@ pub struct ScriptWorkspaceFixture {
 
 impl ScriptWorkspaceFixture {
     pub fn new(script_source: &Path) -> Self {
-        let workspace =
-            TempDir::new().expect("create isolated workspace fixture tempdir");
+        let workspace = TempDir::new().expect("create isolated workspace fixture tempdir");
         let root = workspace.path().join("workspace-fixture");
         let fixture_tools = root.join("tools").join("agent-hooks");
         let fixture_transcripts = root.join("transcripts");
         let store_root = root.join("session-store");
 
-        fs::create_dir_all(&fixture_tools)
-            .expect("create fixture hook directory");
-        fs::create_dir_all(&fixture_transcripts)
-            .expect("create fixture transcript directory");
-        fs::create_dir_all(&store_root)
-            .expect("create fixture session store root");
+        fs::create_dir_all(&fixture_tools).expect("create fixture hook directory");
+        fs::create_dir_all(&fixture_transcripts).expect("create fixture transcript directory");
+        fs::create_dir_all(&store_root).expect("create fixture session store root");
 
         let fixture_script_path = fixture_tools.join("session-capture-stop.sh");
         fs::copy(script_source, &fixture_script_path)
@@ -169,17 +153,11 @@ impl ScriptWorkspaceFixture {
         }
     }
 
-    pub fn configure_hook_command(
-        &self,
-        command: &mut Command,
-    ) {
+    pub fn configure_hook_command(&self, command: &mut Command) {
         command.env("MCP_MAIN_CHECKOUT", &self.root);
     }
 
-    pub fn transcript_path(
-        &self,
-        file_name: &str,
-    ) -> PathBuf {
+    pub fn transcript_path(&self, file_name: &str) -> PathBuf {
         self.root.join("transcripts").join(file_name)
     }
 

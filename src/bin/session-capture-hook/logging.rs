@@ -1,12 +1,7 @@
 use std::path::PathBuf;
 
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::{
-    EnvFilter,
-    fmt,
-    layer::SubscriberExt as _,
-    util::SubscriberInitExt as _,
-};
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _};
 
 /// Initialize file-only tracing so hook stdout/stderr stay reserved for the
 /// Copilot hook contract (`{}` payload on stdout, human diagnostics on
@@ -22,8 +17,7 @@ pub(super) fn init_file_logging() -> WorkerGuard {
         .unwrap_or_else(|_| std::env::temp_dir().join("session-capture-hook"));
     let _ = std::fs::create_dir_all(&log_dir);
 
-    let appender =
-        tracing_appender::rolling::never(&log_dir, "session-capture-hook.log");
+    let appender = tracing_appender::rolling::never(&log_dir, "session-capture-hook.log");
     let (writer, guard) = tracing_appender::non_blocking(appender);
 
     let filter = EnvFilter::try_from_env("SESSION_HOOK_LOG")

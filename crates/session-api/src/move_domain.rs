@@ -5,30 +5,15 @@
 //! so this adapter supports sessions whose ids are UUID strings and leaves
 //! non-UUID legacy/session-provider ids to their existing read/query paths.
 
-use std::path::{
-    Path,
-    PathBuf,
-};
+use std::path::{Path, PathBuf};
 
 use memory_kernel::storage::move_kernel::{
-    self,
-    load_move_set_journal,
-    MoveDomain,
-    MoveError,
-    MoveOutcome,
-    MovePlan,
-    MoveReferences,
-    MoveResult,
-    MoveSetExecutionPhase,
-    MoveSetOutcome,
-    MoveSetPlan,
+    self, MoveDomain, MoveError, MoveOutcome, MovePlan, MoveReferences, MoveResult,
+    MoveSetExecutionPhase, MoveSetOutcome, MoveSetPlan, load_move_set_journal,
 };
 use uuid::Uuid;
 
-use crate::{
-    SessionError,
-    SessionStoreConfig,
-};
+use crate::{SessionError, SessionStoreConfig};
 
 const SESSION_INDEX_DIR: &str = ".session";
 
@@ -66,10 +51,7 @@ impl<'a> SessionMoveDomain<'a> {
         }
     }
 
-    fn store_at(
-        &self,
-        root: &Path,
-    ) -> SessionStoreConfig {
+    fn store_at(&self, root: &Path) -> SessionStoreConfig {
         SessionStoreConfig::new(root.to_path_buf())
     }
 }
@@ -87,10 +69,7 @@ impl MoveDomain for SessionMoveDomain<'_> {
         self.store.root.clone()
     }
 
-    fn source_entity_path(
-        &self,
-        entity_id: &Uuid,
-    ) -> MoveResult<Option<PathBuf>> {
+    fn source_entity_path(&self, entity_id: &Uuid) -> MoveResult<Option<PathBuf>> {
         let session_id = entity_id.to_string();
         let paths = self
             .store
@@ -113,25 +92,15 @@ impl MoveDomain for SessionMoveDomain<'_> {
             .collect())
     }
 
-    fn related_entities(
-        &self,
-        _entity_id: &Uuid,
-    ) -> MoveResult<MoveReferences> {
+    fn related_entities(&self, _entity_id: &Uuid) -> MoveResult<MoveReferences> {
         Ok(MoveReferences::default())
     }
 
-    fn target_store_present(
-        &self,
-        target_store_root: &Path,
-    ) -> MoveResult<bool> {
+    fn target_store_present(&self, target_store_root: &Path) -> MoveResult<bool> {
         Ok(target_store_root.is_dir())
     }
 
-    fn entity_indexed_in(
-        &self,
-        store_root: &Path,
-        entity_id: &Uuid,
-    ) -> MoveResult<bool> {
+    fn entity_indexed_in(&self, store_root: &Path, entity_id: &Uuid) -> MoveResult<bool> {
         let store = self.store_at(store_root);
         match store.read_session(&entity_id.to_string()) {
             Ok(_) => Ok(true),
@@ -140,10 +109,7 @@ impl MoveDomain for SessionMoveDomain<'_> {
         }
     }
 
-    fn scan_store(
-        &self,
-        _store_root: &Path,
-    ) -> MoveResult<()> {
+    fn scan_store(&self, _store_root: &Path) -> MoveResult<()> {
         Ok(())
     }
 }
@@ -157,24 +123,17 @@ impl SessionStoreConfig {
         target_workspace_root: &Path,
     ) -> Result<MovePlan, SessionError> {
         let domain = SessionMoveDomain::new(self);
-        move_kernel::plan_move(&domain, session_id, target_workspace_root)
-            .map_err(from_move_error)
+        move_kernel::plan_move(&domain, session_id, target_workspace_root).map_err(from_move_error)
     }
 
     /// Execute a supported session move with a fresh journal.
-    pub fn execute_move_with_journal(
-        &self,
-        plan: &MovePlan,
-    ) -> Result<MoveOutcome, SessionError> {
+    pub fn execute_move_with_journal(&self, plan: &MovePlan) -> Result<MoveOutcome, SessionError> {
         let domain = SessionMoveDomain::new(self);
         move_kernel::execute_move(&domain, plan).map_err(from_move_error)
     }
 
     /// Resume an interrupted session move from its journal id.
-    pub fn resume_move_with_journal(
-        &self,
-        journal_id: Uuid,
-    ) -> Result<MoveOutcome, SessionError> {
+    pub fn resume_move_with_journal(&self, journal_id: Uuid) -> Result<MoveOutcome, SessionError> {
         let domain = SessionMoveDomain::new(self);
         move_kernel::resume_move(&domain, journal_id).map_err(from_move_error)
     }
@@ -205,10 +164,7 @@ impl SessionStoreConfig {
 
     /// Execute a supported normalized set move with one shared lock
     /// lifecycle covering every session in the set.
-    pub fn execute_move_set(
-        &self,
-        plan: &MoveSetPlan,
-    ) -> Result<MoveSetOutcome, SessionError> {
+    pub fn execute_move_set(&self, plan: &MoveSetPlan) -> Result<MoveSetOutcome, SessionError> {
         let domain = SessionMoveDomain::new(self);
         move_kernel::execute_move_set(&domain, plan).map_err(from_move_error)
     }
@@ -217,10 +173,7 @@ impl SessionStoreConfig {
     /// already reached `Validated`/`RolledBack` short-circuits to its
     /// recorded outcome instead of re-entering the kernel's execution loop
     /// with an empty (already-cleared) entity-plan list.
-    pub fn resume_move_set(
-        &self,
-        journal_id: Uuid,
-    ) -> Result<MoveSetOutcome, SessionError> {
+    pub fn resume_move_set(&self, journal_id: Uuid) -> Result<MoveSetOutcome, SessionError> {
         let existing = load_move_set_journal(&self.root, journal_id).map_err(from_move_error)?;
         if matches!(
             existing.phase,
@@ -239,10 +192,7 @@ impl SessionStoreConfig {
 
     /// Roll back a completed or partially completed set move, identified by
     /// the set journal id.
-    pub fn rollback_move_set(
-        &self,
-        journal_id: Uuid,
-    ) -> Result<MoveSetOutcome, SessionError> {
+    pub fn rollback_move_set(&self, journal_id: Uuid) -> Result<MoveSetOutcome, SessionError> {
         let domain = SessionMoveDomain::new(self);
         move_kernel::rollback_move_set(&domain, journal_id).map_err(from_move_error)
     }
@@ -255,17 +205,9 @@ mod tests {
     use std::process::Command;
     use tempfile::tempdir;
 
-    use crate::{
-        CopilotHookMessage,
-        CopilotHookPayload,
-        SessionCaptureRequest,
-        SessionRole,
-    };
+    use crate::{CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest, SessionRole};
 
-    fn run_git(
-        repo_root: &Path,
-        args: &[&str],
-    ) {
+    fn run_git(repo_root: &Path, args: &[&str]) {
         let status = Command::new("git")
             .current_dir(repo_root)
             .args(args)
@@ -311,15 +253,11 @@ mod tests {
 
         let source_workspace = repo.join("source");
         let target_workspace = repo.join("target");
-        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR))
-            .unwrap();
-        std::fs::create_dir_all(canonical_target_session_store(&target_workspace))
-            .unwrap();
+        std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
+        std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
         let session_id = Uuid::new_v4();
-        let source_store = SessionStoreConfig::new(
-            source_workspace.join(SESSION_INDEX_DIR),
-        );
+        let source_store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
         source_store
             .persist_capture(sample_request(&session_id))
             .unwrap();
@@ -359,8 +297,7 @@ mod tests {
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
         std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
 
-        let source_store =
-            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+        let source_store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
 
         let error = source_store
             .plan_move_set(&[], &target_workspace)
@@ -380,8 +317,7 @@ mod tests {
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
         std::fs::create_dir_all(target_workspace.join(SESSION_INDEX_DIR)).unwrap();
 
-        let source_store =
-            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+        let source_store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
 
         let first_id = Uuid::new_v4();
         let second_id = Uuid::new_v4();
@@ -416,8 +352,7 @@ mod tests {
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
         std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
-        let source_store =
-            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+        let source_store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
 
         let first_id = Uuid::new_v4();
         let second_id = Uuid::new_v4();
@@ -431,7 +366,11 @@ mod tests {
         let plan = source_store
             .plan_move_set(&[first_id, second_id], &target_workspace)
             .unwrap();
-        assert!(plan.supported(), "unexpected blockers: {:?}", plan.entity_plans);
+        assert!(
+            plan.supported(),
+            "unexpected blockers: {:?}",
+            plan.entity_plans
+        );
 
         let outcome = source_store.execute_move_set(&plan).unwrap();
         assert_eq!(outcome.entity_ids, plan.entity_ids);
@@ -440,9 +379,8 @@ mod tests {
             assert_eq!(entity_outcome.journal.phase, MoveExecutionPhase::Validated);
         }
 
-        let target_store = SessionStoreConfig::new(
-            canonical_target_session_store(&target_workspace),
-        );
+        let target_store =
+            SessionStoreConfig::new(canonical_target_session_store(&target_workspace));
         for session_id in [first_id, second_id] {
             assert!(matches!(
                 source_store.read_session(&session_id.to_string()),
@@ -472,8 +410,7 @@ mod tests {
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
         std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
-        let source_store =
-            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+        let source_store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
 
         let session_id = Uuid::new_v4();
         source_store
@@ -504,8 +441,7 @@ mod tests {
         std::fs::create_dir_all(source_workspace.join(SESSION_INDEX_DIR)).unwrap();
         std::fs::create_dir_all(canonical_target_session_store(&target_workspace)).unwrap();
 
-        let source_store =
-            SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
+        let source_store = SessionStoreConfig::new(source_workspace.join(SESSION_INDEX_DIR));
 
         let session_id = Uuid::new_v4();
         source_store
@@ -521,12 +457,9 @@ mod tests {
         let rolled_back = source_store.rollback_move_set(journal_id).unwrap();
         assert_eq!(rolled_back.journal.id, journal_id);
 
-        let target_store = SessionStoreConfig::new(
-            canonical_target_session_store(&target_workspace),
-        );
-        assert!(source_store
-            .read_session(&session_id.to_string())
-            .is_ok());
+        let target_store =
+            SessionStoreConfig::new(canonical_target_session_store(&target_workspace));
+        assert!(source_store.read_session(&session_id.to_string()).is_ok());
         assert!(matches!(
             target_store.read_session(&session_id.to_string()),
             Err(SessionError::NotFound { .. })

@@ -2,10 +2,7 @@ use std::str::FromStr;
 
 use feedback_api::EntityUrn;
 
-use super::{
-    FailedToolCallMapping,
-    StructuredFeedbackSignal,
-};
+use super::{FailedToolCallMapping, StructuredFeedbackSignal};
 
 /// Deterministic, order-preserving, deduplicated discovery queue of feedback
 /// target entities.
@@ -41,10 +38,7 @@ impl EntityDiscoveryQueue {
     /// Enqueue an entity if it has not been seen before. Returns `true` if
     /// this was a new entity (now queued), `false` if it was already
     /// discovered and is therefore skipped.
-    pub fn enqueue(
-        &mut self,
-        urn: EntityUrn,
-    ) -> bool {
+    pub fn enqueue(&mut self, urn: EntityUrn) -> bool {
         if self.seen.insert(urn.clone()) {
             self.order.push(urn);
             true
@@ -67,9 +61,7 @@ impl EntityDiscoveryQueue {
 /// [`crate::mine_failed_tool_call_signals`] and
 /// [`crate::mine_explicit_ingestion_signals`]) — it performs no store writes
 /// and creates no tickets.
-pub fn discover_entities_from_signals(
-    signals: &[StructuredFeedbackSignal]
-) -> Vec<EntityUrn> {
+pub fn discover_entities_from_signals(signals: &[StructuredFeedbackSignal]) -> Vec<EntityUrn> {
     let mut queue = EntityDiscoveryQueue::new();
     for signal in signals {
         for urn in entity_refs(signal) {

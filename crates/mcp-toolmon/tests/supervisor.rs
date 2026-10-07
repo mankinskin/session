@@ -5,10 +5,7 @@
 use std::time::Duration;
 
 use mcp_toolmon::supervisor::Supervisor;
-use serde_json::{
-    Value,
-    json,
-};
+use serde_json::{Value, json};
 use tempfile::TempDir;
 
 fn fake_v1_bytes() -> Vec<u8> {
@@ -23,10 +20,7 @@ fn fake_v2_bytes() -> Vec<u8> {
 /// fixture binaries are already executable; `fs::copy` preserves
 /// permissions from the source file's mode on unix but not reliably across
 /// an overwrite of an existing dest, so set it explicitly).
-fn write_exe(
-    path: &std::path::Path,
-    bytes: &[u8],
-) {
+fn write_exe(path: &std::path::Path, bytes: &[u8]) {
     std::fs::write(path, bytes).unwrap();
     #[cfg(unix)]
     {
@@ -48,11 +42,7 @@ fn canonical_exe_name() -> &'static str {
 /// Bounded-wait helper (spec: no bare `sleep` as a synchronization
 /// mechanism). Polls `condition` with a short yield between checks until it
 /// returns `true` or `timeout` elapses, at which point it panics with `msg`.
-async fn wait_until<F: Fn() -> bool>(
-    condition: F,
-    timeout: Duration,
-    msg: &str,
-) {
+async fn wait_until<F: Fn() -> bool>(condition: F, timeout: Duration, msg: &str) {
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
         if condition() {
@@ -65,10 +55,7 @@ async fn wait_until<F: Fn() -> bool>(
     }
 }
 
-async fn call_generation(
-    supervisor: &Supervisor,
-    id: i64,
-) -> Value {
+async fn call_generation(supervisor: &Supervisor, id: i64) -> Value {
     let req = json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"generation","arguments":{}}});
     assert!(
         supervisor.write_line(&req.to_string()).await,
@@ -88,8 +75,7 @@ async fn call_generation(
 /// behavior, not the handshake itself, so this is test setup, not a
 /// behavior change.
 async fn perform_handshake(supervisor: &Supervisor) {
-    let init =
-        json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{}});
+    let init = json!({"jsonrpc":"2.0","id":0,"method":"initialize","params":{}});
     assert!(
         supervisor.write_line(&init.to_string()).await,
         "write initialize failed"
@@ -109,11 +95,7 @@ async fn perform_handshake(supervisor: &Supervisor) {
 /// there is transiently no healthy child to write to (R7): retries the
 /// write itself (not the read) up to `timeout`, bounded by a real deadline
 /// rather than a fixed sleep count.
-async fn call_generation_retrying(
-    supervisor: &Supervisor,
-    id: i64,
-    timeout: Duration,
-) -> Value {
+async fn call_generation_retrying(supervisor: &Supervisor, id: i64, timeout: Duration) -> Value {
     let req = json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":"generation","arguments":{}}});
     let deadline = tokio::time::Instant::now() + timeout;
     loop {
@@ -143,9 +125,7 @@ async fn swap_child_replaces_running_child() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor =
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap();
+    let supervisor = Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap();
 
     perform_handshake(&supervisor).await;
 
@@ -175,9 +155,7 @@ async fn inflight_request_synthesized_error_on_kill() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor =
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap();
+    let supervisor = Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap();
 
     perform_handshake(&supervisor).await;
 
@@ -231,8 +209,7 @@ async fn pending_request_resolved_during_drain_receives_original_response() {
 
     let command = vec![canonical.to_string_lossy().to_string()];
     let supervisor = std::sync::Arc::new(
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap(),
+        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap(),
     );
 
     perform_handshake(&supervisor).await;
@@ -355,9 +332,7 @@ async fn respawn_backoff_no_process_exit() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor =
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap();
+    let supervisor = Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap();
 
     perform_handshake(&supervisor).await;
 
@@ -405,9 +380,7 @@ async fn no_swap_tool_appears_in_tools_list() {
     write_exe(&canonical, &fake_v1_bytes());
 
     let command = vec![canonical.to_string_lossy().to_string()];
-    let supervisor =
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap();
+    let supervisor = Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap();
 
     let list_before = list_tools(&supervisor, 1).await;
 
@@ -422,12 +395,8 @@ async fn no_swap_tool_appears_in_tools_list() {
     let _ = supervisor.shutdown().await;
 }
 
-async fn list_tools(
-    supervisor: &Supervisor,
-    id: i64,
-) -> Vec<String> {
-    let req =
-        json!({"jsonrpc":"2.0","id":id,"method":"tools/list","params":{}});
+async fn list_tools(supervisor: &Supervisor, id: i64) -> Vec<String> {
+    let req = json!({"jsonrpc":"2.0","id":id,"method":"tools/list","params":{}});
     supervisor.write_line(&req.to_string()).await;
     let line = supervisor.read_line().await.unwrap();
     let resp: Value = serde_json::from_str(&line).unwrap();
@@ -456,8 +425,7 @@ async fn concurrent_swap_produces_no_corrupted_responses() {
 
     let command = vec![canonical.to_string_lossy().to_string()];
     let supervisor = std::sync::Arc::new(
-        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path()))
-            .unwrap(),
+        Supervisor::spawn_with_shadow_dir(&command, Some(shadow_root.path())).unwrap(),
     );
 
     perform_handshake(&supervisor).await;
@@ -466,12 +434,7 @@ async fn concurrent_swap_produces_no_corrupted_responses() {
         let supervisor = supervisor.clone();
         tokio::spawn(async move {
             for i in 0..20i64 {
-                let resp = call_generation_retrying(
-                    &supervisor,
-                    i,
-                    Duration::from_secs(2),
-                )
-                .await;
+                let resp = call_generation_retrying(&supervisor, i, Duration::from_secs(2)).await;
                 let text = generation_text(&resp);
                 assert!(
                     text == "v1" || text == "v2",
