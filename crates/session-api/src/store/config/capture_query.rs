@@ -84,7 +84,16 @@ impl SessionStoreConfig {
         &self,
         payload: CopilotHookPayload,
     ) -> Result<SessionStorePlan, SessionError> {
-        self.persist_capture(SessionCaptureRequest::copilot(payload))
+        use memory_kernel::domain_store::CreateEntity;
+
+        match crate::SessionDomainStore::new(self.clone())
+            .create_entity(crate::SessionCreateInput::Capture(
+                SessionCaptureRequest::copilot(payload),
+            ))?
+        {
+            crate::SessionCreateResult::Capture(plan) => Ok(plan),
+            crate::SessionCreateResult::HookEvent => unreachable!("capture input returns a capture plan"),
+        }
     }
 
     pub fn capture_copilot_transcript(

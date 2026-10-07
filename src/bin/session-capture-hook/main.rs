@@ -3,12 +3,13 @@ use std::{
     process,
 };
 
+use memory_kernel::domain_store::CreateEntity;
 use memory_kernel::workspace::{CANONICAL_STORES_DIR, canonical_store_root};
 use session_api::{
     CopilotHookEvent, FeedbackSignalKind, FollowUpSynthesisOutcome, PersistedSessionEvents,
-    SessionError, SessionProvisioningDiagnostic, SessionStoreConfig, SessionStorePlan,
-    ToolMetricsWindow, ToolResponseOverride, build_follow_up_ticket_draft,
-    mine_explicit_ingestion_signals, mine_failed_tool_call_signals,
+    SessionCreateInput, SessionDomainStore, SessionError, SessionProvisioningDiagnostic,
+    SessionStoreConfig, SessionStorePlan, ToolMetricsWindow, ToolResponseOverride,
+    build_follow_up_ticket_draft, mine_explicit_ingestion_signals, mine_failed_tool_call_signals,
     mine_structured_feedback_signals, synthesize_follow_up_ticket,
 };
 use session_workspace_resolver::{ResolveRequest, ResolverConfig, SessionWorkspaceResolver};
@@ -185,7 +186,10 @@ fn persist_hook_event(
     session_id: &str,
     event: session_api::CopilotHookEvent,
 ) -> Result<(), SessionError> {
-    config.persist_hook_event(session_id, event.clone())?;
+    SessionDomainStore::new(config.clone()).create_entity(SessionCreateInput::HookEvent {
+        session_id: session_id.to_string(),
+        event: event.clone(),
+    })?;
     mirror_user_prompt_to_main(store_root, session_id, event)
 }
 
@@ -211,7 +215,13 @@ fn mirror_user_prompt_to_main(
     if main_store == store_root {
         return Ok(());
     }
-    SessionStoreConfig::new(main_store).persist_hook_event(session_id, event)
+    SessionDomainStore::new(SessionStoreConfig::new(main_store)).create_entity(
+        SessionCreateInput::HookEvent {
+            session_id: session_id.to_string(),
+            event,
+        },
+    )?;
+    Ok(())
 }
 #[derive(Debug)]
 enum ProvisioningDiagnostic {

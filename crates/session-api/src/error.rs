@@ -4,6 +4,15 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum SessionError {
+    #[error("domain store error: {0}")]
+    DomainStore(#[from] memory_kernel::domain_store::DomainStoreError),
+
+    #[error("workspace error: {0}")]
+    Workspace(#[from] memory_kernel::workspace::ConsumerWorkspaceError),
+
+    #[error("legacy store write override: {0}")]
+    LegacyStoreWrite(#[from] memory_kernel::workspace::LegacyStoreWriteOverride),
+
     #[error("invalid hook input: {0}")]
     InvalidHookInput(String),
 

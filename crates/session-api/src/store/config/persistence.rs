@@ -246,7 +246,7 @@ impl SessionStoreConfig {
     ) -> Result<String, SessionError> {
         let requested = requested.map(|id| {
             validate_session_id(&id)?;
-            Ok(id)
+            Ok::<String, SessionError>(id)
         }).transpose()?;
 
         if let Some(provisioned) = self.provisioned_worktree_session_id() {

@@ -1,5 +1,6 @@
 pub mod audit;
 pub mod delegation_cost;
+pub mod domain_store;
 pub mod error;
 pub mod escalation;
 pub mod follow_up;
@@ -25,6 +26,7 @@ pub use delegation_cost::{
     SubAgentDelegationReport, compute_delegation_cost_report,
     compute_delegation_cost_report_from_events, normalize_path_for_dedup,
 };
+pub use domain_store::{SessionCreateInput, SessionCreateResult, SessionDomainStore};
 pub use error::SessionError;
 pub use escalation::{
     EscalationAction, EscalationRecord, EscalationResolution, EscalationStatus, create_escalation,
