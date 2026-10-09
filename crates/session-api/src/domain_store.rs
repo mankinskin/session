@@ -224,8 +224,20 @@ mod tests {
         assert_eq!(record.session_id, session_id);
         assert_eq!(record.metadata.workspace_path, selected.to_string_lossy());
         let selected_store = canonical_store_root(&selected, ".session");
-        assert!(selected_store.join("sessions").join(session_id).join("session.json").is_file());
-        assert!(selected_store.join("sessions").join(session_id).join("events.json").is_file());
+        assert!(
+            selected_store
+                .join("sessions")
+                .join(session_id)
+                .join("session.json")
+                .is_file()
+        );
+        assert!(
+            selected_store
+                .join("sessions")
+                .join(session_id)
+                .join("events.json")
+                .is_file()
+        );
         assert!(!canonical_store_root(parent.path(), ".session").exists());
         assert!(!canonical_store_root(&sibling, ".session").exists());
     }
