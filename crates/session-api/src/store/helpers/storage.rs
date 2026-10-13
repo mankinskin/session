@@ -5,42 +5,6 @@ use events::{
 };
 use links::extend_unique;
 
-/// Discover the repository root so handoff package paths can be verified as
-/// repo-root-relative, regardless of where the session store root happens to
-/// live (a temp dir in tests, a nested `.session` dir in production).
-///
-/// `CARGO_MANIFEST_DIR` is baked in at compile time to this crate's own
-/// checkout location. This repo nests submodules at multiple levels (e.g.
-/// `context-engine` is itself a submodule of an outer repo, and `memory-api`
-/// has its own `.git`, each also carrying its own `AGENTS.md`), so neither
-/// `.git` nor `AGENTS.md` presence alone can identify the correct root.
-/// `repo_map.toon` lives at this repo's root uniquely (see the ticket
-/// `fb14754e` problem statement), so prefer it and fall back to the nearest
-/// `.git` ancestor if it is absent.
-pub(super) fn workspace_root() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let mut dir = manifest_dir.as_path();
-    loop {
-        if dir.join("repo_map.toon").is_file() {
-            return dir.to_path_buf();
-        }
-        match dir.parent() {
-            Some(parent) => dir = parent,
-            None => break,
-        }
-    }
-    let mut dir = manifest_dir.as_path();
-    loop {
-        if dir.join(".git").exists() {
-            return dir.to_path_buf();
-        }
-        match dir.parent() {
-            Some(parent) => dir = parent,
-            None => return manifest_dir,
-        }
-    }
-}
-
 /// Normalize a path to forward-slash form so persisted handoff paths are
 /// portable across platforms (AC1: repo-root-relative, forward-slash).
 pub(super) fn normalize_repo_relative_path(path: &str) -> String {

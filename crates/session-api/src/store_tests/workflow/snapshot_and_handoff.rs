@@ -498,6 +498,62 @@ fn handoff_package_validates_target_files_in_assigned_worktree() {
 }
 
 #[test]
+fn handoff_package_without_worktree_uses_owning_store_workspace_for_all_layouts() {
+    let tempdir = TempDir::new().unwrap();
+    let cases = [
+        (
+            "canonical",
+            tempdir.path().join(".workflow-tools/session"),
+            tempdir.path().to_path_buf(),
+        ),
+        (
+            "legacy",
+            tempdir.path().join(".session"),
+            tempdir.path().to_path_buf(),
+        ),
+        (
+            "relocated",
+            tempdir.path().join("relocated-session-store"),
+            tempdir.path().join("relocated-session-store"),
+        ),
+    ];
+
+    for (layout, store_root, validation_root) in cases {
+        let target_file = validation_root.join("handoff-fixtures/owned-root.txt");
+        std::fs::create_dir_all(target_file.parent().unwrap()).unwrap();
+        std::fs::write(&target_file, layout).unwrap();
+
+        let config = SessionStoreConfig::new(store_root);
+        let session_id = uuid::Uuid::new_v4().to_string();
+        config
+            .init_runtime_context(crate::SessionRuntimeInitRequest {
+                session_id: Some(session_id.clone()),
+                ..Default::default()
+            })
+            .unwrap();
+        let package = crate::SessionHandoffPackage {
+            objective: format!("Validate the {layout} store layout"),
+            target_tickets: vec![],
+            higher_level_objective: String::new(),
+            upward_context: vec![],
+            target_files: vec!["handoff-fixtures/owned-root.txt".to_string()],
+            decisions: vec![],
+            non_goals: vec![],
+            context_anchors: vec![],
+            open_escalations: vec!["Test package is intentionally incomplete".to_string()],
+            risk_notes: None,
+            predecessor_handoff: None,
+        };
+
+        config
+            .create_handoff_record(&session_id, Some(package), vec![], None)
+            .unwrap_or_else(|error| {
+                panic!("{layout} store must validate against its own root: {error}")
+            });
+    }
+}
+
+#[test]
 fn handoff_package_normalizes_backslash_target_files_to_forward_slash() {
     let tempdir = TempDir::new().unwrap();
     let config =

@@ -16,3 +16,11 @@ cargo build -p session --bin session --features cli
 
 See [crates/session-api](crates/session-api) for the underlying model and
 [crates/worktree-ctl](crates/worktree-ctl) for worktree lifecycle commands.
+
+## Handoff path validation
+
+Handoff `--target-file` and path-shaped `--context-anchor` values are
+workspace-relative. Validation uses an active assigned worktree when one
+exists; otherwise it uses the workspace that owns the selected session store
+(canonical `.workflow-tools/session`, legacy `.session`, or an explicitly
+relocated store). Absolute paths and parent-directory escapes are rejected.

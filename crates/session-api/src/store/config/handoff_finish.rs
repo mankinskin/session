@@ -233,7 +233,7 @@ impl SessionStoreConfig {
                     .then_some(entry.assignment.path)
             },
         );
-        Ok(active_worktree.unwrap_or_else(workspace_root))
+        Ok(active_worktree.unwrap_or_else(|| sibling_store_base(&self.root)))
     }
 
     fn mirror_handoff_to_tickets(
