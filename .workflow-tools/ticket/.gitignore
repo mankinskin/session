@@ -3,3 +3,7 @@ tickets.db
 tickets.db-shm
 tickets.db-wal
 search_index/
+
+# Stable advisory lock files are retained to keep a consistent lock inode.
+.ticket-lock
+.ticket-generation
