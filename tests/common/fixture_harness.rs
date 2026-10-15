@@ -37,6 +37,20 @@ pub fn repo_root_from_manifest(manifest_dir: &str) -> PathBuf {
         .expect("session-api crate should live under repo root")
 }
 
+pub fn context_engine_hook_script(script_name: &str) -> Option<PathBuf> {
+    let workflow_tools_root = repo_root_from_manifest(env!("CARGO_MANIFEST_DIR"));
+    let configured_root = std::env::var_os("CONTEXT_ENGINE_ROOT").map(PathBuf::from);
+    let sibling_root = workflow_tools_root
+        .parent()
+        .map(|parent| parent.join("context-engine"));
+
+    configured_root
+        .into_iter()
+        .chain(sibling_root)
+        .map(|root| root.join("tools/agent-hooks").join(script_name))
+        .find(|path| path.is_file())
+}
+
 pub fn unique_suffix() -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)

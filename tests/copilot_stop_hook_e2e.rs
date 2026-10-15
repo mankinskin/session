@@ -11,9 +11,9 @@ use session_api::{SessionStoreConfig, copilot_payload_from_transcript_path};
 use tempfile::tempdir;
 
 use common::fixture_harness::{
-    FIXTURE_SESSION_ID, LOCAL_FIXTURE_SESSION_ID, ScriptWorkspaceFixture, find_cargo_bin,
-    local_fixture_a, local_fixture_scenarios, repo_root_from_manifest, shell_single_quote,
-    unique_suffix, write_fixture_transcript,
+    FIXTURE_SESSION_ID, LOCAL_FIXTURE_SESSION_ID, ScriptWorkspaceFixture,
+    context_engine_hook_script, find_cargo_bin, local_fixture_a, local_fixture_scenarios,
+    repo_root_from_manifest, shell_single_quote, unique_suffix, write_fixture_transcript,
 };
 
 fn repo_root() -> PathBuf {
@@ -76,18 +76,22 @@ fn e2e_hook_binary_persists_fixture_transcript() {
 
     assert!(!record.turns.is_empty());
     assert_eq!(record.session_id, FIXTURE_SESSION_ID);
-    assert_eq!(record.metadata.workspace_path, "default");
+    assert_eq!(
+        record.metadata.workspace_path,
+        config.workspace_path.as_str()
+    );
     assert_eq!(record.metadata.trigger.as_deref(), Some("SessionStart"));
 }
 
 #[test]
 fn e2e_stop_hook_script_persists_fixture_from_nested_workspace_cwd() {
     let repo_root = repo_root();
-    let script_source = repo_root.join("tools/agent-hooks/session-capture-stop.sh");
-    assert!(
-        script_source.is_file(),
-        "missing hook script under repo root"
-    );
+    let Some(script_source) = context_engine_hook_script("session-capture-stop.sh") else {
+        eprintln!(
+            "skipping cross-repository hook test: set CONTEXT_ENGINE_ROOT or provide a sibling context-engine checkout"
+        );
+        return;
+    };
 
     let fixture_text = include_str!("fixtures/capture_hook_workspace_e2e.jsonl");
     let suffix = unique_suffix();
@@ -124,8 +128,8 @@ fn e2e_stop_hook_script_persists_fixture_from_nested_workspace_cwd() {
         return;
     };
 
-    let manifest_path = repo_root
-        .join("workflow-tools/session/Cargo.toml")
+    let manifest_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("Cargo.toml")
         .to_string_lossy()
         .replace("\\\\?\\", "")
         .replace('\\', "/");
@@ -218,7 +222,10 @@ fn e2e_stop_hook_script_persists_fixture_from_nested_workspace_cwd() {
         .expect("stop hook should persist fixture transcript into the temp store");
 
     assert_eq!(record.session_id, session_id);
-    assert_eq!(record.metadata.workspace_path, "default");
+    assert_eq!(
+        record.metadata.workspace_path,
+        config.workspace_path.as_str()
+    );
     assert_eq!(record.metadata.trigger.as_deref(), Some("SessionStart"));
     assert_eq!(record.turns.len(), 2);
     assert_eq!(
