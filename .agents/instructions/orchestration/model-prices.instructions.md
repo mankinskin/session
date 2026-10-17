@@ -6,6 +6,7 @@ applyTo: "**/*.json,**/*.toml"
 ## The Model Cost Table
 
 `workflow-tools/session/crates/model-prices/` is the single source of truth for model pricing in this repository. Every routing, delegation, and cost-gate decision resolves against it. **Never hardcode a price** into instructions, agent templates, or tooling — read it from the table.
+For template selection, use the [root agent roster](https://github.com/mankinskin/meta-workspace/blob/main/AGENTS.md).
 
 | Path | Role |
 |---|---|
