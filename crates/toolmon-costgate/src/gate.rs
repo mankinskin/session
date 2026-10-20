@@ -138,13 +138,16 @@ impl Gate {
     /// substring match on `provider_id`/`model_id`, taking the **maximum**
     /// price among matches so an ambiguous id is never cheaper than its most
     /// expensive variant. `None` when nothing matches.
+    ///
+    /// Both sides are compared in [`model_key`] form, so a hyphenated caller id
+    /// (`gpt-6.1-sol`) matches a display-name row (`GPT-6.1 Sol`).
     pub fn resolve_output_mtok(&self, model: &str) -> Option<f64> {
-        let low = model.to_lowercase();
+        let key = model_key(model);
 
         let exact_max = self
             .models
             .iter()
-            .filter(|r| r.model_id.to_lowercase() == low)
+            .filter(|r| model_key(&r.model_id) == key)
             .filter_map(|r| r.output_mtok)
             .fold(None, fold_max);
         if exact_max.is_some() {
@@ -154,8 +157,7 @@ impl Gate {
         self.models
             .iter()
             .filter(|r| {
-                r.provider_id.to_lowercase().contains(&low)
-                    || r.model_id.to_lowercase().contains(&low)
+                model_key(&r.provider_id).contains(&key) || model_key(&r.model_id).contains(&key)
             })
             .filter_map(|r| r.output_mtok)
             .fold(None, fold_max)
@@ -166,9 +168,21 @@ impl Gate {
         self.resolve_output_mtok(model).is_some()
     }
 
-    /// Compact, sorted, deduplicated list of known `model_id`s, for rejection guidance.
+    /// Sorted, deduplicated [`model_key`] ids for rejection guidance. The
+    /// `github-copilot` roster (the models actually offered to callers) is
+    /// listed when present; otherwise every loaded id is listed.
     pub fn available_model_ids(&self) -> Vec<String> {
-        let mut ids: Vec<String> = self.models.iter().map(|r| r.model_id.clone()).collect();
+        let roster: Vec<&PriceRow> = self
+            .models
+            .iter()
+            .filter(|r| r.provider_id == ROSTER_PROVIDER)
+            .collect();
+        let source: Vec<&PriceRow> = if roster.is_empty() {
+            self.models.iter().collect()
+        } else {
+            roster
+        };
+        let mut ids: Vec<String> = source.iter().map(|r| model_key(&r.model_id)).collect();
         ids.sort();
         ids.dedup();
         ids
@@ -293,6 +307,18 @@ impl Gate {
     }
 }
 
+const ROSTER_PROVIDER: &str = "github-copilot";
+
+/// Separator-insensitive comparison key: trimmed, lowercased, with spaces and
+/// underscores folded to hyphens (`"GPT-6.1 Sol"` -> `"gpt-6.1-sol"`).
+pub fn model_key(id: &str) -> String {
+    id.trim()
+        .chars()
+        .map(|c| if c == ' ' || c == '_' { '-' } else { c })
+        .collect::<String>()
+        .to_lowercase()
+}
+
 fn fold_max(acc: Option<f64>, v: f64) -> Option<f64> {
     Some(match acc {
         Some(a) if a >= v => a,
@@ -306,13 +332,27 @@ fn fold_max(acc: Option<f64>, v: f64) -> Option<f64> {
 /// `available` is the compact list of known `model_id`s, sourced from
 /// [`Gate::available_model_ids`].
 pub fn unknown_model_guidance(model: &str, available: &[String]) -> String {
-    let sample = if available.is_empty() {
+    let family = model_key(model)
+        .split('-')
+        .next()
+        .unwrap_or_default()
+        .to_string();
+    let same_family: Vec<&String> = available
+        .iter()
+        .filter(|id| !family.is_empty() && id.split('-').next() == Some(family.as_str()))
+        .collect();
+    let candidates: Vec<&String> = if same_family.is_empty() {
+        available.iter().collect()
+    } else {
+        same_family
+    };
+    let sample = if candidates.is_empty() {
         "(no models loaded)".to_string()
     } else {
-        available
+        candidates
             .iter()
-            .take(12)
-            .cloned()
+            .take(24)
+            .map(|s| s.as_str())
             .collect::<Vec<_>>()
             .join(", ")
     };
@@ -416,6 +456,56 @@ mod tests {
         let g = test_gate();
         assert!(g.is_orchestrator(15.0001));
         assert!(!g.is_orchestrator(15.0));
+    }
+
+    fn copilot_gate() -> Gate {
+        let row = |provider: &str, id: &str, out: f64| PriceRow {
+            provider_id: provider.into(),
+            model_id: id.into(),
+            output_mtok: Some(out),
+        };
+        let rows = vec![
+            row("01-ai", "yi-large", 3.0),
+            row("github-copilot", "GPT-6.1 Sol", 10.0),
+            row("github-copilot", "GPT-6 Luna", 4.0),
+            row("github-copilot", "Claude Opus 5", 25.0),
+            row("github-copilot", "Claude Sonnet 5", 10.0),
+        ];
+        Gate::new(rows, ModelBudgetCalibration::default(), None, None)
+    }
+
+    #[test]
+    fn hyphenated_id_matches_display_name_row() {
+        let g = copilot_gate();
+        assert_eq!(g.resolve_output_mtok("gpt-6.1-sol"), Some(10.0));
+        assert_eq!(g.resolve_output_mtok("claude-opus-5"), Some(25.0));
+        assert_eq!(g.resolve_output_mtok("Claude Sonnet 5"), Some(10.0));
+        assert_eq!(g.resolve_output_mtok("claude_sonnet_5"), Some(10.0));
+    }
+
+    #[test]
+    fn hyphenated_id_is_allowed_by_evaluate() {
+        let g = copilot_gate();
+        assert!(!matches!(
+            g.evaluate("gpt-6.1-sol", "any_tool", None),
+            Decision::Reject { .. }
+        ));
+    }
+
+    #[test]
+    fn available_ids_prefer_roster_in_key_form() {
+        let g = copilot_gate();
+        let ids = g.available_model_ids();
+        assert!(ids.contains(&"gpt-6.1-sol".to_string()));
+        assert!(!ids.iter().any(|id| id == "yi-large"));
+    }
+
+    #[test]
+    fn guidance_lists_same_family_first() {
+        let g = copilot_gate();
+        let msg = unknown_model_guidance("gpt-9-nova", &g.available_model_ids());
+        assert!(msg.contains("gpt-6-luna, gpt-6.1-sol"));
+        assert!(!msg.contains("claude-opus-5"));
     }
 
     #[test]

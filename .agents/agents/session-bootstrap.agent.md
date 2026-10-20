@@ -4,7 +4,7 @@ description: "Use when a new session needs an assigned worktree, durable claims,
 tools: [execute, read, vscodeGeneral/toolSearch, 'peek-mcp/*', 'session-mcp/*', ticket-mcp/board_check_in, ticket-mcp/board_show, ticket-mcp/get_ticket, ticket-mcp/list_tickets]
 argument-hint: "Session UUID and ticket id to initialize in an assigned worktree."
 user-invocable: true
-model: "GPT-5 mini"
+model: "GPT-6 Luna"
 ---
 
 You initialize a session into a traceable, ready-to-work state.

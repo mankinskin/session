@@ -1612,8 +1612,9 @@ mod tests {
     #[test]
     fn space_and_underscore_separators_are_normalized() {
         let _routing = active_routing();
-        // "Claude_Opus 4 1" doesn't match exactly, but normalizing separators
-        // to hyphens and lowercasing resolves to "claude-opus-4-1".
+        // The gate's own key normalization folds spaces/underscores to hyphens,
+        // so "Claude_Opus 4 1" resolves directly to "claude-opus-4-1" without
+        // needing the proxy's fallback (and therefore without a warning).
         let g = test_gate();
         let mut p = PendingList::default();
         let mut pc = PendingCalls::default();
@@ -1638,7 +1639,7 @@ mod tests {
             "result": { "content": [{ "type": "text", "text": "ok" }] }
         });
         let (out, _) = handle_server_message(resp, Some(&g), &mut p, &mut pc);
-        assert!(out["result"]["costGateWarning"].is_string());
+        assert!(out["result"]["costGateWarning"].is_null());
     }
 
     #[test]
