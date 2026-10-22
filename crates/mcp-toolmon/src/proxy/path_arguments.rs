@@ -5,6 +5,8 @@ pub(crate) enum PathArgumentKind {
     Workspace,
     Path,
     RenameDestination,
+    /// Read-only copy source: any existing file, not confined to the worktree.
+    ReadSource,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -22,7 +24,7 @@ const PATH_ARGUMENT_REGISTRY: &[(&str, &str, PathArgumentKind)] = &[
     ("fs_rename_file", "from", PathArgumentKind::Path),
     ("fs_rename_file", "to", PathArgumentKind::RenameDestination),
     ("fs_rename_file", "root", PathArgumentKind::Path),
-    ("fs_copy_file", "from", PathArgumentKind::Path),
+    ("fs_copy_file", "from", PathArgumentKind::ReadSource),
     ("fs_copy_file", "to", PathArgumentKind::Path),
     ("fs_copy_file", "root", PathArgumentKind::Path),
     ("fs_delete_file", "path", PathArgumentKind::Path),

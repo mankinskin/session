@@ -602,10 +602,9 @@ fn lookup_reads_branch_manifest_without_a_transcript() {
         config.lookup_worktree(WORKTREE_SESSION_A).unwrap().branch,
         "agent/session-a"
     );
-    assert!(matches!(
-        config.peek_range(WORKTREE_SESSION_A, 0, None),
-        Err(SessionError::NotFound { .. })
-    ));
+    let range = config.peek_range(WORKTREE_SESSION_A, 0, None).unwrap();
+    assert_eq!(range.total_turns, 0);
+    assert!(range.turns.is_empty());
 }
 
 #[test]

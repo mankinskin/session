@@ -1,4 +1,5 @@
 include!("store_tests/capture/basics.rs");
+include!("store_tests/capture/missing_transcript.rs");
 include!("store_tests/capture/query_and_worktree.rs");
 include!("store_tests/capture/federated_sessions.rs");
 include!("store_tests/capture/ticket_relation.rs");

@@ -39,6 +39,11 @@ pub(super) fn parse_entity_urn(entity_urn: &str) -> Result<ParsedEntityUrn, Sess
             "'{trimmed}' (expected ce://<workspace>/<store>/<entity> with store ticket|spec|rule|dossier, details: {err})"
         ))
     })?;
+    if !urn.is_entity() {
+        return Err(SessionError::InvalidEntityUrn(format!(
+            "'{trimmed}' is an external reference; session pins require ce://<workspace>/<store>/<entity>"
+        )));
+    }
     let workspace_path = urn.workspace().to_string();
     let store = urn.store();
     let entity_id = urn.entity().to_string();
@@ -131,5 +136,27 @@ mod tests {
                 .to_string()
                 .contains("unsupported store 'unknown_store'")
         );
+    }
+
+    #[test]
+    fn parse_entity_urn_rejects_external_references_as_pins() {
+        for urn in [
+            "file:///c:/repo/src/lib.rs",
+            "tool://session-mcp/session_peek_skeleton",
+            "https://example.com/doc",
+        ] {
+            let err = parse_entity_urn(urn).unwrap_err();
+            assert!(
+                err.to_string().contains("external reference"),
+                "{urn}: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_entity_urn_accepts_canonical_entity_scheme() {
+        let parsed = parse_entity_urn("entity://default/ticket/t-123").unwrap();
+        assert_eq!(parsed.kind, SessionPinnedEntityKind::Ticket);
+        assert_eq!(parsed.entity_id, "t-123");
     }
 }

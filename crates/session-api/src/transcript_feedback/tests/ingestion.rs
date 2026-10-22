@@ -103,7 +103,8 @@ fn recovers_feedback_entry_for_failed_ingestion_call() {
         .unwrap()
         .expect("recovered entry");
 
-    assert_eq!(entry.target.to_string(), "ce://memory-api/rule/some-rule");
+    // Legacy `ce://` input is accepted and rendered in the canonical `entity://` form.
+    assert_eq!(entry.target.to_string(), "entity://memory-api/rule/some-rule");
     assert_eq!(entry.rating, Some(FeedbackRating::NotHelpful));
     assert_eq!(entry.note_text.as_deref(), Some("confusing wording"));
     assert_eq!(

@@ -157,13 +157,18 @@ impl SessionStoreConfig {
     ) -> Result<SessionRecord, SessionError> {
         let paths = self.paths_for_session_id(session_id)?;
         let mut record = self.read_session_manifest(session_id)?;
-        let transcript: PersistedSessionTranscript =
-            read_json(&paths.transcript_path)?;
-        ensure_supported_schema_version(
-            &paths.transcript_path,
-            transcript.schema_version,
-        )?;
-        record.turns = transcript.turns;
+        // A manifest can exist before its first transcript capture; treat the
+        // absent transcript as zero turns rather than a missing session.
+        if let Some(transcript) = read_json_if_exists::<
+            PersistedSessionTranscript,
+        >(&paths.transcript_path)?
+        {
+            ensure_supported_schema_version(
+                &paths.transcript_path,
+                transcript.schema_version,
+            )?;
+            record.turns = transcript.turns;
+        }
         Ok(record)
     }
 

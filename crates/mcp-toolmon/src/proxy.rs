@@ -286,6 +286,22 @@ pub fn handle_client_message(
                         } else {
                             value
                         };
+                        if argument.kind == PathArgumentKind::ReadSource {
+                            let source = canonicalize_tool_path(Path::new(value))
+                                .ok()
+                                .filter(|source| source.is_file());
+                            if source.is_none() {
+                                let telemetry =
+                                    immediate_telemetry("reject-workspace", Some(caller_model));
+                                let error =
+                                    format!("copy source '{value}' does not exist or is not a file");
+                                return (
+                                    ClientAction::Respond(error_result(&id, &error)),
+                                    Some(telemetry),
+                                );
+                            }
+                            continue;
+                        }
                         let validation = if argument.kind == PathArgumentKind::RenameDestination
                             && !Path::new(value).is_absolute()
                         {
@@ -1258,6 +1274,119 @@ mod tests {
                 "{tool}: {text}"
             );
         }
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    fn copy_request(from: Value, to: Value, root: &Path) -> Value {
+        let mut request = call("fs_copy_file", Some("gpt-5-mini"));
+        request["params"]["arguments"]["from"] = from;
+        request["params"]["arguments"]["to"] = to;
+        request["params"]["arguments"]["root"] = json!(root);
+        request
+    }
+
+    fn route_copy(request: Value) -> ClientAction {
+        route_with_schema(
+            request,
+            &test_gate(),
+            "fs_copy_file",
+            json!({"from": {}, "to": {}, "root": {}}),
+        )
+        .0
+    }
+
+    #[test]
+    fn copy_from_existing_file_outside_worktree_into_worktree_is_forwarded() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let external = temp.path().join("external.md");
+        std::fs::write(&external, "external\n").unwrap();
+        for source in [main_checkout.join("README.md"), external] {
+            let destination = worktree.join("copied.md");
+            let request = copy_request(json!(source), json!(destination), &worktree);
+            let ClientAction::Forward(forwarded) = route_copy(request) else {
+                panic!("copy source outside worktree should forward: {}", source.display());
+            };
+            assert_eq!(forwarded["params"]["arguments"]["from"], json!(source));
+            assert_eq!(forwarded["params"]["arguments"]["to"], json!(destination));
+        }
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn copy_into_missing_nested_worktree_directory_is_forwarded() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let destination = worktree.join("a").join("b").join("copied.md");
+        let request = copy_request(
+            json!(main_checkout.join("README.md")),
+            json!(destination),
+            &worktree,
+        );
+        assert!(matches!(route_copy(request), ClientAction::Forward(_)));
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn copy_rejects_missing_or_directory_source() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        for source in [
+            temp.path().join("missing.md"),
+            main_checkout.join("missing").join("nested.md"),
+            temp.path().to_path_buf(),
+        ] {
+            let request =
+                copy_request(json!(source), json!(worktree.join("copied.md")), &worktree);
+            let text = response_text(route_copy(request));
+            assert!(
+                text.contains("copy source") && text.contains("not a file"),
+                "{}: {text}",
+                source.display()
+            );
+        }
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn copy_with_outside_source_still_rejects_outside_destination() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let request = copy_request(
+            json!(main_checkout.join("README.md")),
+            json!(temp.path().join("escaped.md")),
+            &worktree,
+        );
+        let text = response_text(route_copy(request));
+        assert!(text.contains("PATH_OUTSIDE_SESSION_WORKTREE"), "{text}");
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
+    }
+
+    #[test]
+    fn move_from_outside_worktree_is_still_rejected() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let mut request = call("fs_move_file", Some("gpt-5-mini"));
+        request["params"]["arguments"]["from"] = json!(main_checkout.join("README.md"));
+        request["params"]["arguments"]["to"] = json!(worktree.join("moved.md"));
+        request["params"]["arguments"]["root"] = json!(worktree);
+        let (action, _) = route_with_schema(
+            request,
+            &test_gate(),
+            "fs_move_file",
+            json!({"from": {}, "to": {}, "root": {}}),
+        );
+        assert!(response_text(action).contains("PATH_OUTSIDE_SESSION_WORKTREE"));
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
 
