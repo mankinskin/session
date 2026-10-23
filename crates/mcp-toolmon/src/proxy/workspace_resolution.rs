@@ -79,7 +79,7 @@ fn resolve_workspace(
             let canonical_workspace = canonicalize_tool_path(workspace)?;
             if !canonical_workspace.starts_with(&canonical_target_root) {
                 return Err(format!(
-                    "PATH_OUTSIDE_SESSION_WORKTREE: path '{}' (canonical '{}') is outside resolved session worktree '{}' for session '{}'. Supply a path inside the assigned checkout; paths are not rewritten.",
+                    "PATH_OUTSIDE_SESSION_WORKTREE: path '{}' (canonical '{}') is outside resolved session worktree '{}' for session '{}'. Supply a path inside the assigned checkout; paths are not rewritten. Budget-offset grants do not authorize filesystem access.",
                     workspace.display(),
                     canonical_workspace.display(),
                     canonical_target_root.display(),

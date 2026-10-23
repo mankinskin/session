@@ -124,7 +124,10 @@ pub enum SessionError {
     #[error("session data was not found at {path}")]
     NotFound { path: PathBuf },
 
-    #[error("runtime context for workspace session {session_id} was not found")]
+    #[error(
+        "runtime context for workspace session {session_id} was not found; \
+         call session_runtime_init (CLI: session init) with this session_id and the same workspace before using runtime operations"
+    )]
     RuntimeContextNotFound { session_id: String },
 
     #[error("session finish is blocked: {reason}")]

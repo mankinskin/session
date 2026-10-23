@@ -1065,7 +1065,7 @@ impl SessionServer {
 
     #[tool(
         name = "session_runtime_pin",
-        description = "Pin an entity URN into runtime workspace context."
+        description = "Pin a canonical ce://<workspace>/<store>/<entity> URN into runtime context. Call session_runtime_init first with the same session_id and workspace. Raw paths and external references are not session pins."
     )]
     pub async fn session_runtime_pin(
         &self,
@@ -1673,7 +1673,7 @@ impl SessionServer {
 
     #[tool(
         name = "session_grant_create",
-        description = "Create a new budget-offset grant for the graded cost gate."
+        description = "Create a budget-offset grant for the graded cost gate. Grants do not authorize filesystem paths or override PATH_OUTSIDE_SESSION_WORKTREE."
     )]
     pub async fn session_grant_create(
         &self,
@@ -1709,7 +1709,7 @@ impl SessionServer {
 
     #[tool(
         name = "session_grant_list",
-        description = "List all budget-offset grants in the store."
+        description = "List budget-offset grants for the cost gate. Grants do not authorize filesystem paths."
     )]
     pub async fn session_grant_list(
         &self,

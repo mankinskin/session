@@ -693,6 +693,24 @@ fn read_runtime_context_missing_surfaces_not_found() {
 }
 
 #[test]
+fn runtime_pin_without_init_names_the_required_recovery() {
+    let tempdir = TempDir::new().unwrap();
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
+    let session_id = "11111111-1111-4111-8111-111111111111";
+    let error = config
+        .pin_runtime_entity(session_id, "ce://default/dossier/example", None, None)
+        .unwrap_err();
+    assert!(matches!(error, SessionError::RuntimeContextNotFound { .. }));
+    let message = error.to_string();
+    assert!(
+        message.contains("session_runtime_init")
+            && message.contains(session_id)
+            && message.contains("same workspace"),
+        "{message}"
+    );
+}
+
+#[test]
 fn writes_never_target_legacy_runtime_tree() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");

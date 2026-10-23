@@ -17,6 +17,19 @@ cargo build -p session --bin session --features cli
 See [crates/session-api](crates/session-api) for the underlying model and
 [crates/worktree-ctl](crates/worktree-ctl) for worktree lifecycle commands.
 
+## Runtime pins and access errors
+
+Initialize runtime context with `session init --session-id <uuid> --workspace
+<root>` (MCP: `session_runtime_init`) before pinning entities. Use the same
+session UUID and explicit workspace root for initialization and pin operations.
+Pins accept canonical `ce://<workspace>/<store>/<entity>` references, not raw
+paths or external URLs; a dossier pin uses `ce://default/dossier/<folder>`.
+
+`session_grant_*` operations adjust the graded cost gate's budget only.
+Grants never authorize filesystem access or bypass
+`PATH_OUTSIDE_SESSION_WORKTREE`. For a path-boundary rejection, use a path
+inside the assigned checkout rather than requesting a budget-offset grant.
+
 ## Handoff path validation
 
 Handoff `--target-file` and path-shaped `--context-anchor` values are

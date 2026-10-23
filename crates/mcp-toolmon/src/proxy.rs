@@ -1367,6 +1367,10 @@ mod tests {
         );
         let text = response_text(route_copy(request));
         assert!(text.contains("PATH_OUTSIDE_SESSION_WORKTREE"), "{text}");
+        assert!(
+            text.contains("Budget-offset grants do not authorize filesystem access"),
+            "{text}"
+        );
         unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
 
