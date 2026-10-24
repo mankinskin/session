@@ -1,6 +1,5 @@
 ---
 description: "Use at the start of and at the end of every session, and whenever picking up handed-off work: session identity declaration, worktree binding, transcript-visible traceability, and verified techniques for inspecting prior sessions."
-applyTo: "**"
 ---
 
 ## Single Session Identifier

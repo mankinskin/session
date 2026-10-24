@@ -1,6 +1,5 @@
 ---
 description: "Use when resolving model prices, syncing the model cost table, or wiring cost-aware routing to real numbers. Covers workflow-tools/session/crates/model-prices layout, the sync script, offline queries, the cost gate, and staleness policy."
-applyTo: "**/*.json,**/*.toml"
 ---
 
 ## The Model Cost Table

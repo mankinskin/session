@@ -1,6 +1,5 @@
 ---
 description: "Use when deciding whether to create a worktree or when registering one for a large implementation task. The capture hook never creates worktrees."
-applyTo: "**"
 ---
 
 ## Default Execution Context
