@@ -13,7 +13,7 @@ use session_api::{
     SessionRuntimeInitRequest, SessionStoreConfig, SessionTerminalCreateRequest,
     SessionValidationGate, SessionWorkflowEdge, SessionWorkflowEdgeKind, SessionWorkflowNodeDraft,
     SessionWorkflowNodeKind, SessionWorkflowNodeRequirement, SessionWorkflowNodeStatus,
-    SessionWorktreeCheckInRequest, ToolMetricsWindow,
+    SessionWorktreeCheckInRequest, SessionWorktreeUnassignRequest, ToolMetricsWindow,
 };
 
 mod write_policy;
@@ -92,6 +92,8 @@ pub enum SessionCommand {
     Finish(FinishArgs),
     /// Check a session into its authoritative worktree assignment.
     CheckIn(CheckInArgs),
+    /// Remove an explicit assignment and return the session to main.
+    Unassign(UnassignArgs),
     /// Look up the worktree assignment for a session.
     Lookup(LookupArgs),
     /// Query stored sessions with optional filters.
@@ -204,6 +206,24 @@ pub struct CheckInArgs {
     /// Predecessor session id when rotating from a prior assignment.
     #[arg(long)]
     pub predecessor_session_id: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct UnassignArgs {
+    #[arg(long)]
+    pub session_id: String,
+    #[arg(long)]
+    pub owner_id: String,
+    #[arg(long)]
+    pub ticket_id: String,
+    /// Exact path from the current registry receipt (may no longer exist).
+    #[arg(long)]
+    pub expected_worktree_path: PathBuf,
+    /// Exact branch from the current registry receipt.
+    #[arg(long)]
+    pub expected_branch: String,
+    #[arg(long)]
+    pub reason: String,
 }
 
 #[derive(Debug, Args)]
@@ -828,6 +848,17 @@ fn dispatch(config: &SessionStoreConfig, command: SessionCommand) -> Result<Valu
                 worktree_path: args.worktree_path,
                 branch: args.branch,
                 predecessor_session_id: args.predecessor_session_id,
+            })?;
+            to_value(&receipt)
+        }
+        SessionCommand::Unassign(args) => {
+            let receipt = config.unassign_worktree(SessionWorktreeUnassignRequest {
+                session_id: args.session_id,
+                owner_id: args.owner_id,
+                ticket_id: args.ticket_id,
+                expected_worktree_path: args.expected_worktree_path,
+                expected_branch: args.expected_branch,
+                reason: args.reason,
             })?;
             to_value(&receipt)
         }
@@ -1587,6 +1618,20 @@ mod tests {
     };
     use std::process::Command;
     use tempfile::tempdir;
+
+    #[test]
+    fn unassign_requires_explicit_workspace_and_all_preconditions() {
+        let args = [
+            "session", "unassign", "--session-id", "11111111-1111-4111-8111-111111111111",
+            "--owner-id", "agent", "--ticket-id", "ticket", "--expected-worktree-path",
+            "/repo/.worktrees/session/deleted", "--expected-branch", "feature/x",
+            "--reason", "Return to main",
+        ];
+        let cli = parse_cli_from(args).unwrap();
+        assert!(matches!(cli.command, SessionCommand::Unassign(_)));
+        assert!(matches!(run(cli), Err(CliRunError::BadRequest(_))));
+        assert!(parse_cli_from(&args[..args.len() - 2]).is_err());
+    }
 
     #[test]
     fn parses_check_in_command() {

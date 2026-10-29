@@ -247,7 +247,7 @@ pub fn handle_client_message(
                         .find(|argument| argument.kind == PathArgumentKind::Workspace)
                         .and_then(|argument| msg["params"]["arguments"][argument.name].as_str())
                         .map(|value| {
-                            if value.is_empty() || value == "default" {
+                            if tool != "session_unassign" && (value.is_empty() || value == "default") {
                                 "."
                             } else {
                                 value
@@ -280,6 +280,7 @@ pub fn handle_client_message(
                             continue;
                         };
                         let value = if argument.kind == PathArgumentKind::Workspace
+                            && tool != "session_unassign"
                             && (value.is_empty() || value == "default")
                         {
                             "."
@@ -733,6 +734,65 @@ mod tests {
             assert!(forwarded["params"]["arguments"].get("workspace").is_none());
         }
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
+    }
+
+    #[test]
+    fn deleted_worktree_allows_only_explicit_main_store_unassignment() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        std::fs::remove_dir_all(&worktree).unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        let mut request = call("session_unassign", Some("gpt-5-mini"));
+        request["params"]["arguments"]["workspace"] = json!(main_checkout);
+        let (action, _) = route_with_schema(
+            request,
+            &test_gate(),
+            "session_unassign",
+            json!({"workspace": {"type": "string"}}),
+        );
+        assert!(matches!(action, ClientAction::Forward(_)));
+        for workspace in [
+            None,
+            Some(PathBuf::from("")),
+            Some(PathBuf::from("default")),
+            Some(PathBuf::from("..")),
+            Some(worktree.clone()),
+            Some(main_checkout.join("other-repo")),
+        ] {
+            let mut request = call("session_unassign", Some("gpt-5-mini"));
+            if let Some(workspace) = workspace {
+                request["params"]["arguments"]["workspace"] = json!(workspace);
+            }
+            let (action, _) = route_with_schema(
+                request,
+                &test_gate(),
+                "session_unassign",
+                json!({"workspace": {"type": "string"}}),
+            );
+            assert!(matches!(action, ClientAction::Respond(_)));
+        }
+        let mut request = call("update_ticket", Some("gpt-5-mini"));
+        request["params"]["arguments"]["workspace"] = json!(main_checkout);
+        assert!(matches!(route_with_schema(
+            request.clone(), &test_gate(), "update_ticket",
+            json!({"workspace": {"type": "string"}}),
+        ).0, ClientAction::Respond(_)));
+        SessionStoreConfig::new(main_checkout.join(".session")).unassign_worktree(
+            session_api::SessionWorktreeUnassignRequest {
+                session_id: TEST_SESSION_ID.to_string(),
+                owner_id: "agent".to_string(),
+                ticket_id: "ticket".to_string(),
+                expected_worktree_path: worktree,
+                expected_branch: "agent/test".to_string(),
+                reason: "Requester selected main".to_string(),
+            },
+        ).unwrap();
+        assert!(matches!(route_with_schema(
+            request, &test_gate(), "update_ticket",
+            json!({"workspace": {"type": "string"}}),
+        ).0, ClientAction::Forward(_)));
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
 
     #[test]

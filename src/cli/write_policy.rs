@@ -9,6 +9,7 @@ pub(super) fn command_writes_store(command: &SessionCommand) -> bool {
         | SessionCommand::Handoff(_)
         | SessionCommand::Finish(_)
         | SessionCommand::CheckIn(_)
+        | SessionCommand::Unassign(_)
         | SessionCommand::TerminalCreate(_)
         | SessionCommand::TerminalAppendOutput(_)
         | SessionCommand::TerminalClose(_) => true,

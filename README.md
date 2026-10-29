@@ -20,6 +20,36 @@ to validate that registration, without caching or scanning `.worktrees`.
 Missing registrations use the invocation checkout. Broken or inactive
 registrations remain errors rather than falling back to main.
 
+### Return an assigned session to main
+
+Use `session unassign` (MCP: `session_unassign`) with the **owning main**
+workspace, recorded owner/ticket, exact recorded path/branch, and an audit
+reason. This is the explicit recovery path when the assigned checkout has
+already been deleted; ordinary calls still fail closed until it succeeds.
+
+```bash
+session --workspace /path/to/main --json unassign \
+  --session-id <uuid> --owner-id <recorded-owner> --ticket-id <recorded-ticket> \
+  --expected-worktree-path /path/to/main/.worktrees/<uuid>/<slug> \
+  --expected-branch <recorded-branch> --reason "Requester selected main"
+```
+
+The shared `SessionStoreConfig::unassign_worktree` operation checks ownership
+and assignment preconditions under the same main-store lock as check-in.
+It clears the main manifest's worktree metadata, retains a receipt under
+`local/worktree-unassignments/<uuid>/`, and removes the active registry entry
+last. Errors restore the registry, manifest and audit snapshots. It does not
+delete or modify any checkout content, copied stores, tickets, or transcripts.
+The receipt returns `main_checkout`, the previous assignment, timestamp,
+reason and `audit_path`. Subsequent unassigned calls use main without cached
+routing. Repeating unassignment reports no assignment instead of fabricating
+success; a later explicit check-in remains possible.
+
+MCP permits only this recovery operation to target the owning main workspace
+or its session store despite a broken assignment. Other operations retain
+normal containment checks. Deploy the updated session CLI/MCP server and
+`mcp-toolmon` together before relying on recovery.
+
 ## Quickstart
 
 ```bash

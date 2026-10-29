@@ -162,6 +162,26 @@ pub struct SessionWorktreeCheckInReceipt {
     pub predecessor_path: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionWorktreeUnassignRequest {
+    pub session_id: String,
+    pub owner_id: String,
+    pub ticket_id: String,
+    pub expected_worktree_path: PathBuf,
+    pub expected_branch: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionWorktreeUnassignReceipt {
+    pub session_id: String,
+    pub main_checkout: PathBuf,
+    pub previous_assignment: SessionWorktreeCheckInReceipt,
+    pub reason: String,
+    pub unassigned_at: DateTime<Utc>,
+    pub audit_path: PathBuf,
+}
+
 mod config {
     use super::*;
 

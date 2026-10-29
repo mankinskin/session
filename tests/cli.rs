@@ -172,6 +172,37 @@ fn managed_worktree(
 }
 
 #[test]
+fn unassign_deleted_checkout_roundtrip() {
+    let dir = tempdir().unwrap();
+    let session_id = "11111111-1111-4111-8111-111111111111";
+    let worktree = managed_worktree(&dir, session_id, "unassign", "feature/unassign");
+    let config = SessionStoreConfig::new(dir.path().join(".workflow-tools/session"));
+    config.check_in_worktree(session_api::SessionWorktreeCheckInRequest {
+        session_id: session_id.to_string(),
+        owner_id: "agent".to_string(),
+        ticket_id: "ticket".to_string(),
+        worktree_path: worktree.clone(),
+        branch: "feature/unassign".to_string(),
+        predecessor_session_id: None,
+    }).unwrap();
+    std::fs::remove_dir_all(&worktree).unwrap();
+    let output = Command::new(env!("CARGO_BIN_EXE_session"))
+        .args(["--json", "--workspace"])
+        .arg(dir.path())
+        .args(["unassign", "--session-id", session_id, "--owner-id", "agent",
+            "--ticket-id", "ticket", "--expected-worktree-path"])
+        .arg(&worktree)
+        .args(["--expected-branch", "feature/unassign", "--reason", "Return to main"])
+        .output().unwrap();
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let receipt: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(receipt["session_id"], session_id);
+    assert_eq!(receipt["main_checkout"], dir.path().canonicalize().unwrap().to_string_lossy().as_ref());
+    assert!(PathBuf::from(receipt["audit_path"].as_str().unwrap()).is_file());
+    assert!(config.registered_worktree(session_id).unwrap().is_none());
+}
+
+#[test]
 fn check_in_and_lookup_roundtrip() {
     let dir = tempdir().unwrap();
     let store_root: PathBuf = dir.path().join(".session");

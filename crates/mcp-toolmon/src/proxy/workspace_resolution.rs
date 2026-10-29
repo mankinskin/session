@@ -280,6 +280,29 @@ pub(crate) fn resolve_workspace_for_tool(
     session_id: &str,
     workspace: Option<&str>,
 ) -> Result<(String, PathBuf), String> {
+    if tool == "session_unassign" {
+        let selector = workspace
+            .filter(|value| !value.trim().is_empty() && *value != "default" && *value != "..")
+            .ok_or_else(|| "session_unassign requires an explicit owning main workspace".to_string())?;
+        let resolver = anchored_resolver()?;
+        let (main_checkout, store_root) = repository_root_target(&resolver, DEFAULT_STORE_DIR)?;
+        let selected = canonicalize_tool_path(Path::new(selector))?;
+        let canonical_store = canonical_session_store_root(&main_checkout);
+        let legacy_store = main_checkout.join(DEFAULT_STORE_DIR);
+        if selected != main_checkout
+            && selected != canonicalize_tool_path(&canonical_store)?
+            && selected != canonicalize_tool_path(&legacy_store)?
+        {
+            return Err(format!(
+                "session_unassign requires owning main checkout '{}' or its session store; received '{}'",
+                main_checkout.display(), selected.display()
+            ));
+        }
+        // This narrow recovery operation must remain reachable even when the
+        // current registration is broken. Domain checks still enforce ownership
+        // and the expected assignment; no other tool bypasses normal routing.
+        return Ok((normalized_path(&selected), store_root));
+    }
     // `session_check_in` bootstrap enforces a stricter shape (a direct
     // `.worktrees/<session>/<slug>` child with a `.git` entry) than the
     // general containment check in `resolve_workspace`, and only applies to

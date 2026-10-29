@@ -18,7 +18,8 @@ use session_api::{
     SessionQuery, SessionRuntimeInitRequest, SessionStoreConfig, SessionTerminalCreateRequest,
     SessionValidationGate, SessionWorkflowEdge, SessionWorkflowEdgeKind, SessionWorkflowNodeDraft,
     SessionWorkflowNodeKind, SessionWorkflowNodePatch, SessionWorkflowNodeRequirement,
-    SessionWorkflowNodeStatus, SessionWorktreeCheckInRequest, ToolMetricsWindow,
+    SessionWorkflowNodeStatus, SessionWorktreeCheckInRequest, SessionWorktreeUnassignRequest,
+    ToolMetricsWindow,
 };
 
 // ── Workflow enum schema advertisement ─────────────────────────────────────
@@ -101,6 +102,23 @@ pub struct CheckInInput {
     /// Predecessor session id when rotating from a prior assignment.
     #[serde(default)]
     pub predecessor_session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+pub struct UnassignInput {
+    /// Explicit owning MAIN checkout or its session store, not the assigned checkout.
+    pub workspace: String,
+    pub session_id: String,
+    /// Owner identity recorded in the assignment.
+    pub owner_id: String,
+    /// Ticket recorded in the assignment.
+    pub ticket_id: String,
+    /// Exact recorded path; it need not exist.
+    pub expected_worktree_path: String,
+    /// Exact recorded branch, checked before changing routing.
+    pub expected_branch: String,
+    /// Required audit reason for returning to main.
+    pub reason: String,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -767,6 +785,8 @@ impl SessionServer {
             | SessionError::InvalidWorkspaceSlug(_)
             | SessionError::MissingWorktreeAssignment { .. }
             | SessionError::SessionOwnershipMismatch { .. }
+            | SessionError::WorktreeAssignmentChanged { .. }
+            | SessionError::MissingWorktreeUnassignReason
             | SessionError::WorktreeConflict { .. }
             | SessionError::CrossSessionReuseRequiresAdopt { .. }
             | SessionError::RuntimeContextNotFound { .. }
@@ -931,6 +951,17 @@ fn indexed_mcp_error(collection: &str, index: usize, error: McpError) -> McpErro
 fn session_capability_catalog() -> serde_json::Value {
     serde_json::json!({
         "surface": "session-mcp",
+        "worktree_assignment": {
+            "default": "main",
+            "tools": ["session_check_in", "session_lookup", "session_unassign"],
+            "unassign": {
+                "workspace": "Explicit owning main checkout or its session store.",
+                "preconditions": ["owner_id", "ticket_id", "expected_worktree_path", "expected_branch", "reason"],
+                "supports_deleted_checkout": true,
+                "deletes_checkout_content": false,
+                "result": ["main_checkout", "previous_assignment", "unassigned_at", "reason", "audit_path"],
+            },
+        },
         "handle": {
             "field": "session_id",
             "note": "Required by every workflow/runtime tool. Returned as a \
@@ -1532,6 +1563,28 @@ impl SessionServer {
     }
 
     #[tool(
+        name = "session_unassign",
+        description = "Explicitly remove a session's registered worktree assignment and return its owning main checkout. Requires the main workspace and matching owner, ticket, recorded path and branch. Supports deleted checkouts, retains an audit receipt, and never deletes checkout content."
+    )]
+    pub async fn session_unassign(
+        &self,
+        Parameters(input): Parameters<UnassignInput>,
+    ) -> Result<CallToolResult, McpError> {
+        let receipt = self
+            .config_for_workspace(&input.workspace)?
+            .unassign_worktree(SessionWorktreeUnassignRequest {
+                session_id: input.session_id,
+                owner_id: input.owner_id,
+                ticket_id: input.ticket_id,
+                expected_worktree_path: PathBuf::from(input.expected_worktree_path),
+                expected_branch: input.expected_branch,
+                reason: input.reason,
+            })
+            .map_err(Self::session_err)?;
+        Self::json_result(&receipt)
+    }
+
+    #[tool(
         name = "session_lookup",
         description = "Look up the authoritative worktree assignment for a session."
     )]
@@ -2115,6 +2168,52 @@ mod tests {
             })
             .expect("text content");
         serde_json::from_str(&text).expect("parse json")
+    }
+
+    #[tokio::test]
+    async fn unassign_deleted_checkout_returns_main_and_retains_audit() {
+        let dir = tempdir().unwrap();
+        let session_id = "11111111-1111-4111-8111-111111111111";
+        let worktree = dir.path().join(".worktrees").join(session_id).join("unassign");
+        for args in [
+            vec!["init", "--quiet"],
+            vec!["-c", "user.name=tests", "-c", "user.email=tests@example.invalid",
+                "commit", "--quiet", "--allow-empty", "-m", "fixture"],
+        ] {
+            assert!(std::process::Command::new("git").current_dir(dir.path())
+                .args(args).status().unwrap().success());
+        }
+        assert!(std::process::Command::new("git").current_dir(dir.path())
+            .args(["worktree", "add", "--quiet", "-b", "feature/unassign"])
+            .arg(&worktree).status().unwrap().success());
+        let store = dir.path().join(".workflow-tools/session");
+        let config = SessionStoreConfig::new(&store);
+        config.check_in_worktree(SessionWorktreeCheckInRequest {
+            session_id: session_id.to_string(),
+            owner_id: "agent".to_string(),
+            ticket_id: "ticket".to_string(),
+            worktree_path: worktree.clone(),
+            branch: "feature/unassign".to_string(),
+            predecessor_session_id: None,
+        }).unwrap();
+        std::fs::remove_dir_all(&worktree).unwrap();
+        let server = SessionServer::new(store);
+        let make_input = |owner: &str| UnassignInput {
+            workspace: dir.path().to_string_lossy().to_string(),
+            session_id: session_id.to_string(),
+            owner_id: owner.to_string(),
+            ticket_id: "ticket".to_string(),
+            expected_worktree_path: worktree.to_string_lossy().to_string(),
+            expected_branch: "feature/unassign".to_string(),
+            reason: "Requester selected main".to_string(),
+        };
+        assert!(server.session_unassign(Parameters(make_input("other"))).await.is_err());
+        assert!(config.registered_worktree(session_id).unwrap().is_some());
+        let payload = extract_json(server.session_unassign(Parameters(make_input("agent"))).await.unwrap());
+        assert_eq!(payload["session_id"], session_id);
+        assert_eq!(payload["main_checkout"], dir.path().canonicalize().unwrap().to_string_lossy().as_ref());
+        assert!(PathBuf::from(payload["audit_path"].as_str().unwrap()).is_file());
+        assert!(config.registered_worktree(session_id).unwrap().is_none());
     }
 
     #[tokio::test]

@@ -77,7 +77,8 @@ pub use store::{
     PersistedSessionEvents, PersistedSessionManifest, PersistedSessionTranscript, RelationStrength,
     SessionQuery, SessionQueryDiagnostic, SessionQueryResult, SessionRuntimePaths,
     SessionStoreConfig, SessionStorePaths, SessionStorePlan, SessionTicketBackfillReport,
-    SessionWorktreeCheckInReceipt, SessionWorktreeCheckInRequest, TicketSessionMatch,
+    SessionWorktreeCheckInReceipt, SessionWorktreeCheckInRequest,
+    SessionWorktreeUnassignReceipt, SessionWorktreeUnassignRequest, TicketSessionMatch,
 };
 pub use subagent_rollup::{
     SubAgentRollup, compute_subagent_rollups, compute_subagent_rollups_with_events,

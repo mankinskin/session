@@ -86,6 +86,7 @@ mod tests {
             "fs_move_file",
             "fs_rename_file",
             "session_check_in",
+            "session_unassign",
             "update_ticket",
             "unknown_tool",
         ] {

@@ -89,15 +89,25 @@ pub enum SessionError {
     InvalidStorePath(PathBuf),
 
     #[error(
-        "session {session_id} has no main-checkout worktree registry entry; migration required"
+        "session {session_id} has no registered worktree assignment"
     )]
     MissingWorktreeAssignment { session_id: String },
 
     #[error("session {session_id} worktree registry points at missing worktree {path}")]
     RegisteredWorktreeMissing { session_id: String, path: PathBuf },
 
-    #[error("session {session_id} ownership mismatch for worktree check-in")]
+    #[error("session {session_id} ownership mismatch for worktree mutation")]
     SessionOwnershipMismatch { session_id: String },
+
+    #[error("session {session_id} assignment changed; expected path {expected_path} on branch {expected_branch}")]
+    WorktreeAssignmentChanged {
+        session_id: String,
+        expected_path: PathBuf,
+        expected_branch: String,
+    },
+
+    #[error("worktree unassignment requires a nonempty reason")]
+    MissingWorktreeUnassignReason,
 
     #[error("worktree path {path} is already owned by active session {session_id}")]
     WorktreeConflict { path: PathBuf, session_id: String },
