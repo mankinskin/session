@@ -590,6 +590,13 @@ mod tests {
         let mut record = store.read_session(TEST_SESSION_ID).unwrap();
         record.metadata.worktree.as_mut().unwrap().status = status;
         std::fs::write(path, serde_json::to_vec_pretty(&record).unwrap()).unwrap();
+        let registry_path = main_checkout
+            .join(".session/local/worktrees")
+            .join(format!("{TEST_SESSION_ID}.json"));
+        let mut registry: Value =
+            serde_json::from_slice(&std::fs::read(&registry_path).unwrap()).unwrap();
+        registry["assignment"]["status"] = json!(status);
+        std::fs::write(registry_path, serde_json::to_vec_pretty(&registry).unwrap()).unwrap();
         (temp, main_checkout, worktree)
     }
 
@@ -726,6 +733,31 @@ mod tests {
             assert!(forwarded["params"]["arguments"].get("workspace").is_none());
         }
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
+    }
+
+    #[test]
+    fn leftover_worktree_and_captured_metadata_do_not_reject_canonical_store_calls() {
+        let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        let (_temp, main_checkout, _worktree) =
+            routing_fixture(SessionWorktreeStatus::Active, false);
+        std::fs::remove_file(
+            main_checkout.join(".session/local/worktrees").join(format!("{TEST_SESSION_ID}.json")),
+        ).unwrap();
+        let workspace = main_checkout.join("workflow-tools");
+        std::fs::create_dir_all(&workspace).unwrap();
+        unsafe { std::env::set_var(MAIN_CHECKOUT_ENV, &main_checkout) };
+        for tool in ["get_ticket", "spec_get", "test_get_spec", "update_ticket"] {
+            let mut request = call(tool, Some("gpt-5-mini"));
+            request["params"]["arguments"]["workspace"] = json!(workspace);
+            let (action, _) = route_with_schema(
+                request,
+                &test_gate(),
+                tool,
+                json!({"workspace": {"type": "string"}}),
+            );
+            assert!(matches!(action, ClientAction::Forward(_)), "{tool}");
+        }
+        unsafe { std::env::remove_var(MAIN_CHECKOUT_ENV) };
     }
 
     #[test]
@@ -997,26 +1029,25 @@ mod tests {
     }
 
     #[test]
-    fn positional_worktree_discovery_overrides_legacy_main_checkout_assignment() {
+    fn registered_main_checkout_is_not_overridden_by_directory_candidates() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, _worktree) =
             routing_fixture(SessionWorktreeStatus::Active, true);
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", main_checkout) };
         let (ClientAction::Forward(_), _) = route(allowed_call(), &test_gate()) else {
-            panic!("positional UUID worktree should be forwarded");
+            panic!("an explicit main-checkout assignment should be forwarded");
         };
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 
     #[test]
-    fn positional_worktree_discovery_ignores_legacy_assignment_status() {
+    fn inactive_registered_worktree_is_rejected() {
         let _env = ENV_LOCK.lock().unwrap_or_else(|error| error.into_inner());
         let (_temp, main_checkout, _worktree) =
             routing_fixture(SessionWorktreeStatus::Superseded, false);
         unsafe { std::env::set_var("MCP_MAIN_CHECKOUT", main_checkout) };
-        let (ClientAction::Forward(_), _) = route(allowed_call(), &test_gate()) else {
-            panic!("positional UUID worktree should be forwarded");
-        };
+        let text = response_text(route(allowed_call(), &test_gate()).0);
+        assert!(text.contains("inactive worktree assignment"), "{text}");
         unsafe { std::env::remove_var("MCP_MAIN_CHECKOUT") };
     }
 

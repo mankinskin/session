@@ -518,25 +518,41 @@ impl SessionStoreConfig {
         receipt_from_registry(&request.session_id, entry)
     }
 
+    /// Reads the explicit check-in registry, never inferring an assignment
+    /// from checkout names, branch names, or captured session metadata.
+    pub fn registered_worktree(
+        &self,
+        session_id: &str,
+    ) -> Result<Option<SessionWorktreeCheckInReceipt>, SessionError> {
+        self.worktree_registry_entry(session_id)?
+            .map(|entry| receipt_from_registry(session_id, entry))
+            .transpose()
+    }
+
     pub fn lookup_worktree(
         &self,
         session_id: &str,
     ) -> Result<SessionWorktreeCheckInReceipt, SessionError> {
         let manifest = self.read_session_manifest(session_id)?;
-        let main_checkout = self.main_checkout_for_store()?;
-        let main_store = main_session_store_root(&self.root, &main_checkout);
-        let registry_path = registry_path(&main_store, session_id);
-        let entry: WorktreeRegistryEntry = read_json(&registry_path).map_err(|error| match error {
-            SessionError::NotFound { .. } => SessionError::MissingWorktreeAssignment { session_id: session_id.to_string() },
-            other => other,
+        let receipt = self.registered_worktree(session_id)?.ok_or_else(|| {
+            SessionError::MissingWorktreeAssignment {
+                session_id: session_id.to_string(),
+            }
         })?;
-        if !entry.assignment.path.exists() {
-            return Err(SessionError::RegisteredWorktreeMissing { session_id: session_id.to_string(), path: entry.assignment.path.clone() });
+        if !receipt.worktree_path.exists() {
+            return Err(SessionError::RegisteredWorktreeMissing {
+                session_id: session_id.to_string(),
+                path: receipt.worktree_path,
+            });
         }
-        if manifest.metadata.worktree.as_ref().map(|worktree| &worktree.branch) != Some(&entry.assignment.branch) {
-            return Err(SessionError::MissingWorktreeAssignment { session_id: session_id.to_string() });
+        if manifest.metadata.worktree.as_ref().map(|worktree| &worktree.branch)
+            != Some(&receipt.branch)
+        {
+            return Err(SessionError::MissingWorktreeAssignment {
+                session_id: session_id.to_string(),
+            });
         }
-        receipt_from_registry(session_id, entry)
+        Ok(receipt)
     }
 
     /// Return a bounded window of transcript turns for a persisted session.

@@ -6,6 +6,20 @@ records session events as they happen. Primary use case: look up which
 worktree/branch a session owns, inspect a prior session's transcript, or
 record a handoff package between sessions.
 
+## Checkout selection
+
+The main checkout is the default. Agents create or adopt a worktree only when
+the current requester explicitly asks for one; overlap, dirty files, and risk
+are reasons to coordinate or stop, not implicit permission to isolate.
+
+`SessionStoreConfig::registered_worktree` is the shared assignment lookup.
+It reads only the explicit `session_check_in` registry in the main session
+store's `local/worktrees/`. Branch-only manifests and leftover directories
+are not assignments. MCP and capture routing use `SessionWorkspaceResolver`
+to validate that registration, without caching or scanning `.worktrees`.
+Missing registrations use the invocation checkout. Broken or inactive
+registrations remain errors rather than falling back to main.
+
 ## Quickstart
 
 ```bash

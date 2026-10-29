@@ -227,10 +227,10 @@ impl SessionStoreConfig {
         &self,
         session_id: &str,
     ) -> Result<PathBuf, SessionError> {
-        let active_worktree = self.worktree_registry_entry(session_id)?.and_then(
-            |entry| {
-                (entry.assignment.status == SessionWorktreeStatus::Active)
-                    .then_some(entry.assignment.path)
+        let active_worktree = self.registered_worktree(session_id)?.and_then(
+            |assignment| {
+                (assignment.status == SessionWorktreeStatus::Active)
+                    .then_some(assignment.worktree_path)
             },
         );
         Ok(active_worktree.unwrap_or_else(|| sibling_store_base(&self.root)))

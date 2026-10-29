@@ -12,7 +12,9 @@ use session_api::{
     build_follow_up_ticket_draft, mine_explicit_ingestion_signals, mine_failed_tool_call_signals,
     mine_structured_feedback_signals, synthesize_follow_up_ticket,
 };
-use session_workspace_resolver::{ResolveRequest, ResolverConfig, SessionWorkspaceResolver};
+use session_workspace_resolver::{
+    ResolutionError, ResolveRequest, ResolverConfig, SessionWorkspaceResolver,
+};
 use ticket_api::storage::TicketStore;
 
 /// Domain store directory name passed to the workspace resolvers.
@@ -623,7 +625,13 @@ fn resolve_capture_store_root(
                 None
             }
         },
-        Err(_) => Some(main_store_root),
+        Err(ResolutionError::MissingSessionWorktree { .. }) => Some(main_store_root),
+        Err(error) => {
+            eprintln!(
+                "[session-capture-hook] capture skipped: registered workspace could not be resolved: {error}"
+            );
+            None
+        }
     }
 }
 
@@ -805,6 +813,16 @@ mod tests {
             &worktree,
             &format!("agent/{session_id}/capture"),
         );
+        SessionStoreConfig::new(main_checkout.join(".workflow-tools/session"))
+            .check_in_worktree(session_api::SessionWorktreeCheckInRequest {
+                session_id: session_id.to_string(),
+                owner_id: "test".to_string(),
+                ticket_id: "test".to_string(),
+                worktree_path: worktree.clone(),
+                branch: format!("agent/{session_id}/capture"),
+                predecessor_session_id: None,
+            })
+            .unwrap();
         worktree
     }
 
@@ -870,7 +888,7 @@ mod tests {
         unsafe { env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
 
         assert_eq!(
-            resolve_capture_store_root(None, Some("missing")),
+            resolve_capture_store_root(None, Some("66666666-6666-4666-8666-666666666666")),
             Some(main_checkout.join(".workflow-tools/session"))
         );
         unsafe {
@@ -892,7 +910,7 @@ mod tests {
         let original_main_checkout = env::var_os("MCP_MAIN_CHECKOUT");
         unsafe { env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
 
-        let resolved = resolve_capture_store_root(None, Some("missing"));
+        let resolved = resolve_capture_store_root(None, Some("66666666-6666-4666-8666-666666666666"));
 
         unsafe {
             match original_main_checkout {
@@ -911,6 +929,33 @@ mod tests {
             Some(root)
         );
         assert_eq!(checkout_for_store_root(&root.join(".session")), Some(root));
+    }
+
+    #[test]
+    fn capture_ignores_leftover_checkouts_but_does_not_ignore_broken_registrations() {
+        let _env_lock = ENV_LOCK.lock().unwrap();
+        let fixture = tempdir().unwrap();
+        let main_checkout = fixture.path().join("main");
+        let session_id = "66666666-6666-4666-8666-666666666666";
+        register_active_worktree(&main_checkout, session_id);
+        let registry = main_checkout.join(".workflow-tools/session/local/worktrees")
+            .join(format!("{session_id}.json"));
+        std::fs::remove_file(&registry).unwrap();
+        let original_main_checkout = env::var_os("MCP_MAIN_CHECKOUT");
+        unsafe { env::set_var("MCP_MAIN_CHECKOUT", &main_checkout) };
+        let unregistered = resolve_capture_store_root(None, Some(session_id));
+        std::fs::write(&registry, b"not json").unwrap();
+        let broken = resolve_capture_store_root(None, Some(session_id));
+        let invalid_id = resolve_capture_store_root(None, Some("not-a-uuid"));
+        unsafe {
+            match original_main_checkout {
+                Some(value) => env::set_var("MCP_MAIN_CHECKOUT", value),
+                None => env::remove_var("MCP_MAIN_CHECKOUT"),
+            }
+        }
+        assert_eq!(unregistered, Some(main_checkout.join(".workflow-tools/session")));
+        assert_eq!(broken, None);
+        assert_eq!(invalid_id, None);
     }
 
     #[test]

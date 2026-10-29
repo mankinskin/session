@@ -10,7 +10,11 @@ Multiple agents editing the same checkout at the same time is the failure mode t
 
 ## When This Applies
 
-Use this protocol only after choosing a worktree for concrete isolation: overlapping active file ownership, requester-required branch isolation, or a planned Git operation that needs an independent branch. [AGENTS.md](../../../../AGENTS.md#task-routing) makes the main checkout the default after a board check. Ticket size, file count, submodules, and risk alone do not trigger this protocol.
+Use this protocol only after an explicit current-requester request for a
+worktree, under the [provisioning policy](../session/worktree-provisioning.instructions.md).
+The main checkout is the default after a board check. Ownership overlap,
+dirty files, planned Git operations, ticket size, submodules, and risk do not
+authorize creation; coordinate or stop instead.
 
 Before this protocol starts, resolve the target repository from the active VS
 Code workspace root and verify the candidate with `git -C <candidate> rev-parse
@@ -46,7 +50,10 @@ All steps belong to the implementation session — the same session that creates
 
 `<full-session-uuid>` is the complete session UUID. `<slug>` is a lowercase hyphenated shortening of the task title, 40 characters or fewer. One session, one active slug directory, one branch, one worktree — never two active slug directories for one session UUID.
 
-Use the final topic slug when creating the worktree; no hook-created `session` placeholder exists. Existing flat `.worktrees/<short-id>-<slug>` worktrees remain supported during transition and are not migrated. More than one valid candidate is an `AmbiguousSessionWorktree` error, not a selection.
+Use the final topic slug when creating the worktree; no hook-created `session`
+placeholder exists. Existing flat worktrees remain usable only through an
+explicit check-in registry assignment. Directory candidates are never a
+routing authority, regardless of how many match a session's name.
 
 `.worktrees/` is git-ignored at the repository root. Never commit a worktree directory.
 

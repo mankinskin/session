@@ -4,12 +4,9 @@
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use session_api::{SessionError, store::SessionStoreConfig};
 use session_workspace_resolver::{
     ResolutionError, ResolveRequest, ResolverConfig, SessionWorkspaceResolver,
 };
-
-use super::gating::{ToolAccess, tool_access};
 
 pub(crate) const MAIN_CHECKOUT_ENV: &str = "MCP_MAIN_CHECKOUT";
 pub(crate) const DEFAULT_STORE_DIR: &str = ".session";
@@ -41,7 +38,6 @@ pub(crate) fn anchored_resolver() -> Result<SessionWorkspaceResolver, String> {
 fn resolve_workspace(
     session_id: &str,
     workspace: Option<&str>,
-    access: ToolAccess,
 ) -> Result<(String, PathBuf), String> {
     let store_dir = DEFAULT_STORE_DIR.to_string();
     let resolver = anchored_resolver()?;
@@ -51,11 +47,6 @@ fn resolve_workspace(
         store_dir: &store_dir,
     }) {
         Ok(resolved) => {
-            if access == ToolAccess::Mutation {
-                resolved
-                    .require_mutation_target()
-                    .map_err(|error| error.to_string())?;
-            }
             let store_root = resolved
                 .store_root(&store_dir)
                 .map_err(|error| error.to_string())?;
@@ -69,7 +60,7 @@ fn resolve_workspace(
             (canonical_target_root, store_root)
         }
         Err(ResolutionError::MissingSessionWorktree { .. }) => {
-            resolve_unassigned_session_target(&resolver, session_id, &store_dir, access)?
+            resolve_unassigned_session_target(&resolver, session_id, &store_dir)?
         }
         Err(other) => return Err(other.to_string()),
     };
@@ -139,21 +130,16 @@ pub(crate) fn canonicalize_tool_path(path: &Path) -> Result<PathBuf, String> {
     }
 }
 
-/// Resolves the checkout scope for a session with no discoverable worktree
-/// (never checked in, or an assignment that no longer resolves on disk).
-///
-/// Reads always fall back to the repository's main-checkout store: a stale
-/// read has no destructive effect, so there is nothing to gate. Mutations
-/// only fall back when the session genuinely never opted into worktree
-/// isolation (`session_is_unassigned`); a session that did opt in but whose
-/// assignment is now broken stays blocked from mutating the main checkout.
+/// A missing registry assignment uses the invocation checkout. Broken or
+/// inactive assignments are resolver errors and never enter this fallback.
 fn resolve_unassigned_session_target(
     resolver: &SessionWorkspaceResolver,
     session_id: &str,
     store_dir: &str,
-    access: ToolAccess,
 ) -> Result<(PathBuf, PathBuf), String> {
-    let candidates = resolver.refused_candidates(store_dir).unwrap_or_default();
+    let candidates = resolver
+        .refused_candidates(store_dir)
+        .map_err(|error| error.to_string())?;
     let looks_like_repository_root = candidates.len() == 1
         && candidates[0]
             .parent()
@@ -164,14 +150,6 @@ fn resolve_unassigned_session_target(
             candidates,
         }
         .to_string());
-    }
-    if access == ToolAccess::Mutation {
-        let repository_root = candidates[0]
-            .parent()
-            .expect("looks_like_repository_root guarantees a parent");
-        if !session_is_unassigned(repository_root, session_id)? {
-            return Err(ResolutionError::MainCheckoutMutationBlocked.to_string());
-        }
     }
     repository_root_target(resolver, store_dir)
 }
@@ -184,8 +162,7 @@ fn normalized_path(path: &Path) -> String {
 }
 
 /// Targets the repository's main-checkout store directly, bypassing worktree
-/// resolution. Used for reads always, and for mutations from a session that
-/// has never opted into worktree isolation via `session_check_in`.
+/// resolution, only when the session has no explicit registration.
 ///
 /// Returns a canonicalized target root so callers can apply the same
 /// absolute-workspace containment check used for a resolved session worktree.
@@ -212,32 +189,6 @@ fn repository_root_target(
         )
     })?;
     Ok((canonical_target_root, store_root))
-}
-
-/// A legacy assignment to the main checkout is not worktree isolation.
-/// A missing assigned worktree remains assigned and blocks mutation fallback.
-fn session_is_unassigned(repository_root: &Path, session_id: &str) -> Result<bool, String> {
-    let config = SessionStoreConfig::new(canonical_session_store_root(repository_root));
-    match config.read_session(session_id) {
-        Ok(record) => Ok(match record.metadata.worktree {
-            None => true,
-            Some(assignment) => {
-                assignment_targets_repository_root(repository_root, &assignment.path)
-            }
-        }),
-        Err(SessionError::NotFound { .. }) => Ok(true),
-        Err(error) => Err(error.to_string()),
-    }
-}
-
-fn assignment_targets_repository_root(repository_root: &Path, assignment_path: &Path) -> bool {
-    match (
-        std::fs::canonicalize(repository_root),
-        std::fs::canonicalize(assignment_path),
-    ) {
-        (Ok(repository_root), Ok(assignment_path)) => repository_root == assignment_path,
-        _ => false,
-    }
 }
 
 fn try_resolve_session_check_in_bootstrap_workspace(
@@ -289,8 +240,14 @@ fn try_resolve_session_check_in_bootstrap_workspace(
             normalized_path(&repository)
         )
     })?;
-    if !session_is_unassigned(&canonical_repository, session_id)? {
-        return Ok(None);
+    match resolver.resolve(ResolveRequest {
+        session_id,
+        relative_workspace: None,
+        store_dir: DEFAULT_STORE_DIR,
+    }) {
+        Err(ResolutionError::MissingSessionWorktree { .. }) => {}
+        Ok(_) => return Ok(None),
+        Err(error) => return Err(error.to_string()),
     }
     let canonical_worktrees = canonical_repository.join(".worktrees");
     let canonical_nested_parent = canonical_worktrees.join(session_id);
@@ -334,6 +291,5 @@ pub(crate) fn resolve_workspace_for_tool(
     {
         return Ok(resolved);
     }
-    let access = tool_access(tool);
-    resolve_workspace(session_id, workspace, access)
+    resolve_workspace(session_id, workspace)
 }

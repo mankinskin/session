@@ -1,5 +1,5 @@
 ---
-description: "Use when deciding whether to create a worktree or when registering one for a large implementation task. The capture hook never creates worktrees."
+description: "Use when explicitly requested worktree isolation needs creation or registration. The capture hook never creates worktrees."
 ---
 
 ## Default Execution Context
@@ -12,13 +12,18 @@ repository from the location of this instruction file, prompt absolute paths, a
 pasted artifact path, or an inherited current directory. “Main checkout” in
 this file means the selected target repository main checkout.
 
-The capture hook can provision a session worktree before the session's first tool call. Provisioning makes an isolated checkout available; it does not select the execution mode for the session. An agent uses a worktree only when the task needs explicit isolation under [AGENTS.md](../../../../AGENTS.md#task-routing). VS Code loads [.github/hooks/hooks.json](../../../../../context-engine/.github/hooks/hooks.json) through the `.chat.hookFilesLocations` setting in [.vscode/settings.json](../../../../../context-engine/.vscode/settings.json). The registered binary is `session-capture-hook`, installed on `PATH` at `~/.cargo/bin/session-capture-hook`.
-
-`SessionStart` is the event eager provisioning is primarily attached to, so a provisioned worktree may exist before the first prompt. If `SessionStart` was missed for a session (e.g. hooks were reconfigured mid-session, or the event never fired), the hook lazily provisions instead on the first later event that carries a session id and isn't `Stop` (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `SubagentStart`, `SubagentStop`) — `Stop` intentionally never provisions, so a session that never began capturing does not spring a fresh worktree into existence only at its end. The `UserPromptSubmit` timeout is 300 seconds to allow a cold provision.
+The capture hook never provisions worktrees, on `SessionStart` or any later
+event. A leftover directory, branch name, captured metadata, or agent-authored
+roadmap does not select worktree execution or authorize its creation.
 
 ## When To Create A Worktree
 
-Create a worktree only for worktree-backed implementation work under [AGENTS.md](../../../../AGENTS.md#task-routing): overlapping active file ownership, requester-required branch isolation, or a planned Git operation requiring an independent branch. A multi-file change, a submodule, risk, or work expected to span sessions alone does not require a worktree. Small, self-contained work stays in the selected main checkout and does not call `session_check_in` or `board_check_in`.
+Create or adopt a worktree only when the current requester explicitly asks for
+worktree isolation. Ownership overlap, dirty files, risk, a submodule, task
+size, or an agent-proposed waypoint do not supply that permission. Coordinate
+or stop on conflicting ownership; do not silently create a checkout as a
+workaround. Otherwise work in the selected main checkout without
+`session_check_in`.
 
 The agent that will perform the isolated task creates the worktree from the selected main checkout:
 
@@ -34,7 +39,7 @@ Immediately after creation, register the assignment with the session tool before
 
 ```text
 session_check_in {
-  workspace: "<main checkout>",
+  workspace: "<main checkout>/.worktrees/<full-session-uuid>/<topic-slug>",
   session_id: "<full-session-uuid>",
   owner_id: "<agent id>",
   ticket_id: "<full ticket uuid>",
@@ -43,7 +48,20 @@ session_check_in {
 }
 ```
 
-Then claim the task's files on the board. The session record is authoritative for routing: registered sessions use the worktree; unregistered sessions use the main checkout. Do not infer or create a worktree from a hook event, a current directory, or a missing assignment.
+Then claim the task's files on the board. Registered sessions use their
+assigned worktree; unregistered sessions use the main checkout.
+The authoritative assignment is the session API's explicit check-in registry
+under the main session store's `local/worktrees/`, not the branch-only session
+manifest. All assignment consumers use `SessionStoreConfig::registered_worktree`;
+MCP and capture routing use `SessionWorkspaceResolver` to validate it. Missing
+registrations use the main checkout; broken, malformed, or inactive registrations
+must not silently fall back there. Do not cache assignments across lifecycle
+changes or rediscover them by scanning `.worktrees`.
+
+Treat any nonzero bootstrap result as failure, even if a directory was created.
+Do not register or use a partially initialized checkout. A checkout starts from
+committed Git state, not the main checkout's uncommitted Ticket/Spec/Test updates;
+verify the selected entity authority and revisions before any execution.
 
 ## Capture Hook
 

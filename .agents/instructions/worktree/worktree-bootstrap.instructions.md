@@ -4,6 +4,11 @@ description: "Use when creating or renaming a session worktree for worktree-back
 
 ## 1. Bootstrap (implementation agent)
 
+First obtain the explicit current-requester request required by the
+[provisioning policy](../session/worktree-provisioning.instructions.md).
+If bootstrap fails, stop: a created directory is not a successful bootstrap
+and must not be registered or used as an execution checkout.
+
 Run from the repository root, on `main`, before dispatching the implementation agent:
 
 ```bash
