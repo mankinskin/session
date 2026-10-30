@@ -2125,6 +2125,7 @@ mod tests {
         CopilotHookMessage, CopilotHookPayload, SessionCaptureRequest, SessionError, SessionRole,
         SessionStoreConfig,
     };
+    use std::path::Path;
     use std::process::Command;
     use tempfile::tempdir;
 
@@ -2153,6 +2154,51 @@ mod tests {
         config
             .persist_capture(SessionCaptureRequest::copilot(payload))
             .expect("seed");
+    }
+
+    fn init_checkout_with_worktree(repo_root: &Path, worktree: &Path, branch: &str) {
+        std::fs::create_dir_all(repo_root).unwrap();
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(repo_root)
+                .args(["init", "--quiet"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(repo_root)
+                .args(["config", "user.name", "tests"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(repo_root)
+                .args(["config", "user.email", "tests@example.invalid"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(repo_root)
+                .args(["commit", "--quiet", "--allow-empty", "-m", "fixture"])
+                .status()
+                .unwrap()
+                .success()
+        );
+        assert!(
+            std::process::Command::new("git")
+                .current_dir(repo_root)
+                .args(["worktree", "add", "--quiet", "-b", branch])
+                .arg(worktree)
+                .status()
+                .unwrap()
+                .success()
+        );
     }
 
     fn extract_json(result: rmcp::model::CallToolResult) -> Value {
@@ -2219,14 +2265,20 @@ mod tests {
     #[tokio::test]
     async fn check_in_then_lookup() {
         let dir = tempdir().unwrap();
-        let store_root = dir.path().join(".session");
-        let worktree = dir.path().join("wt");
+        let workspace_root = dir.path();
+        let store_root = workspace_root.join(".workflow-tools/session");
+        let session_id = "11111111-1111-4111-8111-111111111111";
+        let worktree = workspace_root
+            .join(".worktrees")
+            .join(session_id)
+            .join("check-in");
+        init_checkout_with_worktree(workspace_root, &worktree, "feature/x");
         let server = SessionServer::new(store_root.clone());
 
         let receipt = server
             .session_check_in(Parameters(CheckInInput {
-                workspace: store_root.display().to_string(),
-                session_id: "11111111-1111-4111-8111-111111111111".to_string(),
+                workspace: workspace_root.display().to_string(),
+                session_id: session_id.to_string(),
                 owner_id: "agent".to_string(),
                 ticket_id: "t1".to_string(),
                 worktree_path: worktree.to_string_lossy().to_string(),
@@ -2239,7 +2291,7 @@ mod tests {
 
         let lookup = server
             .session_lookup(Parameters(LookupInput {
-                session_id: "11111111-1111-4111-8111-111111111111".to_string(),
+                session_id: session_id.to_string(),
             }))
             .await
             .expect("lookup");
@@ -2249,11 +2301,13 @@ mod tests {
     #[tokio::test]
     async fn terminal_observer_tools_read_output_without_input_operation() {
         let dir = tempdir().unwrap();
-        let session_root = dir.path().join(".session");
-        let workspace = session_root.display().to_string();
+        let workspace_root = dir.path();
+        let session_root = workspace_root.join(".workflow-tools/session");
+        let workspace = workspace_root.display().to_string();
         let session_id = "88888888-8888-4888-8888-888888888888";
         let server = SessionServer::new(session_root.clone());
         let config = SessionStoreConfig::new(session_root);
+        seed(&config, session_id, "agent-terminal");
         config
             .init_runtime_context(SessionRuntimeInitRequest {
                 session_id: Some(session_id.to_string()),
@@ -2308,13 +2362,18 @@ mod tests {
     #[tokio::test]
     async fn handoff_validates_target_file_in_selected_worktree() {
         let dir = tempdir().unwrap();
-        let main_store = dir.path().join("main/.session");
-        let worktree = dir.path().join("worktree");
+        let workspace_root = dir.path();
+        let main_store = workspace_root.join(".workflow-tools/session");
+        let session_id = "99999999-9999-4999-8999-999999999999";
+        let worktree = workspace_root
+            .join(".worktrees")
+            .join(session_id)
+            .join("handoff");
+        init_checkout_with_worktree(workspace_root, &worktree, "agent/handoff-worktree");
         let target = worktree.join("handoff-fixtures/assigned-only.txt");
         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
         std::fs::write(&target, "assigned worktree target").unwrap();
-        let workspace = worktree.display().to_string();
-        let session_id = "99999999-9999-4999-8999-999999999999";
+        let workspace = workspace_root.display().to_string();
         let server = SessionServer::new(main_store);
 
         server
@@ -2368,14 +2427,20 @@ mod tests {
     #[tokio::test]
     async fn sessions_for_ticket_returns_matches_at_requested_tier() {
         let dir = tempdir().unwrap();
-        let store_root = dir.path().join(".session");
-        let worktree = dir.path().join("wt");
+        let workspace_root = dir.path();
+        let store_root = workspace_root.join(".workflow-tools/session");
+        let session_id = "33333333-3333-4333-8333-333333333333";
+        let worktree = workspace_root
+            .join(".worktrees")
+            .join(session_id)
+            .join("ticket");
+        init_checkout_with_worktree(workspace_root, &worktree, "feature/ticket-mcp");
         let server = SessionServer::new(store_root.clone());
 
         server
             .session_check_in(Parameters(CheckInInput {
-                workspace: store_root.display().to_string(),
-                session_id: "33333333-3333-4333-8333-333333333333".to_string(),
+                workspace: workspace_root.display().to_string(),
+                session_id: session_id.to_string(),
                 owner_id: "agent-ticket".to_string(),
                 ticket_id: "ticket-mcp".to_string(),
                 worktree_path: worktree.to_string_lossy().to_string(),
@@ -2397,7 +2462,7 @@ mod tests {
         assert_eq!(payload["count"], 1);
         assert_eq!(
             payload["sessions"][0]["session_id"],
-            "33333333-3333-4333-8333-333333333333"
+            session_id
         );
         assert_eq!(payload["sessions"][0]["matched_strength"], "strict");
 
@@ -2415,8 +2480,14 @@ mod tests {
     #[tokio::test]
     async fn runtime_render_instructions_returns_only_pinned_rules() {
         let dir = tempdir().unwrap();
-        let session_root = dir.path().join(".session");
+        let workspace_root = dir.path();
+        let session_root = workspace_root.join(".workflow-tools/session");
         let config = SessionStoreConfig::new(&session_root);
+        seed(
+            &config,
+            "11111111-1111-4111-8111-111111111111",
+            "agent-runtime",
+        );
         let init = config
             .init_runtime_context(SessionRuntimeInitRequest {
                 session_id: Some("11111111-1111-4111-8111-111111111111".to_string()),
@@ -2446,7 +2517,7 @@ mod tests {
 
         let result = server
             .session_runtime_render_instructions(Parameters(RuntimeViewInput {
-                workspace: session_root.display().to_string(),
+                workspace: workspace_root.display().to_string(),
                 session_id: init.context.session_id,
             }))
             .await

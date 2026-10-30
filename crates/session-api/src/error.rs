@@ -166,6 +166,8 @@ pub enum SessionError {
     IntakeLinkageConflict { session_id: String, request_id: String, reason: String },
     #[error("persisted intake state at {path} is inconsistent: {reason}")]
     IntakeCorrupt { path: PathBuf, reason: String },
+    #[error("requester decision {code}: {message}")]
+    RequesterDecision { code: &'static str, message: String },
 
     #[error(
         "concurrent mutation conflict for workspace session {session_id}: \

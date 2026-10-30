@@ -201,6 +201,7 @@ mod config {
     include!("store/config/worktree_capture_inference.rs");
     include!("store/config/terminals.rs");
     include!("store/config/session_intake.rs");
+    include!("store/config/requester_decision.rs");
 }
 
 pub use config::SessionIntakeOperation;

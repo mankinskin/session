@@ -6,7 +6,8 @@ use std::{
 use memory_kernel::domain_store::CreateEntity;
 use memory_kernel::workspace::{CANONICAL_STORES_DIR, canonical_store_root};
 use session_api::{
-    CopilotHookEvent, FeedbackSignalKind, FollowUpSynthesisOutcome, PersistedSessionEvents,
+    CopilotHookEvent, FeedbackSignalKind, FollowUpSynthesisOutcome, HostPromptIngress,
+    PersistedSessionEvents,
     SessionCreateInput, SessionDomainStore, SessionError, SessionProvisioningDiagnostic,
     SessionStoreConfig, SessionStorePlan, ToolMetricsWindow, ToolResponseOverride,
     build_follow_up_ticket_draft, mine_explicit_ingestion_signals, mine_failed_tool_call_signals,
@@ -85,7 +86,8 @@ fn run() -> Result<(), SessionError> {
     tracing::debug!(store_root = %store_root.display(), "resolved capture store root");
     let config = SessionStoreConfig::new(store_root.clone());
     let hook_event_name = hook_event_name(&args);
-    let captured_hook_event = hook_event(&args, &hook_event_name);
+    let mut captured_hook_event = hook_event(&args, &hook_event_name);
+    bind_requester_decision(&config, &args, &hook_event_name, &mut captured_hook_event)?;
     if !transcript_path.is_file() {
         if let (Some(session_id), Some(event)) = (args.session_id.as_deref(), captured_hook_event) {
             persist_hook_event(&config, &store_root, session_id, event)?;
@@ -180,6 +182,47 @@ fn run() -> Result<(), SessionError> {
 
     emit_hook_payload(routing_outcome.as_ref());
     Ok(())
+}
+
+// Run before ordinary capture so every mirror keeps the decision's event identity.
+fn bind_requester_decision(
+    config: &SessionStoreConfig,
+    args: &args::Args,
+    hook_event_name: &str,
+    event: &mut Option<CopilotHookEvent>,
+) -> Result<(), SessionError> {
+    if hook_event_name != "UserPromptSubmit" {
+        return Ok(());
+    }
+    let (Some(session_id), Some(raw)) = (args.session_id.as_deref(), args.raw_prompt.as_deref())
+    else {
+        return Ok(());
+    };
+    let ingress = HostPromptIngress::trusted_local_hook(
+        hook_event_name,
+        raw.as_bytes().to_vec(),
+        args.host_event_id.clone(),
+    );
+    match config.ingest_requester_prompt(session_id, &ingress) {
+        Ok(None) => Ok(()),
+        Ok(Some(receipt)) => {
+            if let Some(event) = event.as_mut() {
+                event.event_id = Some(receipt.reference.source_event_id.clone());
+                event.data_json = Some(serde_json::json!({ "prompt": raw }));
+            }
+            Ok(())
+        }
+        Err(error)
+            if matches!(
+                error.requester_code(),
+                Some("approval_authority_unavailable" | "approval_stale")
+            ) =>
+        {
+            eprintln!("[session-capture-hook] decision line rejected: {error}");
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
 }
 
 fn persist_hook_event(

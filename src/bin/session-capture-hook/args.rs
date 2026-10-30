@@ -17,6 +17,8 @@ pub(super) struct Args {
     /// stream so the submitted prompt is not lost while waiting for the
     /// transcript file to flush.
     pub(super) prompt: Option<String>,
+    pub(super) raw_prompt: Option<String>,
+    pub(super) host_event_id: Option<String>,
     /// PostToolUse hook stdin `tool_use_id`, paired with `tool_response_chars`
     /// to build a `ToolResponseOverride` (ticket 44119807 T2).
     pub(super) tool_call_id: Option<String>,
@@ -82,6 +84,8 @@ pub(super) fn parse_args() -> Result<Args, SessionError> {
         hook_event_name: None,
         from_hook_stdin,
         prompt: None,
+        raw_prompt: None,
+        host_event_id: None,
         tool_call_id: None,
         tool_response_chars: None,
         session_id: None,
@@ -112,6 +116,14 @@ pub(super) fn args_from_hook_stdin(mut args: Args) -> Result<Args, SessionError>
     }
     if let Some(prompt) = get_field(&payload, &["prompt"]) {
         args.prompt = Some(prompt);
+    }
+    if let Some(raw) = payload.get("prompt").and_then(Value::as_str) {
+        if !raw.is_empty() {
+            args.raw_prompt = Some(raw.to_string());
+        }
+    }
+    if let Some(id) = get_field(&payload, &["event_id", "eventId", "message_id", "messageId"]) {
+        args.host_event_id = Some(id);
     }
     if let Some(hook_event_name) = ["hook_event_name", "hookEventName"]
         .iter()

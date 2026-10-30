@@ -12,6 +12,8 @@ pub mod move_domain;
 pub mod peek;
 pub mod price_loader;
 pub mod quality_gate;
+pub mod requester_decision;
+pub use requester_decision::RequesterDecisionRef;
 pub mod session_intake;
 pub mod store;
 pub mod subagent_rollup;
@@ -73,6 +75,12 @@ pub use peek::{
 };
 pub use quality_gate::{
     QualityGate, QualityGateOutcome, QualityGatePhase, post_delegation_gate, pre_delegation_gate,
+};
+pub use requester_decision::{
+    DECISION_COMMAND, DecisionFault, DecisionIngress, DecisionKind, DecisionReference,
+    HostPromptIngress, ParsedDecision, PendingRequesterDecision,
+    REQUESTER_DECISION_SCHEMA_VERSION, RequesterChallenge, RequesterChallengeRequest,
+    RequesterConsumption, RequesterDecisionReceipt, USER_PROMPT_SUBMIT, parse_decision_prompt,
 };
 pub use session_intake::{
     SESSION_INTAKE_SCHEMA_VERSION, SessionIntake, SessionIntakeLinkState, SessionIntakeLinkage,
