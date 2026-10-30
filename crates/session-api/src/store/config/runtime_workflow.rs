@@ -1,9 +1,15 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     /// Reject workflow/pin mutations once the workspace has a persisted finish
     /// record. Finished workspaces are immutable: this guarantees a finished
     /// workspace cannot silently drift into an incomplete state while still
     /// returning a stale success from `finish_workflow`.
-    fn ensure_workspace_not_finished(&self, session_id: &str) -> Result<(), SessionError> {
+    pub(super) fn ensure_workspace_not_finished(
+        &self,
+        session_id: &str,
+    ) -> Result<(), SessionError> {
         let paths = self.runtime_paths_for_workspace(session_id)?;
         if paths.finish_path.exists() {
             return Err(SessionError::WorkspaceFinished {
@@ -24,7 +30,7 @@ impl SessionStoreConfig {
     /// finished workspace into an incomplete state. Checking after the lock is
     /// held closes that window: any mutation that wins the lock after finish
     /// observes the finish record and is rejected with [`SessionError::WorkspaceFinished`].
-    fn begin_runtime_mutation(
+    pub(super) fn begin_runtime_mutation(
         &self,
         session_id: &str,
     ) -> Result<RuntimeMutationLock, SessionError> {
@@ -39,7 +45,7 @@ impl SessionStoreConfig {
     /// The lock is an OS-held exclusive file lock. The lock file remains in place
     /// between owners so releasing one file handle cannot unlink the inode used by
     /// a successor. The operating system releases the lock if the process exits.
-    pub(super) fn acquire_runtime_lock(
+    pub(in super::super) fn acquire_runtime_lock(
         &self,
         session_id: &str,
     ) -> Result<RuntimeMutationLock, SessionError> {
@@ -375,7 +381,7 @@ impl SessionStoreConfig {
     /// (`session_workflow_update_node`/`session_workflow_remove_node` at the
     /// MCP layer) instead of being stuck forever or "fixed" by piling on a
     /// second required node.
-    fn validate_workflow_node_draft(
+    pub(super) fn validate_workflow_node_draft(
         &self,
         draft: &SessionWorkflowNodeDraft,
     ) -> Result<(), SessionError> {
@@ -477,7 +483,7 @@ impl SessionStoreConfig {
     }
 }
 
-pub(super) fn indexed_workflow_error(
+pub(in super::super) fn indexed_workflow_error(
     collection: &str,
     index: usize,
     error: SessionError,

@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     pub fn create_terminal_observer(
         &self,
@@ -29,7 +32,10 @@ impl SessionStoreConfig {
         };
         let terminal_dir = self.terminal_dir(&manifest.session_id, &manifest.terminal_id)?;
         write_json(&terminal_dir.join("manifest.json"), &manifest)?;
-        write_json(&terminal_dir.join("events.json"), &Vec::<SessionTerminalEvent>::new())?;
+        write_json(
+            &terminal_dir.join("events.json"),
+            &Vec::<SessionTerminalEvent>::new(),
+        )?;
         Ok(manifest)
     }
 
@@ -53,7 +59,10 @@ impl SessionStoreConfig {
             output,
         };
         record.events.push(event.clone());
-        write_json(&self.terminal_events_path(session_id, terminal_id)?, &record.events)?;
+        write_json(
+            &self.terminal_events_path(session_id, terminal_id)?,
+            &record.events,
+        )?;
         Ok(event)
     }
 
@@ -108,18 +117,17 @@ impl SessionStoreConfig {
         terminal_id: &str,
     ) -> Result<SessionTerminalRecord, SessionError> {
         let manifest_path = self.terminal_manifest_path(session_id, terminal_id)?;
-        let manifest = read_json_if_exists(&manifest_path)?.ok_or_else(|| {
-            SessionError::TerminalNotFound {
+        let manifest =
+            read_json_if_exists(&manifest_path)?.ok_or_else(|| SessionError::TerminalNotFound {
                 session_id: session_id.to_string(),
                 terminal_id: terminal_id.to_string(),
-            }
-        })?;
+            })?;
         let events = read_json_if_exists(&self.terminal_events_path(session_id, terminal_id)?)?
             .unwrap_or_default();
         Ok(SessionTerminalRecord { manifest, events })
     }
 
-    fn terminal_dir(
+    pub(super) fn terminal_dir(
         &self,
         session_id: &str,
         terminal_id: &str,
@@ -128,22 +136,30 @@ impl SessionStoreConfig {
         if uuid::Uuid::parse_str(terminal_id).is_err() {
             return Err(SessionError::InvalidTerminalId(terminal_id.to_string()));
         }
-        Ok(self.paths_for_session_id(session_id)?.session_dir.join("terminals").join(terminal_id))
+        Ok(self
+            .paths_for_session_id(session_id)?
+            .session_dir
+            .join("terminals")
+            .join(terminal_id))
     }
 
-    fn terminal_manifest_path(
+    pub(super) fn terminal_manifest_path(
         &self,
         session_id: &str,
         terminal_id: &str,
     ) -> Result<PathBuf, SessionError> {
-        Ok(self.terminal_dir(session_id, terminal_id)?.join("manifest.json"))
+        Ok(self
+            .terminal_dir(session_id, terminal_id)?
+            .join("manifest.json"))
     }
 
-    fn terminal_events_path(
+    pub(super) fn terminal_events_path(
         &self,
         session_id: &str,
         terminal_id: &str,
     ) -> Result<PathBuf, SessionError> {
-        Ok(self.terminal_dir(session_id, terminal_id)?.join("events.json"))
+        Ok(self
+            .terminal_dir(session_id, terminal_id)?
+            .join("events.json"))
     }
 }

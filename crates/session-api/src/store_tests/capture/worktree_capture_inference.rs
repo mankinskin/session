@@ -1,9 +1,9 @@
-use std::{
-    path::Path,
-    process::Command,
-};
+#[allow(unused_imports)]
+use super::*;
 
-fn run_git(working_dir: &Path, args: &[&str]) {
+pub(super) use std::{path::Path, process::Command};
+
+pub(super) fn run_git(working_dir: &Path, args: &[&str]) {
     let status = Command::new("git")
         .current_dir(working_dir)
         .args(args)
@@ -17,7 +17,7 @@ fn run_git(working_dir: &Path, args: &[&str]) {
 /// name via `git rev-parse` without touching a shared repo. Tolerates the
 /// initial branch (`init.defaultBranch`, commonly `main`) already matching
 /// the requested name.
-fn init_git_repo_on_branch(working_dir: &Path, branch: &str) {
+pub(super) fn init_git_repo_on_branch(working_dir: &Path, branch: &str) {
     run_git(working_dir, &["init", "-q"]);
     run_git(working_dir, &["config", "user.email", "test@example.com"]);
     run_git(working_dir, &["config", "user.name", "Test"]);
@@ -27,13 +27,8 @@ fn init_git_repo_on_branch(working_dir: &Path, branch: &str) {
     run_git(working_dir, &["checkout", "-q", "-B", branch]);
 }
 
-fn seed_ticket_worktree_inference(
-    ticket_store_root: &Path,
-    ticket_id: uuid::Uuid,
-) {
-    let store =
-        ticket_api::storage::TicketStore::open_or_init(ticket_store_root)
-            .unwrap();
+pub(super) fn seed_ticket_worktree_inference(ticket_store_root: &Path, ticket_id: uuid::Uuid) {
+    let store = ticket_api::storage::TicketStore::open_or_init(ticket_store_root).unwrap();
     store
         .create(
             Some(ticket_id),
@@ -48,14 +43,12 @@ fn seed_ticket_worktree_inference(
 }
 
 #[test]
-fn infer_worktree_from_environment_resolves_existing_ticket_from_branch() {
+pub(super) fn infer_worktree_from_environment_resolves_existing_ticket_from_branch() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
 
-    let ticket_id =
-        uuid::Uuid::parse_str("bbbbbbbb-2222-4222-8222-222222222222")
-            .unwrap();
+    let ticket_id = uuid::Uuid::parse_str("bbbbbbbb-2222-4222-8222-222222222222").unwrap();
     seed_ticket_worktree_inference(&store_root.join(".ticket"), ticket_id);
 
     let repo_dir = tempdir.path().join("repo");
@@ -72,11 +65,7 @@ fn infer_worktree_from_environment_resolves_existing_ticket_from_branch() {
         .unwrap();
 
     config
-        .infer_worktree_from_environment(
-            "session-infer-existing",
-            &repo_dir,
-            tempdir.path(),
-        )
+        .infer_worktree_from_environment("session-infer-existing", &repo_dir, tempdir.path())
         .unwrap();
 
     let record = config.read_session("session-infer-existing").unwrap();
@@ -89,8 +78,7 @@ fn infer_worktree_from_environment_resolves_existing_ticket_from_branch() {
 }
 
 #[test]
-fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable()
-{
+pub(super) fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
@@ -109,11 +97,7 @@ fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable()
         .unwrap();
 
     config
-        .infer_worktree_from_environment(
-            "session-infer-unresolvable",
-            &repo_dir,
-            tempdir.path(),
-        )
+        .infer_worktree_from_environment("session-infer-unresolvable", &repo_dir, tempdir.path())
         .unwrap();
 
     let record = config.read_session("session-infer-unresolvable").unwrap();
@@ -122,7 +106,7 @@ fn infer_worktree_from_environment_leaves_ticket_id_empty_when_unresolvable()
 }
 
 #[test]
-fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
+pub(super) fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
@@ -144,11 +128,7 @@ fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
     // checkout of the main checkout must never be recorded as a worktree
     // assignment.
     config
-        .infer_worktree_from_environment(
-            "session-infer-main",
-            &repo_dir,
-            &repo_dir,
-        )
+        .infer_worktree_from_environment("session-infer-main", &repo_dir, &repo_dir)
         .unwrap();
 
     let record = config.read_session("session-infer-main").unwrap();
@@ -157,7 +137,7 @@ fn infer_worktree_from_environment_is_quiet_on_plain_main_branch() {
 }
 
 #[test]
-fn infer_worktree_from_environment_is_quiet_on_detached_head() {
+pub(super) fn infer_worktree_from_environment_is_quiet_on_detached_head() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
@@ -177,11 +157,7 @@ fn infer_worktree_from_environment_is_quiet_on_detached_head() {
         .unwrap();
 
     config
-        .infer_worktree_from_environment(
-            "session-infer-detached",
-            &repo_dir,
-            tempdir.path(),
-        )
+        .infer_worktree_from_environment("session-infer-detached", &repo_dir, tempdir.path())
         .unwrap();
 
     let record = config.read_session("session-infer-detached").unwrap();
@@ -190,7 +166,7 @@ fn infer_worktree_from_environment_is_quiet_on_detached_head() {
 }
 
 #[test]
-fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
+pub(super) fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
@@ -208,11 +184,7 @@ fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
         .unwrap();
 
     config
-        .infer_worktree_from_environment(
-            "session-infer-non-git",
-            &non_git_dir,
-            tempdir.path(),
-        )
+        .infer_worktree_from_environment("session-infer-non-git", &non_git_dir, tempdir.path())
         .unwrap();
 
     let record = config.read_session("session-infer-non-git").unwrap();
@@ -221,7 +193,7 @@ fn infer_worktree_from_environment_succeeds_quietly_in_non_git_directory() {
 }
 
 #[test]
-fn infer_worktree_from_environment_never_overwrites_real_check_in() {
+pub(super) fn infer_worktree_from_environment_never_overwrites_real_check_in() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root.clone());
@@ -246,24 +218,15 @@ fn infer_worktree_from_environment_never_overwrites_real_check_in() {
     // A different ticket that the branch shape below *would* resolve to,
     // proving hook inference does not clobber the real check-in even when
     // it disagrees.
-    let other_ticket_id =
-        uuid::Uuid::parse_str("cccccccc-3333-4333-8333-333333333333")
-            .unwrap();
-    seed_ticket_worktree_inference(
-        &store_root.join(".ticket"),
-        other_ticket_id,
-    );
+    let other_ticket_id = uuid::Uuid::parse_str("cccccccc-3333-4333-8333-333333333333").unwrap();
+    seed_ticket_worktree_inference(&store_root.join(".ticket"), other_ticket_id);
 
     let repo_dir = tempdir.path().join("repo");
     std::fs::create_dir_all(&repo_dir).unwrap();
     init_git_repo_on_branch(&repo_dir, "agent/cccccccc-other-slug");
 
     config
-        .infer_worktree_from_environment(
-            WORKTREE_SESSION_REAL,
-            &repo_dir,
-            tempdir.path(),
-        )
+        .infer_worktree_from_environment(WORKTREE_SESSION_REAL, &repo_dir, tempdir.path())
         .unwrap();
 
     let record = config.read_session(WORKTREE_SESSION_REAL).unwrap();

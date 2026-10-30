@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     pub fn create_handoff_record(
         &self,
@@ -16,8 +19,8 @@ impl SessionStoreConfig {
                     fields: "objective".to_string(),
                 });
             }
-            let readiness_holds = !pkg.objective.trim().is_empty()
-                && pkg.open_escalations.is_empty();
+            let readiness_holds =
+                !pkg.objective.trim().is_empty() && pkg.open_escalations.is_empty();
             let missing_upward_context = pkg.missing_upward_context_fields();
             if !missing_upward_context.is_empty() {
                 let fields = missing_upward_context.join(", ");
@@ -76,8 +79,7 @@ impl SessionStoreConfig {
         }
 
         let context = self.read_runtime_context(session_id)?;
-        let workflow =
-            self.workflow_snapshot(session_id, resolver)?;
+        let workflow = self.workflow_snapshot(session_id, resolver)?;
         // Fail before any handoff files are written so a bad graph never leaves a partial folder.
         let structural_issues = validate_workflow_graph(&workflow.workflow);
         if !structural_issues.is_empty() {
@@ -96,15 +98,12 @@ impl SessionStoreConfig {
                 diagnostics: workflow
                     .diagnostics
                     .iter()
-                    .map(|diag| {
-                        format!("{} [{}]: {}", diag.node_id, diag.code, diag.message)
-                    })
+                    .map(|diag| format!("{} [{}]: {}", diag.node_id, diag.code, diag.message))
                     .collect::<Vec<_>>()
                     .join("; "),
             });
         }
-        let validation =
-            self.resolve_validation_gates(&context, validation, false)?;
+        let validation = self.resolve_validation_gates(&context, validation, false)?;
         let view = self.view_runtime_context(session_id)?;
         let handoff_id = Uuid::new_v4().to_string();
         let resume_command = format!(
@@ -166,20 +165,16 @@ impl SessionStoreConfig {
         };
 
         let paths = self.runtime_paths_for_workspace(session_id)?;
-        fs::create_dir_all(&paths.handoffs_dir).map_err(|source| {
-            SessionError::Io {
-                path: paths.handoffs_dir.clone(),
-                source,
-            }
+        fs::create_dir_all(&paths.handoffs_dir).map_err(|source| SessionError::Io {
+            path: paths.handoffs_dir.clone(),
+            source,
         })?;
 
         // Create handoff folder and write both JSON and Markdown
         let handoff_folder = paths.handoffs_dir.join(&handoff_id);
-        fs::create_dir_all(&handoff_folder).map_err(|source| {
-            SessionError::Io {
-                path: handoff_folder.clone(),
-                source,
-            }
+        fs::create_dir_all(&handoff_folder).map_err(|source| SessionError::Io {
+            path: handoff_folder.clone(),
+            source,
         })?;
 
         let handoff_json_path = handoff_folder.join("handoff.json");
@@ -188,11 +183,9 @@ impl SessionStoreConfig {
         let handoff_md_path = handoff_folder.join("handoff.md");
         let ticket_store = TicketStore::open(&self.ticket_store_root()).ok();
         let markdown_content = render_handoff_record_markdown(&record, ticket_store.as_ref());
-        fs::write(&handoff_md_path, markdown_content).map_err(|source| {
-            SessionError::Io {
-                path: handoff_md_path.clone(),
-                source,
-            }
+        fs::write(&handoff_md_path, markdown_content).map_err(|source| SessionError::Io {
+            path: handoff_md_path.clone(),
+            source,
         })?;
 
         // Mirror the handoff onto each target ticket (best-effort; the handoff
@@ -205,9 +198,7 @@ impl SessionStoreConfig {
         // the source session may not have a session.json yet, e.g. a
         // workflow-only workspace session, and the handoff record itself
         // remains the authoritative source of truth).
-        if let Ok(mut source_record) =
-            self.read_session(&record.session_id)
-        {
+        if let Ok(mut source_record) = self.read_session(&record.session_id) {
             if !source_record
                 .emitted_handoff_ids
                 .iter()
@@ -223,32 +214,29 @@ impl SessionStoreConfig {
         Ok(record)
     }
 
-    fn handoff_path_validation_root(
+    pub(super) fn handoff_path_validation_root(
         &self,
         session_id: &str,
     ) -> Result<PathBuf, SessionError> {
-        let active_worktree = self.registered_worktree(session_id)?.and_then(
-            |assignment| {
+        let active_worktree = self
+            .registered_worktree(session_id)?
+            .and_then(|assignment| {
                 (assignment.status == SessionWorktreeStatus::Active)
                     .then_some(assignment.worktree_path)
-            },
-        );
+            });
         Ok(active_worktree.unwrap_or_else(|| sibling_store_base(&self.root)))
     }
 
-    fn mirror_handoff_to_tickets(
+    pub(super) fn mirror_handoff_to_tickets(
         &self,
         record: &SessionHandoffRecord,
         target_tickets: &[crate::SessionHandoffTargetTicket],
     ) -> Result<(), SessionError> {
-        let store =
-            TicketStore::open_or_init(&self.ticket_store_root()).map_err(
-                |error| {
-                    SessionError::InvalidHookInput(format!(
-                        "ticket store unavailable for handoff mirror: {error}"
-                    ))
-                },
-            )?;
+        let store = TicketStore::open_or_init(&self.ticket_store_root()).map_err(|error| {
+            SessionError::InvalidHookInput(format!(
+                "ticket store unavailable for handoff mirror: {error}"
+            ))
+        })?;
 
         // A handoff is working-session context, not ticket content: mirror
         // it as a free-form `notes` part addressed by its own stable id
@@ -280,8 +268,7 @@ impl SessionStoreConfig {
         }
         if !record.validation.is_empty() {
             let validation_json =
-                serde_json::to_string_pretty(&record.validation)
-                    .unwrap_or_default();
+                serde_json::to_string_pretty(&record.validation).unwrap_or_default();
             content.push_str(&format!(
                 "\n**Validation:**\n```json\n{validation_json}\n```\n"
             ));
@@ -299,13 +286,7 @@ impl SessionStoreConfig {
                 Err(_) => continue,
             };
             // Best-effort: ignore individual ticket write errors.
-            let _ = store.write_part(
-                &ticket_id,
-                Uuid::new_v4(),
-                "notes",
-                &content,
-                None,
-            );
+            let _ = store.write_part(&ticket_id, Uuid::new_v4(), "notes", &content, None);
         }
         Ok(())
     }
@@ -317,16 +298,9 @@ impl SessionStoreConfig {
         validation: Vec<SessionValidationGate>,
         resolver: Option<&dyn SessionTicketStateResolver>,
     ) -> Result<SessionHandoffResult, SessionError> {
-        let record = self.create_handoff_record(
-            session_id,
-            package,
-            validation,
-            resolver,
-        )?;
+        let record = self.create_handoff_record(session_id, package, validation, resolver)?;
         let paths = self.runtime_paths_for_workspace(session_id)?;
-        let record_path = paths
-            .handoffs_dir
-            .join(&record.handoff_id);
+        let record_path = paths.handoffs_dir.join(&record.handoff_id);
         Ok(SessionHandoffResult {
             render: render_handoff_record_terminal(&record),
             record,
@@ -341,12 +315,7 @@ impl SessionStoreConfig {
         validation: Vec<SessionValidationGate>,
         resolver: Option<&dyn SessionTicketStateResolver>,
     ) -> Result<String, SessionError> {
-        let result = self.create_handoff_result(
-            session_id,
-            package,
-            validation,
-            resolver,
-        )?;
+        let result = self.create_handoff_result(session_id, package, validation, resolver)?;
         Ok(result.render)
     }
 
@@ -368,189 +337,7 @@ impl SessionStoreConfig {
         }
         Ok(init)
     }
-
-    pub fn finish_workflow(
-        &self,
-        session_id: &str,
-        validation: Vec<SessionValidationGate>,
-        deferred_optional_node_ids: Vec<String>,
-        resolver: Option<&dyn SessionTicketStateResolver>,
-    ) -> Result<SessionFinishResult, SessionError> {
-        let paths = self.runtime_paths_for_workspace(session_id)?;
-        if let Some(result) = Self::existing_finish_result(&paths.finish_path)?
-        {
-            return Ok(result);
-        }
-
-        // Hold the mutation lock across evaluation and finish-record write so a
-        // concurrent workflow mutation cannot interleave with finish.
-        let _lock = self.acquire_runtime_lock(session_id)?;
-        // Re-check under the lock: another finish may have won the race.
-        if let Some(result) = Self::existing_finish_result(&paths.finish_path)?
-        {
-            return Ok(result);
-        }
-
-        let context = self.read_runtime_context(session_id)?;
-        let snapshot =
-            self.workflow_snapshot(session_id, resolver)?;
-        let deferred = deferred_optional_node_ids
-            .into_iter()
-            .collect::<BTreeSet<_>>();
-
-        Self::evaluate_workflow_completion(&context, &snapshot, &deferred)?;
-        let validation =
-            self.evaluate_required_validation(&context, validation)?;
-
-        let record = SessionFinishRecord {
-            session_id: session_id.to_string(),
-            run_id: context.active_run_id,
-            finished_at: chrono::Utc::now(),
-            deferred_optional_node_ids: deferred.into_iter().collect(),
-            validation,
-        };
-
-        if let Some(parent) = paths.finish_path.parent() {
-            fs::create_dir_all(parent).map_err(|source| SessionError::Io {
-                path: parent.to_path_buf(),
-                source,
-            })?;
-        }
-        write_json(&paths.finish_path, &record)?;
-        Ok(SessionFinishResult {
-            record,
-            already_finished: false,
-        })
-    }
-
-    /// Load a persisted finish record (if any) as an idempotent finish result.
-    ///
-    /// Extracted so `finish_workflow` can perform the pre-lock fast path and the
-    /// under-lock re-check with a single branch each instead of duplicating the
-    /// read-and-wrap logic inline.
-    fn existing_finish_result(
-        finish_path: &Path
-    ) -> Result<Option<SessionFinishResult>, SessionError> {
-        Ok(
-            read_json_if_exists::<SessionFinishRecord>(finish_path)?.map(
-                |record| SessionFinishResult {
-                    record,
-                    already_finished: true,
-                },
-            ),
-        )
-    }
-
-    /// Pure completion predicate for finish: verify every required workflow node
-    /// is done and every optional node is done or explicitly deferred with a
-    /// reason. Ticket nodes whose live state could not be resolved fail closed.
-    ///
-    /// Extracted from `finish_workflow` so the completion invariant can be unit
-    /// tested in isolation and so the locked finish path reads as a linear
-    /// sequence rather than an oversized branching function.
-    fn evaluate_workflow_completion(
-        context: &SessionRuntimeContext,
-        snapshot: &SessionWorkflowSnapshot,
-        deferred: &BTreeSet<String>,
-    ) -> Result<(), SessionError> {
-        let live_states = snapshot
-            .resolutions
-            .iter()
-            .map(|item| (item.node_id.clone(), item.live_ticket_state.clone()))
-            .collect::<BTreeMap<_, _>>();
-        // Ticket-state diagnostics (unavailable / misrouted / not-found) must be
-        // able to block finish; they cannot be silently ignored.
-        let diagnostics_by_node = snapshot
-            .diagnostics
-            .iter()
-            .map(|diag| (diag.node_id.clone(), diag.message.clone()))
-            .collect::<BTreeMap<_, _>>();
-
-        for node in &context.workflow.nodes {
-            // A required ticket- or spec-backed node whose live state could not
-            // be resolved (missing, misrouted, or otherwise unavailable) fails
-            // closed with an explicit unavailable reason instead of a generic
-            // "not done". Spec gating is symmetric to ticket gating.
-            if node.requirement
-                == crate::SessionWorkflowNodeRequirement::Required
-                && matches!(
-                    node.kind,
-                    crate::SessionWorkflowNodeKind::Ticket
-                        | crate::SessionWorkflowNodeKind::Spec
-                )
-            {
-                if let Some(message) = diagnostics_by_node.get(&node.node_id) {
-                    let backing = match node.kind {
-                        crate::SessionWorkflowNodeKind::Spec => "spec",
-                        _ => "ticket",
-                    };
-                    return Err(SessionError::FinishBlocked {
-                        reason: format!(
-                            "required {} node {} has unavailable live state: {}",
-                            backing, node.node_id, message
-                        ),
-                    });
-                }
-            }
-
-            let is_done =
-                node_is_effectively_done(node, live_states.get(&node.node_id));
-            if node.requirement
-                == crate::SessionWorkflowNodeRequirement::Required
-                && !is_done
-            {
-                return Err(SessionError::FinishBlocked {
-                    reason: format!(
-                        "required node {} is not done",
-                        node.node_id
-                    ),
-                });
-            }
-
-            if node.requirement
-                == crate::SessionWorkflowNodeRequirement::Optional
-                && !is_done
-            {
-                let valid_defer = node.status
-                    == SessionWorkflowNodeStatus::Deferred
-                    && node.deferred_reason.is_some()
-                    && deferred.contains(&node.node_id);
-                if !valid_defer {
-                    return Err(SessionError::FinishBlocked {
-                        reason: format!(
-                            "optional node {} must be deferred with a reason",
-                            node.node_id
-                        ),
-                    });
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Resolve required validation gates from the authoritative test store and
-    /// verify each required gate passed, returning the merged gate list to
-    /// persist. Extracted from `finish_workflow` to keep authoritative-gate
-    /// evaluation testable independently of the locked finish sequence.
-    fn evaluate_required_validation(
-        &self,
-        context: &SessionRuntimeContext,
-        validation: Vec<SessionValidationGate>,
-    ) -> Result<Vec<SessionValidationGate>, SessionError> {
-        let validation =
-            self.resolve_validation_gates(context, validation, true)?;
-        for gate in &validation {
-            if gate.required && gate.outcome.as_deref() != Some("passed") {
-                return Err(SessionError::FinishBlocked {
-                    reason: format!(
-                        "required validation {} is not passed",
-                        gate.validation_spec_id
-                    ),
-                });
-            }
-        }
-        Ok(validation)
-    }
-
 }
+
+#[path = "handoff_finish/completion.rs"]
+mod completion;

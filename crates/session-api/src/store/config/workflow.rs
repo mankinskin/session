@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     pub fn workflow_update_node_status(
         &self,
@@ -14,14 +17,11 @@ impl SessionStoreConfig {
             .iter_mut()
             .find(|node| node.node_id == node_id)
             .ok_or_else(|| {
-                SessionError::InvalidHookInput(format!(
-                    "unknown workflow node id: {node_id}"
-                ))
+                SessionError::InvalidHookInput(format!("unknown workflow node id: {node_id}"))
             })?;
 
         node.status = status;
-        node.deferred_reason = if status == SessionWorkflowNodeStatus::Deferred
-        {
+        node.deferred_reason = if status == SessionWorkflowNodeStatus::Deferred {
             deferred_reason
         } else {
             None
@@ -60,9 +60,7 @@ impl SessionStoreConfig {
             .iter()
             .position(|node| node.node_id == node_id)
             .ok_or_else(|| {
-                SessionError::InvalidHookInput(format!(
-                    "unknown workflow node id: {node_id}"
-                ))
+                SessionError::InvalidHookInput(format!("unknown workflow node id: {node_id}"))
             })?;
 
         let mut updated = context.workflow.nodes[index].clone();
@@ -141,7 +139,10 @@ impl SessionStoreConfig {
             )));
         }
 
-        context.workflow.nodes.retain(|node| node.node_id != node_id);
+        context
+            .workflow
+            .nodes
+            .retain(|node| node.node_id != node_id);
         context
             .workflow
             .edges
@@ -182,9 +183,7 @@ impl SessionStoreConfig {
             .map(|node| node.node_id.as_str())
             .collect::<std::collections::BTreeSet<_>>();
         for (index, edge) in edges.iter().enumerate() {
-            if !known.contains(edge.from.as_str())
-                || !known.contains(edge.to.as_str())
-            {
+            if !known.contains(edge.from.as_str()) || !known.contains(edge.to.as_str()) {
                 return Err(indexed_workflow_error(
                     "edges",
                     index,
@@ -238,9 +237,7 @@ impl SessionStoreConfig {
             .iter_mut()
             .find(|node| node.node_id == node_id)
             .ok_or_else(|| {
-                SessionError::InvalidHookInput(format!(
-                    "unknown workflow node id: {node_id}"
-                ))
+                SessionError::InvalidHookInput(format!("unknown workflow node id: {node_id}"))
             })?;
 
         node.kind = crate::SessionWorkflowNodeKind::Ticket;
@@ -262,7 +259,9 @@ impl SessionStoreConfig {
         let context = self.read_runtime_context(session_id)?;
         let mut resolutions = Vec::new();
         let mut diagnostics = Vec::new();
-        let owned_resolver = resolver.is_none().then(|| self.default_ticket_state_resolver());
+        let owned_resolver = resolver
+            .is_none()
+            .then(|| self.default_ticket_state_resolver());
         let resolver = resolver.or(owned_resolver
             .as_ref()
             .map(|item| item as &dyn SessionTicketStateResolver));
@@ -272,17 +271,15 @@ impl SessionStoreConfig {
                 // Ticket-backed nodes resolve authoritative live ticket state.
                 if let Some(ticket_urn) = node.ticket_urn.as_deref() {
                     match resolver.resolve_ticket_state(ticket_urn) {
-                        Ok(state) =>
-                            resolutions.push(SessionWorkflowNodeResolution {
-                                node_id: node.node_id.clone(),
-                                live_ticket_state: state,
-                            }),
-                        Err(message) =>
-                            diagnostics.push(SessionWorkflowDiagnostic {
-                                node_id: node.node_id.clone(),
-                                code: "ticket-state-unavailable".to_string(),
-                                message,
-                            }),
+                        Ok(state) => resolutions.push(SessionWorkflowNodeResolution {
+                            node_id: node.node_id.clone(),
+                            live_ticket_state: state,
+                        }),
+                        Err(message) => diagnostics.push(SessionWorkflowDiagnostic {
+                            node_id: node.node_id.clone(),
+                            code: "ticket-state-unavailable".to_string(),
+                            message,
+                        }),
                     }
                 }
 
@@ -291,17 +288,15 @@ impl SessionStoreConfig {
                 // carries the live entity state regardless of backing kind.
                 if let Some(spec_urn) = node.spec_urn.as_deref() {
                     match resolver.resolve_spec_state(spec_urn) {
-                        Ok(state) =>
-                            resolutions.push(SessionWorkflowNodeResolution {
-                                node_id: node.node_id.clone(),
-                                live_ticket_state: state,
-                            }),
-                        Err(message) =>
-                            diagnostics.push(SessionWorkflowDiagnostic {
-                                node_id: node.node_id.clone(),
-                                code: "spec-state-unavailable".to_string(),
-                                message,
-                            }),
+                        Ok(state) => resolutions.push(SessionWorkflowNodeResolution {
+                            node_id: node.node_id.clone(),
+                            live_ticket_state: state,
+                        }),
+                        Err(message) => diagnostics.push(SessionWorkflowDiagnostic {
+                            node_id: node.node_id.clone(),
+                            code: "spec-state-unavailable".to_string(),
+                            message,
+                        }),
                     }
                 }
             }
@@ -319,8 +314,7 @@ impl SessionStoreConfig {
         session_id: &str,
         resolver: Option<&dyn SessionTicketStateResolver>,
     ) -> Result<String, SessionError> {
-        let snapshot =
-            self.workflow_snapshot(session_id, resolver)?;
+        let snapshot = self.workflow_snapshot(session_id, resolver)?;
         let mut lines = Vec::new();
         lines.push(format!("workflow {}", session_id));
 
@@ -341,10 +335,7 @@ impl SessionStoreConfig {
                 .iter()
                 .find(|node| node.node_id == edge.to)
             {
-                if !node_is_effectively_done(
-                    dependency,
-                    live_states.get(&dependency.node_id),
-                ) {
+                if !node_is_effectively_done(dependency, live_states.get(&dependency.node_id)) {
                     blockers
                         .entry(edge.from.clone())
                         .or_default()
@@ -385,10 +376,7 @@ impl SessionStoreConfig {
         }
 
         for diag in &snapshot.diagnostics {
-            lines.push(format!(
-                "! {} {} {}",
-                diag.node_id, diag.code, diag.message
-            ));
+            lines.push(format!("! {} {} {}", diag.node_id, diag.code, diag.message));
         }
 
         Ok(lines.join("\n"))
@@ -399,8 +387,7 @@ impl SessionStoreConfig {
         session_id: &str,
         resolver: Option<&dyn SessionTicketStateResolver>,
     ) -> Result<String, SessionError> {
-        let snapshot =
-            self.workflow_snapshot(session_id, resolver)?;
+        let snapshot = self.workflow_snapshot(session_id, resolver)?;
         Ok(render_workflow_mermaid(
             &snapshot.workflow,
             &snapshot.resolutions,

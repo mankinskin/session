@@ -1,13 +1,16 @@
-use crate::session_intake::{
+#[allow(unused_imports)]
+use super::*;
+
+pub(super) use crate::session_intake::{
     SESSION_INTAKE_SCHEMA_VERSION, SessionIntake, SessionIntakeLinkState, SessionIntakeLinkage,
     SessionIntakeRecord,
 };
 
-const INTAKE_INPUT_FILE: &str = "input.bin";
-const INTAKE_SUBMISSION_FILE: &str = "submission.json";
-const INTAKE_LINKAGE_FILE: &str = "linkage.json";
+pub(super) const INTAKE_INPUT_FILE: &str = "input.bin";
+pub(super) const INTAKE_SUBMISSION_FILE: &str = "submission.json";
+pub(super) const INTAKE_LINKAGE_FILE: &str = "linkage.json";
 
-fn validate_intake_request_id(value: &str) -> Result<(), SessionError> {
+pub(super) fn validate_intake_request_id(value: &str) -> Result<(), SessionError> {
     let valid = !value.is_empty()
         && value.len() <= 128
         && value
@@ -24,7 +27,7 @@ fn validate_intake_request_id(value: &str) -> Result<(), SessionError> {
     }
 }
 
-fn intake_sha256_hex(bytes: &[u8]) -> String {
+pub(super) fn intake_sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     Sha256::digest(bytes)
         .iter()
@@ -32,129 +35,15 @@ fn intake_sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn is_sha256_hex(value: &str) -> bool {
+pub(super) fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-fn ensure_safe_session_root(root: &Path) -> Result<(), SessionError> {
-    if !root.is_absolute()
-        || root
-            .components()
-            .any(|c| matches!(c, std::path::Component::ParentDir))
-    {
-        return Err(SessionError::InvalidStorePath(root.to_path_buf()));
-    }
-    let mut current = PathBuf::new();
-    for component in root.components() {
-        current.push(component);
-        match fs::symlink_metadata(&current) {
-            Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() => {
-                return Err(SessionError::InvalidStorePath(current));
-            }
-            Ok(_) => {}
-            Err(source) if source.kind() == ErrorKind::NotFound => return Ok(()),
-            Err(source) => {
-                return Err(SessionError::Io {
-                    path: current,
-                    source,
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
-fn ensure_real_directories(root: &Path, path: &Path) -> Result<(), SessionError> {
-    ensure_safe_session_root(root)?;
-    let relative = path
-        .strip_prefix(root)
-        .map_err(|_| SessionError::InvalidStorePath(path.to_path_buf()))?;
-    let mut current = root.to_path_buf();
-    for component in relative.components() {
-        current.push(component);
-        match fs::symlink_metadata(&current) {
-            Ok(meta) if meta.file_type().is_symlink() || !meta.is_dir() => {
-                return Err(SessionError::InvalidStorePath(current));
-            }
-            Ok(_) => {}
-            Err(source) if source.kind() == ErrorKind::NotFound => return Ok(()),
-            Err(source) => {
-                return Err(SessionError::Io {
-                    path: current,
-                    source,
-                });
-            }
-        }
-    }
-    Ok(())
-}
-
-fn read_regular_file_if_exists(path: &Path) -> Result<Option<Vec<u8>>, SessionError> {
-    match fs::symlink_metadata(path) {
-        Ok(meta) if meta.file_type().is_file() => {}
-        Ok(_) => return Err(SessionError::InvalidStorePath(path.to_path_buf())),
-        Err(source) if source.kind() == ErrorKind::NotFound => return Ok(None),
-        Err(source) => {
-            return Err(SessionError::Io {
-                path: path.to_path_buf(),
-                source,
-            });
-        }
-    }
-    fs::read(path).map(Some).map_err(|source| SessionError::Io {
-        path: path.to_path_buf(),
-        source,
-    })
-}
-
-fn write_new_synced(path: &Path, bytes: &[u8]) -> Result<bool, SessionError> {
-    use std::io::Write;
-    let io_error = |target: &Path, source: std::io::Error| SessionError::Io {
-        path: target.to_path_buf(),
-        source,
-    };
-    let parent = path
-        .parent()
-        .ok_or_else(|| SessionError::InvalidStorePath(path.to_path_buf()))?;
-    let tmp = parent.join(format!(
-        ".{}.tmp-{}",
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("intake"),
-        Uuid::new_v4()
-    ));
-    {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&tmp)
-            .map_err(|source| io_error(&tmp, source))?;
-        file.write_all(bytes)
-            .map_err(|source| io_error(&tmp, source))?;
-        file.sync_all().map_err(|source| io_error(&tmp, source))?;
-    }
-    let linked = fs::hard_link(&tmp, path);
-    let _ = fs::remove_file(&tmp);
-    match linked {
-        Ok(()) => {
-            #[cfg(unix)]
-            {
-                fs::File::open(parent)
-                    .and_then(|dir| dir.sync_all())
-                    .map_err(|source| io_error(parent, source))?;
-            }
-            Ok(true)
-        }
-        Err(source) if source.kind() == ErrorKind::AlreadyExists => Ok(false),
-        Err(source) => Err(io_error(path, source)),
-    }
-}
-
 impl SessionStoreConfig {
-    fn intake_require_session(&self, session_id: &str) -> Result<(), SessionError> {
+    pub(super) fn intake_require_session(&self, session_id: &str) -> Result<(), SessionError> {
         validate_session_id(session_id)?;
         let paths = self.paths_for_session_id(session_id)?;
         ensure_real_directories(&self.root, &paths.session_dir)?;
@@ -173,7 +62,11 @@ impl SessionStoreConfig {
         }
     }
 
-    fn intake_dir(&self, session_id: &str, request_id: &str) -> Result<PathBuf, SessionError> {
+    pub(super) fn intake_dir(
+        &self,
+        session_id: &str,
+        request_id: &str,
+    ) -> Result<PathBuf, SessionError> {
         let dir = self
             .runtime_paths_for_workspace(session_id)?
             .workspace_dir
@@ -183,7 +76,7 @@ impl SessionStoreConfig {
         Ok(dir)
     }
 
-    fn intake_is_finished(&self, session_id: &str) -> Result<bool, SessionError> {
+    pub(super) fn intake_is_finished(&self, session_id: &str) -> Result<bool, SessionError> {
         let path = self.runtime_paths_for_workspace(session_id)?.finish_path;
         match std::fs::symlink_metadata(&path) {
             Ok(meta) if meta.file_type().is_file() => Ok(true),
@@ -193,7 +86,7 @@ impl SessionStoreConfig {
         }
     }
 
-    fn load_intake(
+    pub(super) fn load_intake(
         &self,
         session_id: &str,
         request_id: &str,
@@ -257,7 +150,7 @@ impl SessionStoreConfig {
         }))
     }
 
-    fn intake_missing(session_id: &str, request_id: &str) -> SessionError {
+    pub(super) fn intake_missing(session_id: &str, request_id: &str) -> SessionError {
         SessionError::IntakeMissing {
             session_id: session_id.to_string(),
             request_id: request_id.to_string(),
@@ -277,7 +170,7 @@ impl SessionStoreConfig {
         self.submit_locked(session_id, request_id, bytes)
     }
 
-    fn submit_locked(
+    pub(super) fn submit_locked(
         &self,
         session_id: &str,
         request_id: &str,
@@ -370,7 +263,7 @@ impl SessionStoreConfig {
         self.reserve_locked(session_id, request_id, mission_id, workspace_root)
     }
 
-    fn reserve_locked(
+    pub(super) fn reserve_locked(
         &self,
         session_id: &str,
         request_id: &str,
@@ -435,7 +328,7 @@ impl SessionStoreConfig {
         self.complete_locked(session_id, request_id, mission_id)
     }
 
-    fn complete_locked(
+    pub(super) fn complete_locked(
         &self,
         session_id: &str,
         request_id: &str,
@@ -513,9 +406,9 @@ impl SessionStoreConfig {
 
 /// Lock-holding operation preventing finish from interleaving Mission creation.
 pub struct SessionIntakeOperation<'a> {
-    store: &'a SessionStoreConfig,
-    intake: SessionIntake,
-    _lock: RuntimeMutationLock,
+    pub(super) store: &'a SessionStoreConfig,
+    pub(super) intake: SessionIntake,
+    pub(super) _lock: RuntimeMutationLock,
 }
 
 impl SessionIntakeOperation<'_> {
@@ -547,3 +440,8 @@ impl SessionIntakeOperation<'_> {
         Ok(())
     }
 }
+
+#[path = "session_intake/filesystem.rs"]
+mod filesystem;
+#[allow(unused_imports)]
+pub use filesystem::*;

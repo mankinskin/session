@@ -1,21 +1,24 @@
+#[allow(unused_imports)]
+use super::*;
+
 #[derive(serde::Deserialize)]
-struct LegacyRuntimeContext {
+pub(super) struct LegacyRuntimeContext {
     #[serde(default)]
-    active_run_id: String,
+    pub(super) active_run_id: String,
     #[serde(default)]
-    runs: Vec<SessionRunLineage>,
+    pub(super) runs: Vec<SessionRunLineage>,
     #[serde(default)]
-    pinned_entities: Vec<SessionPinnedEntity>,
+    pub(super) pinned_entities: Vec<SessionPinnedEntity>,
     #[serde(default)]
-    workflow: SessionWorkflowGraph,
+    pub(super) workflow: SessionWorkflowGraph,
     #[serde(default)]
-    created_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub(super) created_at: Option<chrono::DateTime<chrono::Utc>>,
     #[serde(default)]
-    updated_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub(super) updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl SessionStoreConfig {
-    fn resolve_validation_gates(
+    pub(super) fn resolve_validation_gates(
         &self,
         context: &SessionRuntimeContext,
         validation: Vec<SessionValidationGate>,
@@ -57,14 +60,11 @@ impl SessionStoreConfig {
         let test_store = self.test_store_config();
         for spec_id in required_specs {
             // Fail closed when a required guard references an unknown validation spec.
-            test_store.get_spec(&spec_id).map_err(|error| {
-                SessionError::FinishBlocked {
-                    reason: format!(
-                        "required validation {} is unavailable: {}",
-                        spec_id, error
-                    ),
-                }
-            })?;
+            test_store
+                .get_spec(&spec_id)
+                .map_err(|error| SessionError::FinishBlocked {
+                    reason: format!("required validation {} is unavailable: {}", spec_id, error),
+                })?;
 
             // Required outcomes are ALWAYS derived from the authoritative test-api
             // execution record. Caller-provided outcomes are never accepted as
@@ -141,21 +141,19 @@ impl SessionStoreConfig {
         })
     }
 
-    fn sessions_root(&self) -> Result<PathBuf, SessionError> {
+    pub(super) fn sessions_root(&self) -> Result<PathBuf, SessionError> {
         if self.root.as_os_str().is_empty() {
             return Err(SessionError::EmptyStoreRoot);
         }
         Ok(self.root.join("sessions"))
     }
 
-    pub(super) fn runtime_paths_for_workspace(
+    pub(in super::super) fn runtime_paths_for_workspace(
         &self,
         session_id: &str,
     ) -> Result<SessionRuntimePaths, SessionError> {
         validate_session_id(session_id)?;
-        let workspace_dir = self
-            .sessions_root()?
-            .join(session_id);
+        let workspace_dir = self.sessions_root()?.join(session_id);
         let handoffs_dir = workspace_dir.join("handoffs");
         let finish_path = workspace_dir.join("finish.json");
         Ok(SessionRuntimePaths {
@@ -165,51 +163,51 @@ impl SessionStoreConfig {
         })
     }
 
-    fn persist_runtime_state(
+    pub(super) fn persist_runtime_state(
         &self,
         context: &SessionRuntimeContext,
     ) -> Result<(), SessionError> {
         let paths = self.runtime_paths_for_workspace(&context.session_id)?;
         ensure_local_gitignore(&self.root)?;
-        fs::create_dir_all(&paths.workspace_dir).map_err(|source| {
-            SessionError::Io {
-                path: paths.workspace_dir.clone(),
-                source,
-            }
+        fs::create_dir_all(&paths.workspace_dir).map_err(|source| SessionError::Io {
+            path: paths.workspace_dir.clone(),
+            source,
         })?;
         let session_paths = self.paths_for_session_id(&context.session_id)?;
-        let mut manifest = read_json_if_exists(&session_paths.manifest_path)?
-            .unwrap_or_else(|| PersistedSessionManifest {
-                schema_version: SESSION_SCHEMA_VERSION,
-                session_id: context.session_id.clone(),
-                source: "session-runtime-init".to_string(),
-                started_at: context.created_at,
-                captured_at: context.updated_at,
-                metadata: SessionMetadata {
-                    workspace_path: self.workspace_path.clone(),
-                    conversation_id: None,
-                    agent_id: None,
-                    ticket_id: None,
-                    model: None,
-                    trigger: Some("session-runtime-init".to_string()),
-                    provisioning: None,
-                    producer: None,
-                    copilot_version: None,
-                    vscode_version: None,
-                    protocol_version: None,
-                    worktree: None,
-                },
-                links: SessionLinks::default(),
-                track_id: None,
-                anchor_ticket_id: None,
-                parent_session_id: None,
-                spawned_session_id: None,
-                emitted_handoff_ids: Vec::new(),
-                picked_up_handoff_ids: Vec::new(),
-                active_run_id: String::new(),
-                runs: Vec::new(),
-                pinned_entities: Vec::new(),
-                workflow: SessionWorkflowGraph::default(),
+        let mut manifest =
+            read_json_if_exists(&session_paths.manifest_path)?.unwrap_or_else(|| {
+                PersistedSessionManifest {
+                    schema_version: SESSION_SCHEMA_VERSION,
+                    session_id: context.session_id.clone(),
+                    source: "session-runtime-init".to_string(),
+                    started_at: context.created_at,
+                    captured_at: context.updated_at,
+                    metadata: SessionMetadata {
+                        workspace_path: self.workspace_path.clone(),
+                        conversation_id: None,
+                        agent_id: None,
+                        ticket_id: None,
+                        model: None,
+                        trigger: Some("session-runtime-init".to_string()),
+                        provisioning: None,
+                        producer: None,
+                        copilot_version: None,
+                        vscode_version: None,
+                        protocol_version: None,
+                        worktree: None,
+                    },
+                    links: SessionLinks::default(),
+                    track_id: None,
+                    anchor_ticket_id: None,
+                    parent_session_id: None,
+                    spawned_session_id: None,
+                    emitted_handoff_ids: Vec::new(),
+                    picked_up_handoff_ids: Vec::new(),
+                    active_run_id: String::new(),
+                    runs: Vec::new(),
+                    pinned_entities: Vec::new(),
+                    workflow: SessionWorkflowGraph::default(),
+                }
             });
         manifest.captured_at = context.updated_at;
         manifest.active_run_id = context.active_run_id.clone();
@@ -219,19 +217,19 @@ impl SessionStoreConfig {
         write_json(&session_paths.manifest_path, &manifest)
     }
 
-    fn ticket_store_root(&self) -> PathBuf {
+    pub(super) fn ticket_store_root(&self) -> PathBuf {
         sibling_store_root(&self.root, ".ticket")
     }
 
-    fn test_store_root(&self) -> PathBuf {
+    pub(super) fn test_store_root(&self) -> PathBuf {
         sibling_store_root(&self.root, ".test")
     }
 
-    fn test_store_config(&self) -> TestStoreConfig {
+    pub(super) fn test_store_config(&self) -> TestStoreConfig {
         TestStoreConfig::new(self.test_store_root())
     }
 
-    fn default_ticket_state_resolver(&self) -> DefaultTicketStateResolver {
+    pub(super) fn default_ticket_state_resolver(&self) -> DefaultTicketStateResolver {
         DefaultTicketStateResolver {
             session_store_root: self.root.clone(),
             workspace_path: self.workspace_path.clone(),
@@ -240,14 +238,16 @@ impl SessionStoreConfig {
         }
     }
 
-    fn resolve_session_id(
+    pub(super) fn resolve_session_id(
         &self,
         requested: Option<String>,
     ) -> Result<String, SessionError> {
-        let requested = requested.map(|id| {
-            validate_session_id(&id)?;
-            Ok::<String, SessionError>(id)
-        }).transpose()?;
+        let requested = requested
+            .map(|id| {
+                validate_session_id(&id)?;
+                Ok::<String, SessionError>(id)
+            })
+            .transpose()?;
 
         if let Some(provisioned) = self.provisioned_worktree_session_id() {
             if let Some(requested) = requested {
@@ -268,7 +268,7 @@ impl SessionStoreConfig {
         Ok(Uuid::new_v4().to_string())
     }
 
-    fn provisioned_worktree_session_id(&self) -> Option<String> {
+    pub(super) fn provisioned_worktree_session_id(&self) -> Option<String> {
         let mut path = self.root.canonicalize().unwrap_or_else(|_| {
             if self.root.is_absolute() {
                 self.root.clone()
@@ -288,7 +288,7 @@ impl SessionStoreConfig {
         None
     }
 
-    fn read_legacy_runtime_context(
+    pub(super) fn read_legacy_runtime_context(
         &self,
         session_id: &str,
     ) -> Result<Option<LegacyRuntimeContext>, SessionError> {
@@ -301,7 +301,7 @@ impl SessionStoreConfig {
         request: SessionCaptureRequest,
     ) -> Result<SessionStorePlan, SessionError> {
         let (mut record, events) = request.into_record_and_events()?;
-        
+
         // Compute cost_usd for turns with token attribution (ticket 6549b6a7)
         let price_table = crate::price_loader::load_price_table(&self.root).ok();
         if let Some(table) = &price_table {
@@ -322,7 +322,7 @@ impl SessionStoreConfig {
                 }
             }
         }
-        
+
         let paths = self.paths_for(&record)?;
         let events = if events.is_empty() {
             None
@@ -350,7 +350,7 @@ impl SessionStoreConfig {
         Ok(plan)
     }
 
-    fn persist_record(
+    pub(super) fn persist_record(
         &self,
         record: SessionRecord,
     ) -> Result<SessionStorePlan, SessionError> {
@@ -363,5 +363,4 @@ impl SessionStoreConfig {
         plan.persist()?;
         Ok(plan)
     }
-
 }

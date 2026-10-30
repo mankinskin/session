@@ -1,60 +1,44 @@
-use chrono::TimeZone;
-use tempfile::TempDir;
+#[allow(unused_imports)]
+use super::*;
 
-use crate::{
-    CopilotHookMessage,
-    CopilotHookPayload,
-    PersistedSessionEvents,
-    PersistedSessionManifest,
-    PersistedSessionTranscript,
-    SESSION_SCHEMA_VERSION,
-    SessionAuditSelector,
-    SessionCaptureRequest,
-    SessionError,
-    SessionProvisioningDiagnostic,
-    SessionQuery,
-    SessionRole,
-    SessionRuntimeInitRequest,
-    SessionStoreConfig,
-    SessionTicketStateResolver,
-    SessionWorkflowEdgeKind,
-    SessionWorkflowNodeDraft,
-    SessionWorkflowNodeKind,
-    SessionWorkflowNodeRequirement,
-    SessionWorkflowNodeStatus,
-    SessionWorktreeAllocationMode,
-    SessionWorktreeCheckInRequest,
-    SessionWorktreeStatus,
-    store::{
-        WorktreeCheckInFailurePoint,
-    },
+pub(super) use chrono::TimeZone;
+pub(super) use tempfile::TempDir;
+
+pub(super) use crate::{
+    CopilotHookMessage, CopilotHookPayload, PersistedSessionEvents, PersistedSessionManifest,
+    PersistedSessionTranscript, SESSION_SCHEMA_VERSION, SessionAuditSelector,
+    SessionCaptureRequest, SessionError, SessionProvisioningDiagnostic, SessionQuery, SessionRole,
+    SessionRuntimeInitRequest, SessionStoreConfig, SessionTicketStateResolver,
+    SessionWorkflowEdgeKind, SessionWorkflowNodeDraft, SessionWorkflowNodeKind,
+    SessionWorkflowNodeRequirement, SessionWorkflowNodeStatus, SessionWorktreeAllocationMode,
+    SessionWorktreeCheckInRequest, SessionWorktreeStatus, store::WorktreeCheckInFailurePoint,
 };
-use uuid::Uuid;
+pub(super) use uuid::Uuid;
 
-const WORKTREE_SESSION_A: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const WORKTREE_SESSION_B: &str = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
-const WORKTREE_SESSION_STRICT: &str = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
-const WORKTREE_SESSION_FORWARD: &str = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
-const WORKTREE_SESSION_GOOD: &str = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
-const WORKTREE_SESSION_REAL: &str = "ffffffff-ffff-4fff-8fff-ffffffffffff";
-const RUNTIME_SESSION_MENTIONED: &str = "11111111-1111-4111-8111-111111111111";
-const RUNTIME_SESSION_HANDOFF: &str = "22222222-2222-4222-8222-222222222222";
+pub(super) const WORKTREE_SESSION_A: &str = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+pub(super) const WORKTREE_SESSION_B: &str = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+pub(super) const WORKTREE_SESSION_STRICT: &str = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+pub(super) const WORKTREE_SESSION_FORWARD: &str = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+pub(super) const WORKTREE_SESSION_GOOD: &str = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+pub(super) const WORKTREE_SESSION_REAL: &str = "ffffffff-ffff-4fff-8fff-ffffffffffff";
+pub(super) const RUNTIME_SESSION_MENTIONED: &str = "11111111-1111-4111-8111-111111111111";
+pub(super) const RUNTIME_SESSION_HANDOFF: &str = "22222222-2222-4222-8222-222222222222";
 
-fn sample_time() -> chrono::DateTime<chrono::Utc> {
+pub(super) fn sample_time() -> chrono::DateTime<chrono::Utc> {
     chrono::Utc
         .with_ymd_and_hms(2026, 6, 2, 13, 0, 0)
         .single()
         .unwrap()
 }
 
-fn sample_time_later() -> chrono::DateTime<chrono::Utc> {
+pub(super) fn sample_time_later() -> chrono::DateTime<chrono::Utc> {
     chrono::Utc
         .with_ymd_and_hms(2026, 6, 2, 13, 5, 0)
         .single()
         .unwrap()
 }
 
-fn sample_payload(
+pub(super) fn sample_payload(
     session_id: &str,
     conversation_id: Option<&str>,
     captured_at: chrono::DateTime<chrono::Utc>,
@@ -89,7 +73,7 @@ fn sample_payload(
     }
 }
 
-fn sample_request(
+pub(super) fn sample_request(
     session_id: &str,
     conversation_id: Option<&str>,
     captured_at: chrono::DateTime<chrono::Utc>,
@@ -103,7 +87,7 @@ fn sample_request(
     ))
 }
 
-fn request_with_provisioning(
+pub(super) fn request_with_provisioning(
     session_id: &str,
     diagnostic: Option<SessionProvisioningDiagnostic>,
 ) -> SessionCaptureRequest {
@@ -117,7 +101,7 @@ fn request_with_provisioning(
     request
 }
 
-fn sample_worktree_request(
+pub(super) fn sample_worktree_request(
     session_id: &str,
     owner_id: &str,
     ticket_id: &str,
@@ -134,7 +118,7 @@ fn sample_worktree_request(
     }
 }
 
-fn managed_worktree(
+pub(super) fn managed_worktree(
     tempdir: &TempDir,
     session_id: &str,
     slug: &str,
@@ -148,9 +132,7 @@ fn managed_worktree(
         let mut index = repository.index().unwrap();
         let tree_id = index.write_tree().unwrap();
         let tree = repository.find_tree(tree_id).unwrap();
-        let signature =
-            git2::Signature::now("session-api tests", "tests@example.invalid")
-                .unwrap();
+        let signature = git2::Signature::now("session-api tests", "tests@example.invalid").unwrap();
         repository
             .commit(Some("HEAD"), &signature, &signature, "initial", &tree, &[])
             .unwrap();
@@ -169,7 +151,7 @@ fn managed_worktree(
 }
 
 #[test]
-fn store_plan_uses_session_id_in_paths() {
+pub(super) fn store_plan_uses_session_id_in_paths() {
     let config = SessionStoreConfig::new(".session");
     let plan = config
         .plan_capture(sample_request(
@@ -186,14 +168,12 @@ fn store_plan_uses_session_id_in_paths() {
     );
     assert_eq!(
         plan.paths.transcript_path,
-        std::path::PathBuf::from(
-            ".session/sessions/session-abc/transcript.json"
-        )
+        std::path::PathBuf::from(".session/sessions/session-abc/transcript.json")
     );
 }
 
 #[test]
-fn store_plan_rejects_invalid_path_segments() {
+pub(super) fn store_plan_rejects_invalid_path_segments() {
     let config = SessionStoreConfig::new(".session");
     let mut request = sample_request(
         "session-abc",
@@ -212,10 +192,9 @@ fn store_plan_rejects_invalid_path_segments() {
 }
 
 #[test]
-fn persist_capture_writes_manifest_and_transcript_files() {
+pub(super) fn persist_capture_writes_manifest_and_transcript_files() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     let plan = config
         .persist_capture(sample_request(
@@ -225,15 +204,11 @@ fn persist_capture_writes_manifest_and_transcript_files() {
             &["Persist this chat"],
         ))
         .unwrap();
-    let manifest_text =
-        std::fs::read_to_string(&plan.paths.manifest_path).unwrap();
-    let transcript_text =
-        std::fs::read_to_string(&plan.paths.transcript_path).unwrap();
+    let manifest_text = std::fs::read_to_string(&plan.paths.manifest_path).unwrap();
+    let transcript_text = std::fs::read_to_string(&plan.paths.transcript_path).unwrap();
 
-    let manifest: PersistedSessionManifest =
-        serde_json::from_str(&manifest_text).unwrap();
-    let transcript: PersistedSessionTranscript =
-        serde_json::from_str(&transcript_text).unwrap();
+    let manifest: PersistedSessionManifest = serde_json::from_str(&manifest_text).unwrap();
+    let transcript: PersistedSessionTranscript = serde_json::from_str(&transcript_text).unwrap();
 
     assert_eq!(manifest.session_id, "session-abc");
     assert_eq!(manifest.metadata.workspace_path, "context-engine");
@@ -243,10 +218,9 @@ fn persist_capture_writes_manifest_and_transcript_files() {
 }
 
 #[test]
-fn persist_capture_appends_only_new_turns_from_later_capture() {
+pub(super) fn persist_capture_appends_only_new_turns_from_later_capture() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     config
         .persist_capture(sample_request(
@@ -273,10 +247,8 @@ fn persist_capture_appends_only_new_turns_from_later_capture() {
             &["first", "second"],
         ))
         .unwrap();
-    let transcript_text =
-        std::fs::read_to_string(&plan.paths.transcript_path).unwrap();
-    let transcript: PersistedSessionTranscript =
-        serde_json::from_str(&transcript_text).unwrap();
+    let transcript_text = std::fs::read_to_string(&plan.paths.transcript_path).unwrap();
+    let transcript: PersistedSessionTranscript = serde_json::from_str(&transcript_text).unwrap();
 
     assert_eq!(transcript.turns.len(), 2);
     assert_eq!(transcript.turns[0].content, "first");
@@ -286,7 +258,7 @@ fn persist_capture_appends_only_new_turns_from_later_capture() {
 }
 
 #[test]
-fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
+pub(super) fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
     let tempdir = TempDir::new().unwrap();
     let store_path = tempdir.path().join("store");
     let config = SessionStoreConfig::new(&store_path);
@@ -367,10 +339,7 @@ fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
     );
 
     config
-        .persist_capture(request_with_provisioning(
-            "session-none-then-user",
-            None,
-        ))
+        .persist_capture(request_with_provisioning("session-none-then-user", None))
         .unwrap();
     config
         .persist_capture(request_with_provisioning(
@@ -389,10 +358,9 @@ fn persist_capture_retains_user_prompt_submit_provisioning_diagnostic() {
 }
 
 #[test]
-fn read_session_reconstructs_persisted_record() {
+pub(super) fn read_session_reconstructs_persisted_record() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     config
         .persist_capture(sample_request(
@@ -422,10 +390,9 @@ fn read_session_reconstructs_persisted_record() {
 }
 
 #[test]
-fn capture_copilot_hook_persists_payload() {
+pub(super) fn capture_copilot_hook_persists_payload() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     let plan = config
         .capture_copilot_hook(sample_payload(

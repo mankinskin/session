@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 // T-KINDS regression coverage: behavioral `Spec` node gating is symmetric to
 // `Ticket`, the open descriptive `category` field never affects gating, and
 // legacy cosmetic kinds deserialize as `Task` for back-compat.
@@ -5,23 +8,17 @@
 /// A resolver returning a caller-controlled live spec state for a specific URN.
 /// Ticket resolution is intentionally unsupported so the tests exercise the
 /// spec resolution path exclusively.
-struct FixedSpecStateResolver {
-    urn: String,
-    state: Option<String>,
+pub(super) struct FixedSpecStateResolver {
+    pub(super) urn: String,
+    pub(super) state: Option<String>,
 }
 
 impl SessionTicketStateResolver for FixedSpecStateResolver {
-    fn resolve_ticket_state(
-        &self,
-        ticket_urn: &str,
-    ) -> Result<Option<String>, String> {
+    fn resolve_ticket_state(&self, ticket_urn: &str) -> Result<Option<String>, String> {
         Err(format!("unexpected ticket urn: {ticket_urn}"))
     }
 
-    fn resolve_spec_state(
-        &self,
-        spec_urn: &str,
-    ) -> Result<Option<String>, String> {
+    fn resolve_spec_state(&self, spec_urn: &str) -> Result<Option<String>, String> {
         if spec_urn == self.urn {
             Ok(self.state.clone())
         } else {
@@ -30,12 +27,14 @@ impl SessionTicketStateResolver for FixedSpecStateResolver {
     }
 }
 
-fn spec_workspace() -> (SessionStoreConfig, String, TempDir) {
+pub(super) fn spec_workspace() -> (SessionStoreConfig, String, TempDir) {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
     (config, workspace_id, tempdir)
@@ -45,10 +44,9 @@ fn spec_workspace() -> (SessionStoreConfig, String, TempDir) {
 /// closed with an explicit unavailable reason (fail closed), symmetric to the
 /// `Ticket` availability gate.
 #[test]
-fn workflow_finish_blocks_spec_node_with_unavailable_state() {
+pub(super) fn workflow_finish_blocks_spec_node_with_unavailable_state() {
     let (config, workspace_id, _tempdir) = spec_workspace();
-    let spec_urn =
-        "ce://context-engine/specs/11111111-1111-4111-8111-111111111111";
+    let spec_urn = "ce://context-engine/specs/11111111-1111-4111-8111-111111111111";
     config
         .workflow_add_node(
             &workspace_id,
@@ -84,10 +82,9 @@ fn workflow_finish_blocks_spec_node_with_unavailable_state() {
 /// A required `Spec` node whose live state is a non-terminal spec state blocks
 /// finish; a terminal spec state (`verified`) permits finish.
 #[test]
-fn workflow_finish_gates_spec_node_on_terminal_state() {
+pub(super) fn workflow_finish_gates_spec_node_on_terminal_state() {
     let (config, workspace_id, _tempdir) = spec_workspace();
-    let spec_urn =
-        "ce://context-engine/specs/22222222-2222-4222-8222-222222222222";
+    let spec_urn = "ce://context-engine/specs/22222222-2222-4222-8222-222222222222";
     config
         .workflow_add_node(
             &workspace_id,
@@ -130,7 +127,7 @@ fn workflow_finish_gates_spec_node_on_terminal_state() {
 /// The open descriptive `category` field never affects finish gating: a
 /// required `Task` node carrying a category still finishes on local `Done`.
 #[test]
-fn workflow_finish_ignores_descriptive_category() {
+pub(super) fn workflow_finish_ignores_descriptive_category() {
     let (config, workspace_id, _tempdir) = spec_workspace();
     config
         .workflow_add_node(
@@ -178,10 +175,9 @@ fn workflow_finish_ignores_descriptive_category() {
 /// as the generic `Task` bucket and re-serialize as `task`, so existing
 /// persisted runtime contexts keep loading.
 #[test]
-fn legacy_node_kinds_deserialize_as_task() {
+pub(super) fn legacy_node_kinds_deserialize_as_task() {
     for legacy in ["action", "decision", "checkpoint"] {
-        let kind: SessionWorkflowNodeKind =
-            serde_json::from_str(&format!("\"{legacy}\"")).unwrap();
+        let kind: SessionWorkflowNodeKind = serde_json::from_str(&format!("\"{legacy}\"")).unwrap();
         assert_eq!(kind, SessionWorkflowNodeKind::Task);
     }
     assert_eq!(
@@ -199,8 +195,7 @@ fn legacy_node_kinds_deserialize_as_task() {
         "created_at": "2026-06-02T13:00:00Z",
         "updated_at": "2026-06-02T13:00:00Z"
     }"#;
-    let node: crate::SessionWorkflowNode =
-        serde_json::from_str(node_json).unwrap();
+    let node: crate::SessionWorkflowNode = serde_json::from_str(node_json).unwrap();
     assert_eq!(node.kind, SessionWorkflowNodeKind::Task);
     assert!(node.spec_urn.is_none());
     assert!(node.category.is_none());

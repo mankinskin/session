@@ -1,9 +1,10 @@
-fn federated_fixture(
-    tempdir: &TempDir
+#[allow(unused_imports)]
+use super::*;
+
+pub(super) fn federated_fixture(
+    tempdir: &TempDir,
 ) -> (SessionStoreConfig, SessionStoreConfig, SessionStoreConfig) {
-    let main = SessionStoreConfig::new(
-        tempdir.path().join(".session"),
-    );
+    let main = SessionStoreConfig::new(tempdir.path().join(".session"));
     let nested = SessionStoreConfig::new(
         tempdir
             .path()
@@ -23,8 +24,7 @@ fn federated_fixture(
 }
 
 #[test]
-fn federated_query_unions_main_nested_and_legacy_with_worktree_duplicate_winner(
-) {
+pub(super) fn federated_query_unions_main_nested_and_legacy_with_worktree_duplicate_winner() {
     let tempdir = TempDir::new().unwrap();
     let (main, nested, legacy) = federated_fixture(&tempdir);
     main.capture_copilot_hook(sample_payload(
@@ -85,7 +85,7 @@ fn federated_query_unions_main_nested_and_legacy_with_worktree_duplicate_winner(
 }
 
 #[test]
-fn federated_tool_metrics_and_backfill_scan_main_nested_and_legacy_sessions() {
+pub(super) fn federated_tool_metrics_and_backfill_scan_main_nested_and_legacy_sessions() {
     let tempdir = TempDir::new().unwrap();
     let (main, nested, legacy) = federated_fixture(&tempdir);
     for (store, session_id) in [
@@ -114,8 +114,7 @@ fn federated_tool_metrics_and_backfill_scan_main_nested_and_legacy_sessions() {
 }
 
 #[test]
-fn federated_handoff_pickup_and_backlog_find_worktree_only_nested_and_legacy_handoffs(
-) {
+pub(super) fn federated_handoff_pickup_and_backlog_find_worktree_only_nested_and_legacy_handoffs() {
     let tempdir = TempDir::new().unwrap();
     let (main, nested, legacy) = federated_fixture(&tempdir);
     let nested_session = nested
@@ -172,10 +171,16 @@ fn federated_handoff_pickup_and_backlog_find_worktree_only_nested_and_legacy_han
     assert!(backlog_ids.contains(&legacy_handoff.handoff_id.as_str()));
 
     let picked_nested = main
-        .pickup_handoff(&nested_handoff.handoff_id, "88888888-8888-4888-8888-888888888888")
+        .pickup_handoff(
+            &nested_handoff.handoff_id,
+            "88888888-8888-4888-8888-888888888888",
+        )
         .unwrap();
     let picked_legacy = main
-        .pickup_handoff(&legacy_handoff.handoff_id, "99999999-9999-4999-8999-999999999999")
+        .pickup_handoff(
+            &legacy_handoff.handoff_id,
+            "99999999-9999-4999-8999-999999999999",
+        )
         .unwrap();
     assert_eq!(
         picked_nested.target_session_id.as_deref(),
@@ -188,8 +193,7 @@ fn federated_handoff_pickup_and_backlog_find_worktree_only_nested_and_legacy_han
 }
 
 #[test]
-fn federated_ticket_relation_finds_worktree_only_session_and_skips_malformed_source(
-) {
+pub(super) fn federated_ticket_relation_finds_worktree_only_session_and_skips_malformed_source() {
     let tempdir = TempDir::new().unwrap();
     let (main, nested, _) = federated_fixture(&tempdir);
     nested
@@ -219,5 +223,8 @@ fn federated_ticket_relation_finds_worktree_only_session_and_skips_malformed_sou
         .sessions_for_ticket("ticket-federated", RelationStrength::Strict)
         .unwrap();
     assert_eq!(matches.len(), 1);
-    assert_eq!(matches[0].session_id, "55555555-5555-4555-8555-555555555555");
+    assert_eq!(
+        matches[0].session_id,
+        "55555555-5555-4555-8555-555555555555"
+    );
 }

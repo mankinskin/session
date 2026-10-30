@@ -61,6 +61,24 @@ cargo build -p session --bin session --features cli
 See [crates/session-api](crates/session-api) for the underlying model and
 [crates/worktree-ctl](crates/worktree-ctl) for worktree lifecycle commands.
 
+## Source layout
+
+Source and test files stay within 500 lines and use responsibility-based Rust
+modules, rather than textual `include!` fragments:
+
+- `src/cli/` separates argument families, dispatch, workflow, governance,
+  handoff, moves, and parser tests.
+- `src/mcp/server/` separates input schemas and tool implementations by domain.
+  Each tool module generates a named rmcp router; the server composes those
+  routers without changing tool names or schemas. Router parity is tested.
+- `src/bin/session-capture-hook/` separates ingress, checkout routing,
+  tool-output inspection, and feedback processing.
+- `crates/session-api/src/store/` separates storage configuration, transactional
+  requester ingestion and receipts, intake filesystem checks, handoff rendering,
+  and assignment/runtime operations. `store_tests/` mirrors these behaviors.
+- Worktree provisioning, maintenance, supervisor recovery, and telemetry tests
+  live in their respective responsibility modules under `crates/`.
+
 ## Runtime pins and access errors
 
 Initialize runtime context with `session init --session-id <uuid> --workspace

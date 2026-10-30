@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 mod intake_contract {
     use super::*;
     use uuid::Uuid;

@@ -1,6 +1,9 @@
-use std::str::FromStr;
+#[allow(unused_imports)]
+use super::*;
 
-fn migrate_local_urn(
+pub(super) use std::str::FromStr;
+
+pub(super) fn migrate_local_urn(
     urn: &mut String,
     legacy_workspace: &str,
     workspace_path: &str,
@@ -13,11 +16,9 @@ fn migrate_local_urn(
     {
         return false;
     }
-    let Ok(rewritten) = feedback_api::EntityUrn::new(
-        workspace_path,
-        parsed.store(),
-        parsed.entity(),
-    ) else {
+    let Ok(rewritten) =
+        feedback_api::EntityUrn::new(workspace_path, parsed.store(), parsed.entity())
+    else {
         return false;
     };
     *urn = rewritten.as_str();
@@ -35,11 +36,9 @@ impl SessionStoreConfig {
     ) -> Result<(), SessionError> {
         let paths = self.paths_for_session_id(session_id)?;
         ensure_local_gitignore(&self.root)?;
-        fs::create_dir_all(&paths.session_dir).map_err(|source| {
-            SessionError::Io {
-                path: paths.session_dir.clone(),
-                source,
-            }
+        fs::create_dir_all(&paths.session_dir).map_err(|source| SessionError::Io {
+            path: paths.session_dir.clone(),
+            source,
         })?;
         let captured_at = chrono::Utc::now();
         let incoming = PersistedSessionEvents {
@@ -58,14 +57,11 @@ impl SessionStoreConfig {
         write_json(&paths.events_path, &events)
     }
 
-
-
     pub fn new(root: impl Into<PathBuf>) -> Self {
         let root = root.into();
         Self {
             workspace_path: memory_kernel::workspace::resolve_workspace_root_from_store_root(
-                &root,
-                ".session",
+                &root, ".session",
             )
             .to_string_lossy()
             .into_owned(),
@@ -73,10 +69,7 @@ impl SessionStoreConfig {
         }
     }
 
-    pub fn paths_for(
-        &self,
-        record: &SessionRecord,
-    ) -> Result<SessionStorePaths, SessionError> {
+    pub fn paths_for(&self, record: &SessionRecord) -> Result<SessionStorePaths, SessionError> {
         self.paths_for_session_id(&record.session_id)
     }
 
@@ -86,13 +79,13 @@ impl SessionStoreConfig {
     ) -> Result<SessionStorePlan, SessionError> {
         use memory_kernel::domain_store::CreateEntity;
 
-        match crate::SessionDomainStore::new(self.clone())
-            .create_entity(crate::SessionCreateInput::Capture(
-                SessionCaptureRequest::copilot(payload),
-            ))?
-        {
+        match crate::SessionDomainStore::new(self.clone()).create_entity(
+            crate::SessionCreateInput::Capture(SessionCaptureRequest::copilot(payload)),
+        )? {
             crate::SessionCreateResult::Capture(plan) => Ok(plan),
-            crate::SessionCreateResult::HookEvent => unreachable!("capture input returns a capture plan"),
+            crate::SessionCreateResult::HookEvent => {
+                unreachable!("capture input returns a capture plan")
+            }
         }
     }
 
@@ -140,33 +133,25 @@ impl SessionStoreConfig {
         let transcript_path = transcript_path.as_ref();
         let trigger = trigger.into();
 
-        let payload =
-            copilot_payload_from_transcript_path_with_tool_response_override(
-                transcript_path,
-                self.workspace_path.clone(),
-                Some(trigger.clone()),
-                tool_response_override.clone(),
-            )?;
+        let payload = copilot_payload_from_transcript_path_with_tool_response_override(
+            transcript_path,
+            self.workspace_path.clone(),
+            Some(trigger.clone()),
+            tool_response_override.clone(),
+        )?;
 
         self.capture_copilot_hook(payload)
     }
 
-    pub fn read_session(
-        &self,
-        session_id: &str,
-    ) -> Result<SessionRecord, SessionError> {
+    pub fn read_session(&self, session_id: &str) -> Result<SessionRecord, SessionError> {
         let paths = self.paths_for_session_id(session_id)?;
         let mut record = self.read_session_manifest(session_id)?;
         // A manifest can exist before its first transcript capture; treat the
         // absent transcript as zero turns rather than a missing session.
-        if let Some(transcript) = read_json_if_exists::<
-            PersistedSessionTranscript,
-        >(&paths.transcript_path)?
+        if let Some(transcript) =
+            read_json_if_exists::<PersistedSessionTranscript>(&paths.transcript_path)?
         {
-            ensure_supported_schema_version(
-                &paths.transcript_path,
-                transcript.schema_version,
-            )?;
+            ensure_supported_schema_version(&paths.transcript_path, transcript.schema_version)?;
             record.turns = transcript.turns;
         }
         Ok(record)
@@ -177,12 +162,8 @@ impl SessionStoreConfig {
         session_id: &str,
     ) -> Result<SessionRecord, SessionError> {
         let paths = self.paths_for_session_id(session_id)?;
-        let mut manifest: PersistedSessionManifest =
-            read_json(&paths.manifest_path)?;
-        ensure_supported_schema_version(
-            &paths.manifest_path,
-            manifest.schema_version,
-        )?;
+        let mut manifest: PersistedSessionManifest = read_json(&paths.manifest_path)?;
+        ensure_supported_schema_version(&paths.manifest_path, manifest.schema_version)?;
 
         // Schema v1 stored a workspace slug in metadata. A session store has
         // one unambiguous owning workspace, so rewrite that legacy selector
@@ -195,11 +176,7 @@ impl SessionStoreConfig {
             migrated = true;
         }
         for pin in &mut manifest.pinned_entities {
-            migrated |= migrate_local_urn(
-                &mut pin.urn,
-                &legacy_workspace,
-                &self.workspace_path,
-            );
+            migrated |= migrate_local_urn(&mut pin.urn, &legacy_workspace, &self.workspace_path);
         }
         for node in &mut manifest.workflow.nodes {
             for urn in [
@@ -210,11 +187,7 @@ impl SessionStoreConfig {
             .into_iter()
             .flatten()
             {
-                migrated |= migrate_local_urn(
-                    urn,
-                    &legacy_workspace,
-                    &self.workspace_path,
-                );
+                migrated |= migrate_local_urn(urn, &legacy_workspace, &self.workspace_path);
             }
         }
         if migrated {
@@ -287,21 +260,18 @@ impl SessionStoreConfig {
         }
 
         let mut newest: Option<SessionRecord> = None;
-        for entry in
-            fs::read_dir(&sessions_root).map_err(|source| SessionError::Io {
-                path: sessions_root.clone(),
-                source,
-            })?
-        {
+        for entry in fs::read_dir(&sessions_root).map_err(|source| SessionError::Io {
+            path: sessions_root.clone(),
+            source,
+        })? {
             let entry = entry.map_err(|source| SessionError::Io {
                 path: sessions_root.clone(),
                 source,
             })?;
-            let file_type =
-                entry.file_type().map_err(|source| SessionError::Io {
-                    path: entry.path(),
-                    source,
-                })?;
+            let file_type = entry.file_type().map_err(|source| SessionError::Io {
+                path: entry.path(),
+                source,
+            })?;
             if !file_type.is_dir() {
                 continue;
             }
@@ -316,10 +286,11 @@ impl SessionStoreConfig {
 
             let replace = match newest.as_ref() {
                 None => true,
-                Some(current) =>
+                Some(current) => {
                     record.captured_at > current.captured_at
                         || (record.captured_at == current.captured_at
-                            && record.session_id < current.session_id),
+                            && record.session_id < current.session_id)
+                }
             };
             if replace {
                 newest = Some(record);
@@ -335,22 +306,19 @@ impl SessionStoreConfig {
     ) -> Result<SessionAuditReport, SessionError> {
         let session_id = match selector {
             SessionAuditSelector::SessionId(session_id) => session_id,
-            SessionAuditSelector::Latest => self.latest_session_id()?.ok_or(
-                SessionError::NoSessionsFound {
-                    root: self.sessions_root()?,
-                },
-            )?,
+            SessionAuditSelector::Latest => {
+                self.latest_session_id()?
+                    .ok_or(SessionError::NoSessionsFound {
+                        root: self.sessions_root()?,
+                    })?
+            }
         };
 
         let record = self.read_session(&session_id)?;
         let paths = self.paths_for_session_id(&session_id)?;
-        let events: Option<PersistedSessionEvents> =
-            read_json_if_exists(&paths.events_path)?;
+        let events: Option<PersistedSessionEvents> = read_json_if_exists(&paths.events_path)?;
         if let Some(events) = &events {
-            ensure_supported_schema_version(
-                &paths.events_path,
-                events.schema_version,
-            )?;
+            ensure_supported_schema_version(&paths.events_path, events.schema_version)?;
         }
 
         Ok(build_session_audit_report(&record, events.as_ref()))
@@ -368,15 +336,17 @@ impl SessionStoreConfig {
     ) -> Result<crate::DelegationCostReport, SessionError> {
         let session_id = match selector {
             SessionAuditSelector::SessionId(session_id) => session_id,
-            SessionAuditSelector::Latest => self.latest_session_id()?.ok_or(
-                SessionError::NoSessionsFound {
-                    root: self.sessions_root()?,
-                },
-            )?,
+            SessionAuditSelector::Latest => {
+                self.latest_session_id()?
+                    .ok_or(SessionError::NoSessionsFound {
+                        root: self.sessions_root()?,
+                    })?
+            }
         };
 
         let record = self.read_session(&session_id)?;
-        Ok(crate::delegation_cost::compute_delegation_cost_report(&record))
+        Ok(crate::delegation_cost::compute_delegation_cost_report(
+            &record,
+        ))
     }
-
 }

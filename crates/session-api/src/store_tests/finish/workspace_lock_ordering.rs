@@ -1,6 +1,8 @@
+#[allow(unused_imports)]
+use super::*;
 
 #[test]
-fn finished_workspace_plain_init_is_read_only_and_byte_stable() {
+pub(super) fn finished_workspace_plain_init_is_read_only_and_byte_stable() {
     let (config, workspace_id, _tempdir) = finished_workspace();
     let manifest_path = config
         .paths_for_session_id(&workspace_id)
@@ -27,7 +29,7 @@ fn finished_workspace_plain_init_is_read_only_and_byte_stable() {
 /// lock conflict (lock acquired first) rather than the finished error — proving
 /// the ordering that closes the finish-versus-mutation race.
 #[test]
-fn finished_check_runs_under_mutation_lock() {
+pub(super) fn finished_check_runs_under_mutation_lock() {
     let (config, workspace_id, _tempdir) = finished_workspace();
 
     let _lock = config.acquire_runtime_lock(&workspace_id).unwrap();

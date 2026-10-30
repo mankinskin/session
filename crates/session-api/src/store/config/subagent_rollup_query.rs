@@ -1,9 +1,10 @@
-use std::collections::HashMap;
+#[allow(unused_imports)]
+use super::*;
 
-use crate::{
-    PersistedSessionEvents,
-    SubAgentRollup,
-    compute_subagent_rollups_with_events,
+pub(super) use std::collections::HashMap;
+
+pub(super) use crate::{
+    PersistedSessionEvents, SubAgentRollup, compute_subagent_rollups_with_events,
 };
 
 impl SessionStoreConfig {
@@ -23,15 +24,11 @@ impl SessionStoreConfig {
             Err(err) => return Err(err),
         };
         let paths = self.paths_for_session_id(session_id)?;
-        let events: Option<PersistedSessionEvents> =
-            read_json_if_exists(&paths.events_path)?;
+        let events: Option<PersistedSessionEvents> = read_json_if_exists(&paths.events_path)?;
 
         // Compute rollups from transcript spans and captured lifecycle hooks.
-        let rollups = compute_subagent_rollups_with_events(
-            &record,
-            context.as_ref(),
-            events.as_ref(),
-        );
+        let rollups =
+            compute_subagent_rollups_with_events(&record, context.as_ref(), events.as_ref());
 
         Ok(rollups)
     }

@@ -1,13 +1,18 @@
+#[allow(unused_imports)]
+use super::*;
 
 /// High: finished workspaces are immutable — every workflow/pin mutation is
 /// rejected after finish.
 #[test]
-fn finished_workspace_rejects_all_mutations() {
+pub(super) fn finished_workspace_rejects_all_mutations() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root);
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
 
@@ -89,20 +94,22 @@ fn finished_workspace_rejects_all_mutations() {
 /// former 30-second stale threshold, and releasing it preserves the stable lock
 /// file used by successor owners.
 #[test]
-fn aged_live_lock_blocks_second_owner_and_releases_safely() {
+pub(super) fn aged_live_lock_blocks_second_owner_and_releases_safely() {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root);
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
 
     let paths = config.runtime_paths_for_workspace(&workspace_id).unwrap();
     let lock_path = paths.workspace_dir.join(".context.lock");
 
-    let formerly_stale =
-        (chrono::Utc::now() - chrono::Duration::seconds(31)).to_rfc3339();
+    let formerly_stale = (chrono::Utc::now() - chrono::Duration::seconds(31)).to_rfc3339();
     std::fs::write(&lock_path, formerly_stale).unwrap();
     let first_owner = config.acquire_runtime_lock(&workspace_id).unwrap();
 
@@ -127,12 +134,12 @@ fn aged_live_lock_blocks_second_owner_and_releases_safely() {
 
 #[cfg(windows)]
 #[test]
-fn failed_windows_replacement_preserves_previous_bytes() {
+pub(super) fn failed_windows_replacement_preserves_previous_bytes() {
     use std::os::windows::fs::OpenOptionsExt;
 
     let tempdir = TempDir::new().unwrap();
     let path = tempdir.path().join("durable.json");
-    super::write_json(&path, &serde_json::json!({ "version": "old" })).unwrap();
+    super::super::write_json(&path, &serde_json::json!({ "version": "old" })).unwrap();
     let previous = std::fs::read(&path).unwrap();
 
     let destination = std::fs::OpenOptions::new()
@@ -142,28 +149,26 @@ fn failed_windows_replacement_preserves_previous_bytes() {
         .open(&path)
         .unwrap();
 
-    let error = super::write_json(
-        &path,
-        &serde_json::json!({ "version": "replacement" }),
-    )
-    .unwrap_err();
+    let error = super::super::write_json(&path, &serde_json::json!({ "version": "replacement" }))
+        .unwrap_err();
     assert!(matches!(error, SessionError::Io { .. }));
     assert_eq!(std::fs::read(&path).unwrap(), previous);
     drop(destination);
 }
 
 #[test]
-fn finish_excludes_mutation_init_and_resume_until_terminal_commit() {
+pub(super) fn finish_excludes_mutation_init_and_resume_until_terminal_commit() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
     let predecessor_run_id = init.run.run_id;
-    let ticket_urn =
-        "ce://context-engine/tickets/66666666-6666-4666-8666-666666666666";
+    let ticket_urn = "ce://context-engine/tickets/66666666-6666-4666-8666-666666666666";
 
     config
         .workflow_add_node(
@@ -193,12 +198,7 @@ fn finish_excludes_mutation_init_and_resume_until_terminal_commit() {
             entered: entered_tx,
             release: std::sync::Mutex::new(release_rx),
         };
-        finish_config.finish_workflow(
-            &finish_workspace_id,
-            vec![],
-            vec![],
-            Some(&resolver),
-        )
+        finish_config.finish_workflow(&finish_workspace_id, vec![], vec![], Some(&resolver))
     });
 
     entered_rx.recv().unwrap();
@@ -262,12 +262,15 @@ fn finish_excludes_mutation_init_and_resume_until_terminal_commit() {
 
 /// Helper: create a workspace with one required Task node marked done and
 /// then finish it, returning the config and workspace id for immutability tests.
-fn finished_workspace() -> (SessionStoreConfig, String, TempDir) {
+pub(super) fn finished_workspace() -> (SessionStoreConfig, String, TempDir) {
     let tempdir = TempDir::new().unwrap();
     let store_root = tempdir.path().join("store");
     let config = SessionStoreConfig::new(store_root);
     let init = config
-        .init_runtime_context(SessionRuntimeInitRequest { session_id: Some(uuid::Uuid::new_v4().to_string()), ..Default::default() })
+        .init_runtime_context(SessionRuntimeInitRequest {
+            session_id: Some(uuid::Uuid::new_v4().to_string()),
+            ..Default::default()
+        })
         .unwrap();
     let workspace_id = init.context.session_id;
 
@@ -307,7 +310,7 @@ fn finished_workspace() -> (SessionStoreConfig, String, TempDir) {
 /// new run to a finished workspace must be rejected under the lock, not
 /// silently drift the run lineage of a terminal workspace.
 #[test]
-fn finished_workspace_rejects_resume_run_creation() {
+pub(super) fn finished_workspace_rejects_resume_run_creation() {
     let (config, workspace_id, _tempdir) = finished_workspace();
 
     let resume_err = config

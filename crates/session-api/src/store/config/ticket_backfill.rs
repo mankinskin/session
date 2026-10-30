@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     /// Backfill ticket linkage for historical sessions using ONLY
     /// structured signals: `branch` shape, `worktree_path` shape, and
@@ -14,14 +17,12 @@ impl SessionStoreConfig {
 
         let ticket_store_root = self.ticket_store_root();
         let ticket_store = if ticket_store_root.exists() {
-            Some(
-                TicketStore::open(&ticket_store_root).map_err(|error| {
-                    SessionError::InvalidHookInput(format!(
-                        "ticket store unavailable at {}: {error}",
-                        ticket_store_root.display()
-                    ))
-                })?,
-            )
+            Some(TicketStore::open(&ticket_store_root).map_err(|error| {
+                SessionError::InvalidHookInput(format!(
+                    "ticket store unavailable at {}: {error}",
+                    ticket_store_root.display()
+                ))
+            })?)
         } else {
             None
         };
@@ -58,7 +59,7 @@ impl SessionStoreConfig {
                 Err(_) => {
                     report.skipped_corrupt += 1;
                     continue;
-                },
+                }
             };
 
             let mut changed = false;
@@ -74,15 +75,10 @@ impl SessionStoreConfig {
                 let short_id = parse_agent_branch_short_id(&worktree.branch)
                     .or_else(|| parse_worktree_path_short_id(&worktree.path));
                 if let Some(short_id) = short_id {
-                    match resolve_ticket_prefix(
-                        ticket_store.as_ref(),
-                        &short_id,
-                    ) {
+                    match resolve_ticket_prefix(ticket_store.as_ref(), &short_id) {
                         Some(full_id) => {
-                            let via_branch = parse_agent_branch_short_id(
-                                &worktree.branch,
-                            )
-                            .is_some();
+                            let via_branch =
+                                parse_agent_branch_short_id(&worktree.branch).is_some();
                             record.metadata.ticket_id = Some(full_id);
                             if via_branch {
                                 report.linked_via_branch += 1;
@@ -90,10 +86,10 @@ impl SessionStoreConfig {
                                 report.linked_via_worktree_path += 1;
                             }
                             changed = true;
-                        },
+                        }
                         None => {
                             report.skipped_unresolvable_shortid += 1;
-                        },
+                        }
                     }
                 }
             }
@@ -110,10 +106,7 @@ impl SessionStoreConfig {
                                 .contains(&ticket_id)
                                 .then(|| ticket_id.to_string())
                         } else if known_ticket_prefixes.contains(&ticket_id) {
-                            resolve_ticket_prefix(
-                                ticket_store.as_ref(),
-                                &ticket_id,
-                            )
+                            resolve_ticket_prefix(ticket_store.as_ref(), &ticket_id)
                         } else {
                             None
                         }
@@ -125,15 +118,16 @@ impl SessionStoreConfig {
                             record.links.ticket_ids.push(full_id);
                             changed = true;
                         }
-                    },
+                    }
                     None => {
                         report.skipped_unresolvable_shortid += 1;
-                    },
+                    }
                 }
             }
 
-            let handoff_targets =
-                entry.store.session_handoff_target_tickets(&entry.session_dir)?;
+            let handoff_targets = entry
+                .store
+                .session_handoff_target_tickets(&entry.session_dir)?;
             if !handoff_targets.is_empty() {
                 report.handoff_already_at_mentioned = true;
             }
@@ -149,10 +143,10 @@ impl SessionStoreConfig {
                             report.linked_via_handoff += 1;
                             changed = true;
                         }
-                    },
+                    }
                     None => {
                         report.skipped_unresolvable_shortid += 1;
-                    },
+                    }
                 }
             }
 
@@ -174,7 +168,7 @@ impl SessionStoreConfig {
     /// `handoffs/*/handoff.json` on disk for one session. Structured-data
     /// read only, same source `sessions_for_ticket`'s mentioned tier already
     /// scans; never touches `transcript.json`.
-    fn session_handoff_target_tickets(
+    pub(super) fn session_handoff_target_tickets(
         &self,
         session_dir: &Path,
     ) -> Result<BTreeSet<String>, SessionError> {
@@ -184,20 +178,16 @@ impl SessionStoreConfig {
             return Ok(targets);
         }
 
-        for entry in
-            fs::read_dir(&handoffs_dir).map_err(|source| SessionError::Io {
-                path: handoffs_dir.clone(),
-                source,
-            })?
-        {
+        for entry in fs::read_dir(&handoffs_dir).map_err(|source| SessionError::Io {
+            path: handoffs_dir.clone(),
+            source,
+        })? {
             let entry = entry.map_err(|source| SessionError::Io {
                 path: handoffs_dir.clone(),
                 source,
             })?;
             let handoff_json_path = entry.path().join("handoff.json");
-            if let Some(record) = read_json_if_exists::<SessionHandoffRecord>(
-                &handoff_json_path,
-            )? {
+            if let Some(record) = read_json_if_exists::<SessionHandoffRecord>(&handoff_json_path)? {
                 targets.extend(record.target_tickets.into_iter().map(|ticket| ticket.id));
             }
         }
@@ -208,7 +198,7 @@ impl SessionStoreConfig {
 
 /// Parses the 8-hex-char short id out of an `agent/<short-id>-<slug>`
 /// branch name. Returns `None` for any other shape.
-fn parse_agent_branch_short_id(branch: &str) -> Option<String> {
+pub(super) fn parse_agent_branch_short_id(branch: &str) -> Option<String> {
     let rest = branch.strip_prefix("agent/")?;
     short_id_prefix(rest)
 }
@@ -216,7 +206,7 @@ fn parse_agent_branch_short_id(branch: &str) -> Option<String> {
 /// Parses the 8-hex-char short id out of a `.worktrees/<short-id>-<slug>`
 /// path component. Returns `None` when no `.worktrees` component is present
 /// or the following component does not match the shape.
-fn parse_worktree_path_short_id(path: &Path) -> Option<String> {
+pub(super) fn parse_worktree_path_short_id(path: &Path) -> Option<String> {
     let mut components = path.components();
     while let Some(component) = components.next() {
         if component.as_os_str() == ".worktrees" {
@@ -230,7 +220,7 @@ fn parse_worktree_path_short_id(path: &Path) -> Option<String> {
 
 /// Shared `<8-hex-chars>-<rest>` shape check used by both the branch and
 /// worktree-path parsers.
-fn short_id_prefix(candidate: &str) -> Option<String> {
+pub(super) fn short_id_prefix(candidate: &str) -> Option<String> {
     let bytes = candidate.as_bytes();
     if bytes.len() < 9 || bytes[8] != b'-' {
         return None;
@@ -246,10 +236,7 @@ fn short_id_prefix(candidate: &str) -> Option<String> {
 /// Resolves and verifies `prefix` (short id or full ticket id) against the
 /// real ticket store. Returns `None` (never writes a guess) when the store
 /// is unavailable, the prefix does not resolve, or it is ambiguous.
-fn resolve_ticket_prefix(
-    store: Option<&TicketStore>,
-    prefix: &str,
-) -> Option<String> {
+pub(super) fn resolve_ticket_prefix(store: Option<&TicketStore>, prefix: &str) -> Option<String> {
     let store = store?;
     if let Ok(ticket_id) = uuid::Uuid::parse_str(prefix) {
         return store
@@ -264,7 +251,7 @@ fn resolve_ticket_prefix(
         .map(|ticket_id| ticket_id.to_string())
 }
 
-fn extract_transcript_ticket_ids(turns: &[SessionTurn]) -> BTreeSet<String> {
+pub(super) fn extract_transcript_ticket_ids(turns: &[SessionTurn]) -> BTreeSet<String> {
     let mut ticket_ids = BTreeSet::new();
     for turn in turns {
         let Some(event_meta) = turn.event_meta.as_ref() else {
@@ -291,7 +278,7 @@ fn extract_transcript_ticket_ids(turns: &[SessionTurn]) -> BTreeSet<String> {
     ticket_ids
 }
 
-fn collect_ticket_id_candidates(
+pub(super) fn collect_ticket_id_candidates(
     value: &serde_json::Value,
     ticket_ids: &mut BTreeSet<String>,
 ) {
@@ -300,12 +287,12 @@ fn collect_ticket_id_candidates(
             for value in values {
                 collect_ticket_id_candidates(value, ticket_ids);
             }
-        },
+        }
         serde_json::Value::Object(object) => {
             for value in object.values() {
                 collect_ticket_id_candidates(value, ticket_ids);
             }
-        },
+        }
         serde_json::Value::String(value) => {
             if uuid::Uuid::parse_str(value).is_ok() {
                 ticket_ids.insert(value.to_ascii_lowercase());
@@ -317,16 +304,18 @@ fn collect_ticket_id_candidates(
             {
                 collect_ticket_id_candidates(&parsed, ticket_ids);
             }
-        },
-        _ => {},
+        }
+        _ => {}
     }
 }
 
-fn collect_short_id_candidates(value: &str, ticket_ids: &mut BTreeSet<String>) {
+pub(super) fn collect_short_id_candidates(value: &str, ticket_ids: &mut BTreeSet<String>) {
     let bytes = value.as_bytes();
     for start in 0..bytes.len().saturating_sub(7) {
         let end = start + 8;
-        if bytes[start..end].iter().all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+        if bytes[start..end]
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
             && is_non_word_byte(bytes.get(start.wrapping_sub(1)))
             && is_non_word_byte(bytes.get(end))
         {
@@ -335,7 +324,6 @@ fn collect_short_id_candidates(value: &str, ticket_ids: &mut BTreeSet<String>) {
     }
 }
 
-fn is_non_word_byte(byte: Option<&u8>) -> bool {
+pub(super) fn is_non_word_byte(byte: Option<&u8>) -> bool {
     byte.is_none_or(|byte| !byte.is_ascii_alphanumeric() && *byte != b'_')
 }
-

@@ -1,13 +1,13 @@
+#[allow(unused_imports)]
 use super::*;
-use events::{
-    canonicalize_captured_events,
-    captured_event_key,
-};
-use links::extend_unique;
+
+pub(super) use super::super::*;
+pub(super) use events::{canonicalize_captured_events, captured_event_key};
+pub(super) use links::extend_unique;
 
 /// Normalize a path to forward-slash form so persisted handoff paths are
 /// portable across platforms (AC1: repo-root-relative, forward-slash).
-pub(super) fn normalize_repo_relative_path(path: &str) -> String {
+pub(in super::super) fn normalize_repo_relative_path(path: &str) -> String {
     path.replace('\\', "/")
 }
 
@@ -15,7 +15,7 @@ pub(super) fn normalize_repo_relative_path(path: &str) -> String {
 /// (rather than a free-form identifier like `spec:5e52039d` or a URN like
 /// `ce://default/ticket/<id>`)? Only path-shaped anchors are subject to
 /// existence verification; the field also carries non-path context notes.
-pub(super) fn looks_like_path(anchor: &str) -> bool {
+pub(in super::super) fn looks_like_path(anchor: &str) -> bool {
     if anchor.contains("://") {
         return false;
     }
@@ -29,10 +29,7 @@ pub(super) fn looks_like_path(anchor: &str) -> bool {
 
 /// Verify a repo-root-relative path exists on disk under `root`, rejecting
 /// absolute paths and parent-directory escapes (AC2: fail at creation time).
-pub(super) fn verify_repo_relative_path_exists(
-    root: &Path,
-    normalized: &str,
-) -> bool {
+pub(in super::super) fn verify_repo_relative_path_exists(root: &Path, normalized: &str) -> bool {
     if normalized.starts_with('/') || normalized.contains("..") {
         return false;
     }
@@ -41,7 +38,7 @@ pub(super) fn verify_repo_relative_path_exists(
 
 /// Remove `path` if it exists. Used to keep optional sidecar files (such as
 /// `tool-metrics.json`) from lingering once they would only hold empty data.
-pub(super) fn remove_file_if_exists(path: &Path) -> Result<(), SessionError> {
+pub(in super::super) fn remove_file_if_exists(path: &Path) -> Result<(), SessionError> {
     match fs::remove_file(path) {
         Ok(()) => Ok(()),
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -52,9 +49,7 @@ pub(super) fn remove_file_if_exists(path: &Path) -> Result<(), SessionError> {
     }
 }
 
-pub(super) fn ensure_local_gitignore(
-    store_root: &Path,
-) -> Result<(), SessionError> {
+pub(in super::super) fn ensure_local_gitignore(store_root: &Path) -> Result<(), SessionError> {
     fs::create_dir_all(store_root).map_err(|source| SessionError::Io {
         path: store_root.to_path_buf(),
         source,
@@ -63,9 +58,7 @@ pub(super) fn ensure_local_gitignore(
     let ignore_path = store_root.join(".gitignore");
     let contents = match fs::read_to_string(&ignore_path) {
         Ok(contents) => contents,
-        Err(source) if source.kind() == std::io::ErrorKind::NotFound => {
-            String::new()
-        }
+        Err(source) if source.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(source) => {
             return Err(SessionError::Io {
                 path: ignore_path,
@@ -82,15 +75,15 @@ pub(super) fn ensure_local_gitignore(
     } else {
         "\n"
     };
-    fs::write(&ignore_path, format!("{contents}{separator}local/\n")).map_err(
-        |source| SessionError::Io {
+    fs::write(&ignore_path, format!("{contents}{separator}local/\n")).map_err(|source| {
+        SessionError::Io {
             path: ignore_path,
             source,
-        },
-    )
+        }
+    })
 }
 
-pub(super) fn write_json<T: Serialize>(
+pub(in super::super) fn write_json<T: Serialize>(
     path: &Path,
     value: &T,
 ) -> Result<(), SessionError> {
@@ -102,11 +95,9 @@ pub(super) fn write_json<T: Serialize>(
         source,
     })?;
 
-    let encoded = serde_json::to_vec_pretty(value).map_err(|source| {
-        SessionError::Serialize {
-            path: path.to_path_buf(),
-            source,
-        }
+    let encoded = serde_json::to_vec_pretty(value).map_err(|source| SessionError::Serialize {
+        path: path.to_path_buf(),
+        source,
     })?;
 
     let tmp_path = parent.join(format!(
@@ -118,11 +109,10 @@ pub(super) fn write_json<T: Serialize>(
     ));
 
     {
-        let mut file =
-            fs::File::create(&tmp_path).map_err(|source| SessionError::Io {
-                path: tmp_path.clone(),
-                source,
-            })?;
+        let mut file = fs::File::create(&tmp_path).map_err(|source| SessionError::Io {
+            path: tmp_path.clone(),
+            source,
+        })?;
         use std::io::Write;
         file.write_all(&encoded)
             .map_err(|source| SessionError::Io {
@@ -146,11 +136,10 @@ pub(super) fn write_json<T: Serialize>(
 
     #[cfg(unix)]
     {
-        let parent_dir =
-            fs::File::open(parent).map_err(|source| SessionError::Io {
-                path: parent.to_path_buf(),
-                source,
-            })?;
+        let parent_dir = fs::File::open(parent).map_err(|source| SessionError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
         parent_dir.sync_all().map_err(|source| SessionError::Io {
             path: parent.to_path_buf(),
             source,
@@ -160,9 +149,7 @@ pub(super) fn write_json<T: Serialize>(
     Ok(())
 }
 
-pub(super) fn read_json<T: DeserializeOwned>(
-    path: &Path
-) -> Result<T, SessionError> {
+pub(in super::super) fn read_json<T: DeserializeOwned>(path: &Path) -> Result<T, SessionError> {
     let encoded = fs::read(path).map_err(|source| match source.kind() {
         ErrorKind::NotFound => SessionError::NotFound {
             path: path.to_path_buf(),
@@ -172,25 +159,22 @@ pub(super) fn read_json<T: DeserializeOwned>(
             source,
         },
     })?;
-    serde_json::from_slice(&encoded).map_err(|source| {
-        SessionError::Deserialize {
-            path: path.to_path_buf(),
-            source,
-        }
+    serde_json::from_slice(&encoded).map_err(|source| SessionError::Deserialize {
+        path: path.to_path_buf(),
+        source,
     })
 }
 
-pub(super) fn read_json_if_exists<T: DeserializeOwned>(
-    path: &Path
+pub(in super::super) fn read_json_if_exists<T: DeserializeOwned>(
+    path: &Path,
 ) -> Result<Option<T>, SessionError> {
     match fs::read(path) {
-        Ok(encoded) =>
-            serde_json::from_slice(&encoded)
-                .map(Some)
-                .map_err(|source| SessionError::Deserialize {
-                    path: path.to_path_buf(),
-                    source,
-                }),
+        Ok(encoded) => serde_json::from_slice(&encoded)
+            .map(Some)
+            .map_err(|source| SessionError::Deserialize {
+                path: path.to_path_buf(),
+                source,
+            }),
         Err(source) if source.kind() == ErrorKind::NotFound => Ok(None),
         Err(source) => Err(SessionError::Io {
             path: path.to_path_buf(),
@@ -199,7 +183,7 @@ pub(super) fn read_json_if_exists<T: DeserializeOwned>(
     }
 }
 
-pub(super) fn merge_manifest(
+pub(in super::super) fn merge_manifest(
     existing: Option<PersistedSessionManifest>,
     mut incoming: PersistedSessionManifest,
 ) -> PersistedSessionManifest {
@@ -210,18 +194,14 @@ pub(super) fn merge_manifest(
         if existing.captured_at > incoming.captured_at {
             incoming.captured_at = existing.captured_at;
         }
-        incoming.metadata =
-            merge_metadata(existing.metadata, incoming.metadata);
+        incoming.metadata = merge_metadata(existing.metadata, incoming.metadata);
         incoming.links = merge_links(existing.links, incoming.links);
 
         // Preserve track fields: prefer incoming non-None, else keep existing
         incoming.track_id = incoming.track_id.or(existing.track_id);
-        incoming.anchor_ticket_id =
-            incoming.anchor_ticket_id.or(existing.anchor_ticket_id);
-        incoming.parent_session_id =
-            incoming.parent_session_id.or(existing.parent_session_id);
-        incoming.spawned_session_id =
-            incoming.spawned_session_id.or(existing.spawned_session_id);
+        incoming.anchor_ticket_id = incoming.anchor_ticket_id.or(existing.anchor_ticket_id);
+        incoming.parent_session_id = incoming.parent_session_id.or(existing.parent_session_id);
+        incoming.spawned_session_id = incoming.spawned_session_id.or(existing.spawned_session_id);
         extend_unique(
             &mut incoming.emitted_handoff_ids,
             existing.emitted_handoff_ids,
@@ -247,7 +227,7 @@ pub(super) fn merge_manifest(
     incoming
 }
 
-pub(super) fn merge_metadata(
+pub(in super::super) fn merge_metadata(
     existing: SessionMetadata,
     incoming: SessionMetadata,
 ) -> SessionMetadata {
@@ -270,22 +250,22 @@ pub(super) fn merge_metadata(
                     && !existing
                         .hook_event_name
                         .eq_ignore_ascii_case("UserPromptSubmit") =>
-                Some(incoming),
+            {
+                Some(incoming)
+            }
             (Some(existing), _) => Some(existing),
             (None, incoming) => incoming,
         },
         producer: incoming.producer.or(existing.producer),
         copilot_version: incoming.copilot_version.or(existing.copilot_version),
         vscode_version: incoming.vscode_version.or(existing.vscode_version),
-        protocol_version: incoming
-            .protocol_version
-            .or(existing.protocol_version),
+        protocol_version: incoming.protocol_version.or(existing.protocol_version),
         worktree: incoming.worktree.or(existing.worktree),
     }
 }
 
-pub(super) fn validate_worktree_request(
-    request: &SessionWorktreeCheckInRequest
+pub(in super::super) fn validate_worktree_request(
+    request: &SessionWorktreeCheckInRequest,
 ) -> Result<(), SessionError> {
     validate_segment(&request.session_id, false)?;
     validate_session_id(&request.session_id)?;
@@ -304,18 +284,14 @@ pub(super) fn validate_worktree_request(
     Ok(())
 }
 
-pub(super) fn canonicalize_worktree_path(
-    path: &Path,
-) -> Result<PathBuf, SessionError> {
-    fs::canonicalize(path).map_err(|source| {
-        SessionError::InvalidManagedWorktree {
-            path: path.to_path_buf(),
-            reason: source.to_string(),
-        }
+pub(in super::super) fn canonicalize_worktree_path(path: &Path) -> Result<PathBuf, SessionError> {
+    fs::canonicalize(path).map_err(|source| SessionError::InvalidManagedWorktree {
+        path: path.to_path_buf(),
+        reason: source.to_string(),
     })
 }
 
-pub(super) fn ensure_supported_schema_version(
+pub(in super::super) fn ensure_supported_schema_version(
     path: &Path,
     found: u32,
 ) -> Result<(), SessionError> {
@@ -330,7 +306,7 @@ pub(super) fn ensure_supported_schema_version(
     }
 }
 
-pub(super) fn can_reuse_assignment(
+pub(in super::super) fn can_reuse_assignment(
     existing: &SessionWorktreeAssignment,
     request: &SessionWorktreeCheckInRequest,
 ) -> bool {
@@ -340,7 +316,7 @@ pub(super) fn can_reuse_assignment(
         && existing.path.exists()
 }
 
-pub(super) fn merge_links(
+pub(in super::super) fn merge_links(
     existing: SessionLinks,
     incoming: SessionLinks,
 ) -> SessionLinks {
@@ -352,112 +328,7 @@ pub(super) fn merge_links(
     merged
 }
 
-pub(super) fn merge_events(
-    existing: Option<PersistedSessionEvents>,
-    incoming: Option<PersistedSessionEvents>,
-    session_id: String,
-    captured_at: chrono::DateTime<chrono::Utc>,
-) -> Result<Option<PersistedSessionEvents>, SessionError> {
-    match (existing, incoming) {
-        (None, None) => Ok(None),
-        (Some(existing), None) => Ok(Some(existing)),
-        (None, Some(mut incoming)) => {
-            incoming.events = canonicalize_captured_events(incoming.events);
-            Ok(Some(incoming))
-        },
-        (Some(mut existing), Some(incoming)) => {
-            if existing.session_id != incoming.session_id {
-                return Err(SessionError::TranscriptConflict {
-                    session_id: incoming.session_id,
-                    existing_turns: existing.events.len(),
-                    incoming_turns: incoming.events.len(),
-                });
-            }
-
-            existing.events = canonicalize_captured_events(existing.events);
-            let incoming_events = canonicalize_captured_events(incoming.events);
-
-            let mut known = std::collections::BTreeSet::new();
-            for event in &existing.events {
-                known.insert(captured_event_key(event));
-            }
-            for event in incoming_events {
-                let key = captured_event_key(&event);
-                if known.insert(key) {
-                    existing.events.push(event);
-                }
-            }
-
-            existing.session_id = session_id;
-            if captured_at > existing.captured_at {
-                existing.captured_at = captured_at;
-            }
-
-            Ok(Some(existing))
-        },
-    }
-}
-
-pub(super) fn merge_transcript(
-    existing: Option<PersistedSessionTranscript>,
-    incoming: PersistedSessionTranscript,
-) -> Result<PersistedSessionTranscript, SessionError> {
-    match existing {
-        None => Ok(incoming),
-        Some(mut existing) => {
-            if existing.session_id != incoming.session_id {
-                return Err(SessionError::TranscriptConflict {
-                    session_id: incoming.session_id,
-                    existing_turns: existing.turns.len(),
-                    incoming_turns: incoming.turns.len(),
-                });
-            }
-
-            let shared_prefix_len = existing
-                .turns
-                .iter()
-                .zip(&incoming.turns)
-                .take_while(|(left, right)| turns_match(left, right))
-                .count();
-
-            if shared_prefix_len < existing.turns.len()
-                && shared_prefix_len < incoming.turns.len()
-            {
-                // Hook captures are periodic snapshots; when histories diverge,
-                // keep the newest complete snapshot instead of rejecting sync.
-                if incoming.turns.len() >= existing.turns.len() {
-                    return Ok(incoming);
-                }
-                return Ok(existing);
-            }
-
-            if incoming.turns.len() > existing.turns.len() {
-                existing.turns.extend(
-                    incoming.turns.into_iter().skip(existing.turns.len()),
-                );
-            }
-
-            if incoming.captured_at > existing.captured_at {
-                existing.captured_at = incoming.captured_at;
-            }
-
-            Ok(existing)
-        },
-    }
-}
-
-pub(super) fn turns_match(
-    left: &SessionTurn,
-    right: &SessionTurn,
-) -> bool {
-    left.sequence == right.sequence
-        && left.role == right.role
-        && left.content == right.content
-        && left.tool_name == right.tool_name
-        && left.event_meta == right.event_meta
-}
-
-pub(super) fn session_matches_query(
+pub(in super::super) fn session_matches_query(
     record: &SessionRecord,
     query: &SessionQuery,
 ) -> bool {
@@ -468,9 +339,7 @@ pub(super) fn session_matches_query(
     }
 
     if let Some(conversation_id) = &query.conversation_id {
-        if record.metadata.conversation_id.as_deref()
-            != Some(conversation_id.as_str())
-        {
+        if record.metadata.conversation_id.as_deref() != Some(conversation_id.as_str()) {
             return false;
         }
     }
@@ -495,7 +364,7 @@ pub(super) fn session_matches_query(
     true
 }
 
-pub(super) fn validate_segment(
+pub(in super::super) fn validate_segment(
     value: &str,
     is_workspace_path: bool,
 ) -> Result<(), SessionError> {
@@ -503,12 +372,8 @@ pub(super) fn validate_segment(
     let invalid = ['/', '\\', ':'];
     // "." and ".." are only rejected for workspace slugs: they would otherwise
     // resolve to a path-traversal segment when joined onto a store base.
-    let is_dot_segment =
-        is_workspace_path && (trimmed == "." || trimmed == "..");
-    if trimmed.is_empty()
-        || value.chars().any(|ch| invalid.contains(&ch))
-        || is_dot_segment
-    {
+    let is_dot_segment = is_workspace_path && (trimmed == "." || trimmed == "..");
+    if trimmed.is_empty() || value.chars().any(|ch| invalid.contains(&ch)) || is_dot_segment {
         return if is_workspace_path {
             Err(SessionError::InvalidWorkspaceSlug(value.to_string()))
         } else {
@@ -517,3 +382,8 @@ pub(super) fn validate_segment(
     }
     Ok(())
 }
+
+#[path = "storage/transcript_merge.rs"]
+mod transcript_merge;
+#[allow(unused_imports)]
+pub use transcript_merge::*;

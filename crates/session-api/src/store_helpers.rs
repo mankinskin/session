@@ -3,4 +3,7 @@ mod events;
 #[path = "store/helpers/links.rs"]
 mod links;
 
-include!("store/helpers/storage.rs");
+#[path = "store/helpers/storage.rs"]
+mod storage;
+#[allow(unused_imports)]
+pub use storage::*;

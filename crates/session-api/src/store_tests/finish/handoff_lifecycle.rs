@@ -1,6 +1,9 @@
-use crate::HandoffBacklogFilter;
+#[allow(unused_imports)]
+use super::*;
 
-fn init_workspace(config: &SessionStoreConfig, session_id: &str) -> String {
+pub(super) use crate::HandoffBacklogFilter;
+
+pub(super) fn init_workspace(config: &SessionStoreConfig, session_id: &str) -> String {
     config
         .init_runtime_context(crate::SessionRuntimeInitRequest {
             session_id: Some(session_id.to_string()),
@@ -12,7 +15,7 @@ fn init_workspace(config: &SessionStoreConfig, session_id: &str) -> String {
         .session_id
 }
 
-fn capture_session(config: &SessionStoreConfig, session_id: &str) {
+pub(super) fn capture_session(config: &SessionStoreConfig, session_id: &str) {
     config
         .capture_copilot_hook(crate::CopilotHookPayload {
             session_id: session_id.to_string(),
@@ -40,10 +43,9 @@ fn capture_session(config: &SessionStoreConfig, session_id: &str) {
 /// `picked_up_handoff_ids` through the real store persist+load path, not
 /// just serde.
 #[test]
-fn session_record_persists_and_loads_handoff_id_lists() {
+pub(super) fn session_record_persists_and_loads_handoff_id_lists() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     let session_id = "session-with-handoffs";
     capture_session(&config, session_id);
@@ -69,17 +71,19 @@ fn session_record_persists_and_loads_handoff_id_lists() {
         reloaded.emitted_handoff_ids,
         vec!["handoff-a".to_string(), "handoff-b".to_string()]
     );
-    assert_eq!(reloaded.picked_up_handoff_ids, vec!["handoff-c".to_string()]);
+    assert_eq!(
+        reloaded.picked_up_handoff_ids,
+        vec!["handoff-c".to_string()]
+    );
 }
 
 /// AC1/AC2: pickup binds `target_session_id` and distinguishes claimed vs
 /// open handoffs; also verifies the target session's `picked_up_handoff_ids`
 /// is updated (AC4).
 #[test]
-fn pickup_binds_target_session_and_updates_target_record() {
+pub(super) fn pickup_binds_target_session_and_updates_target_record() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     let source_session = init_workspace(&config, "33333333-3333-4333-8333-333333333333");
     let package = crate::SessionHandoffPackage {
@@ -121,20 +125,31 @@ fn pickup_binds_target_session_and_updates_target_record() {
     let picked_up = config
         .pickup_handoff(&record.handoff_id, target_session_id)
         .unwrap();
-    assert_eq!(picked_up.target_session_id.as_deref(), Some(target_session_id));
+    assert_eq!(
+        picked_up.target_session_id.as_deref(),
+        Some(target_session_id)
+    );
 
     // Claimed handoffs no longer appear in the backlog.
     let backlog_after = config
         .list_unclaimed_handoffs(&HandoffBacklogFilter::default())
         .unwrap();
-    assert!(!backlog_after.iter().any(|h| h.handoff_id == record.handoff_id));
+    assert!(
+        !backlog_after
+            .iter()
+            .any(|h| h.handoff_id == record.handoff_id)
+    );
 
     // AC4: the target session's picked_up_handoff_ids is updated.
     let target_record = config.read_session(target_session_id).unwrap();
-    assert_eq!(target_record.picked_up_handoff_ids, vec![record.handoff_id.clone()]);
+    assert_eq!(
+        target_record.picked_up_handoff_ids,
+        vec![record.handoff_id.clone()]
+    );
 
     // Picking up an already-claimed handoff is rejected.
-    let second_attempt = config.pickup_handoff(&record.handoff_id, "55555555-5555-4555-8555-555555555555");
+    let second_attempt =
+        config.pickup_handoff(&record.handoff_id, "55555555-5555-4555-8555-555555555555");
     assert!(matches!(
         second_attempt,
         Err(crate::SessionError::HandoffAlreadyClaimed { .. })
@@ -143,10 +158,9 @@ fn pickup_binds_target_session_and_updates_target_record() {
 
 /// AC5: the backlog query is filterable by source session id and by track.
 #[test]
-fn backlog_query_filters_by_source_session_and_track() {
+pub(super) fn backlog_query_filters_by_source_session_and_track() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
 
     let session_a = init_workspace(&config, "11111111-1111-4111-8111-111111111111");
     let session_b = init_workspace(&config, "22222222-2222-4222-8222-222222222222");

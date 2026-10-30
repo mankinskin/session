@@ -1,13 +1,13 @@
-use crate::{
-    SessionError,
-    ToolMetricsReport,
-    ToolMetricsWindow,
-    aggregate_with_cost,
+#[allow(unused_imports)]
+use super::*;
+
+pub(super) use crate::{
+    SessionError, ToolMetricsReport, ToolMetricsWindow, aggregate_with_cost,
     compute_session_summary_with_events,
-    write_rollup,
     tool_metrics::{CharsPerTokenEstimator, GradedCostCalibration, SessionToolMetricsSummary},
+    write_rollup,
 };
-use std::path::PathBuf;
+pub(super) use std::path::PathBuf;
 
 impl SessionStoreConfig {
     /// Get aggregate tool metrics for sessions in this store, respecting the window.
@@ -29,27 +29,29 @@ impl SessionStoreConfig {
                         entry.source_path.display()
                     );
                     continue;
-                },
+                }
             };
             summaries.push(summary);
         }
 
         let estimator = CharsPerTokenEstimator::default();
         let cal = GradedCostCalibration::default();
-        Ok(aggregate_with_cost(summaries, window, &estimator, Some(cal)))
+        Ok(aggregate_with_cost(
+            summaries,
+            window,
+            &estimator,
+            Some(cal),
+        ))
     }
 
     /// Write tool metrics rollup to the canonical location.
-    pub fn write_tool_metrics_rollup(
-        &self,
-        window: ToolMetricsWindow,
-    ) -> Result<(), SessionError> {
+    pub fn write_tool_metrics_rollup(&self, window: ToolMetricsWindow) -> Result<(), SessionError> {
         let report = self.tool_metrics(window)?;
         let rollup_path = self.root.join("tool-metrics-rollup.json");
         write_rollup(&rollup_path, report)
     }
 
-    fn load_or_compute_tool_metrics_summary(
+    pub(super) fn load_or_compute_tool_metrics_summary(
         &self,
         session_id: &str,
     ) -> Result<SessionToolMetricsSummary, SessionError> {
@@ -57,8 +59,7 @@ impl SessionStoreConfig {
 
         // Reuse a cached summary only when it actually holds tool data. An
         // empty cached summary predates event-based capture, so recompute it.
-        if let Some(summary) =
-            read_json_if_exists::<SessionToolMetricsSummary>(&tool_metrics_path)?
+        if let Some(summary) = read_json_if_exists::<SessionToolMetricsSummary>(&tool_metrics_path)?
         {
             if !summary.is_empty() {
                 return Ok(summary);
@@ -91,7 +92,7 @@ impl SessionStoreConfig {
         Ok(summary)
     }
 
-    fn tool_metrics_path(&self, session_id: &str) -> Result<PathBuf, SessionError> {
+    pub(super) fn tool_metrics_path(&self, session_id: &str) -> Result<PathBuf, SessionError> {
         let paths = self.paths_for_session_id(session_id)?;
         Ok(paths.session_dir.join("tool-metrics.json"))
     }

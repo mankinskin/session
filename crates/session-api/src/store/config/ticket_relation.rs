@@ -1,10 +1,13 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     /// Determine the strongest relation signal between `record` and
     /// `ticket_id`, without exceeding the requested `strength` ceiling.
     /// Cumulative/widening: strict is checked first, then linked, then
     /// mentioned (which alone requires reading the session's handoff
     /// packages from disk). Never scans `transcript.json` text.
-    fn ticket_relation_signal(
+    pub(super) fn ticket_relation_signal(
         &self,
         record: &SessionRecord,
         session_dir: &Path,
@@ -39,7 +42,7 @@ impl SessionStoreConfig {
     /// Scan a session's `handoffs/*/handoff.json` records for `ticket_id` in
     /// `target_tickets`. Handoff packages are structured data, not
     /// transcript text, so this satisfies the "no transcript scanning" rule.
-    fn session_handoffs_mention_ticket(
+    pub(super) fn session_handoffs_mention_ticket(
         &self,
         session_dir: &Path,
         ticket_id: &str,
@@ -49,20 +52,16 @@ impl SessionStoreConfig {
             return Ok(false);
         }
 
-        for entry in
-            fs::read_dir(&handoffs_dir).map_err(|source| SessionError::Io {
-                path: handoffs_dir.clone(),
-                source,
-            })?
-        {
+        for entry in fs::read_dir(&handoffs_dir).map_err(|source| SessionError::Io {
+            path: handoffs_dir.clone(),
+            source,
+        })? {
             let entry = entry.map_err(|source| SessionError::Io {
                 path: handoffs_dir.clone(),
                 source,
             })?;
             let handoff_json_path = entry.path().join("handoff.json");
-            if let Some(record) = read_json_if_exists::<SessionHandoffRecord>(
-                &handoff_json_path,
-            )? {
+            if let Some(record) = read_json_if_exists::<SessionHandoffRecord>(&handoff_json_path)? {
                 if record
                     .target_tickets
                     .iter()

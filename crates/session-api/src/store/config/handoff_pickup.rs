@@ -1,7 +1,10 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     /// Find a handoff record by id across every session's handoff folder and
     /// return it alongside the path it was read from.
-    fn find_handoff(
+    pub(super) fn find_handoff(
         &self,
         handoff_id: &str,
     ) -> Result<(SessionHandoffRecord, PathBuf), SessionError> {
@@ -11,9 +14,7 @@ impl SessionStoreConfig {
                 .join("handoffs")
                 .join(handoff_id)
                 .join("handoff.json");
-            if let Some(record) =
-                read_json_if_exists::<SessionHandoffRecord>(&handoff_json_path)?
-            {
+            if let Some(record) = read_json_if_exists::<SessionHandoffRecord>(&handoff_json_path)? {
                 return Ok((record, handoff_json_path));
             }
         }
@@ -77,16 +78,12 @@ impl SessionStoreConfig {
                 })?;
 
             for handoff_entry in handoff_entries {
-                let handoff_entry =
-                    handoff_entry.map_err(|source| SessionError::Io {
-                        path: handoffs_dir.clone(),
-                        source,
-                    })?;
-                let handoff_json_path =
-                    handoff_entry.path().join("handoff.json");
-                let Some(record) = read_json_if_exists::<SessionHandoffRecord>(
-                    &handoff_json_path,
-                )?
+                let handoff_entry = handoff_entry.map_err(|source| SessionError::Io {
+                    path: handoffs_dir.clone(),
+                    source,
+                })?;
+                let handoff_json_path = handoff_entry.path().join("handoff.json");
+                let Some(record) = read_json_if_exists::<SessionHandoffRecord>(&handoff_json_path)?
                 else {
                     continue;
                 };

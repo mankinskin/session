@@ -1,12 +1,15 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
-    fn ensure_no_active_worktree_conflict(
+    pub(super) fn ensure_no_active_worktree_conflict(
         &self,
         main_checkout: &Path,
         requested_path: &Path,
         ignored_session_ids: &[&str],
     ) -> Result<(), SessionError> {
-        let registry_dir = main_session_store_root(&self.root, main_checkout)
-            .join("local/worktrees");
+        let registry_dir =
+            main_session_store_root(&self.root, main_checkout).join("local/worktrees");
         let entries = match std::fs::read_dir(&registry_dir) {
             Ok(entries) => entries,
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -27,12 +30,13 @@ impl SessionStoreConfig {
             if path.extension().and_then(|extension| extension.to_str()) != Some("json") {
                 continue;
             }
-            let session_id = path.file_stem().and_then(|stem| stem.to_str()).ok_or_else(|| {
-                SessionError::InvalidManagedWorktree {
+            let session_id = path
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .ok_or_else(|| SessionError::InvalidManagedWorktree {
                     path: path.clone(),
                     reason: "registry entry has no UTF-8 session id".to_string(),
-                }
-            })?;
+                })?;
             if ignored_session_ids.contains(&session_id) {
                 continue;
             }

@@ -1,7 +1,10 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     /// Enumerate one selected source for every session visible from this
     /// checkout's `.session` store and discoverable worktree stores.
-    fn federated_sessions(&self) -> Result<Vec<FederatedSessionEntry>, SessionError> {
+    pub(super) fn federated_sessions(&self) -> Result<Vec<FederatedSessionEntry>, SessionError> {
         let mut candidates = Vec::new();
         for (store, is_worktree_store) in self.federated_store_roots()? {
             let sessions_root = store.sessions_root()?;
@@ -17,26 +20,26 @@ impl SessionStoreConfig {
                     path: sessions_root.clone(),
                     source,
                 })?;
-                if !entry.file_type().map_err(|source| SessionError::Io {
-                    path: entry.path(),
-                    source,
-                })?.is_dir() {
+                if !entry
+                    .file_type()
+                    .map_err(|source| SessionError::Io {
+                        path: entry.path(),
+                        source,
+                    })?
+                    .is_dir()
+                {
                     continue;
                 }
 
                 let session_id = entry.file_name().to_string_lossy().into_owned();
                 let session_dir = entry.path();
-                let source_path = fs::canonicalize(&session_dir).map_err(|source| {
-                    SessionError::Io {
+                let source_path =
+                    fs::canonicalize(&session_dir).map_err(|source| SessionError::Io {
                         path: session_dir.clone(),
                         source,
-                    }
-                })?;
-                let priority = federated_source_priority(
-                    &store.root,
-                    &session_id,
-                    is_worktree_store,
-                );
+                    })?;
+                let priority =
+                    federated_source_priority(&store.root, &session_id, is_worktree_store);
                 candidates.push(FederatedSessionEntry {
                     store: store.clone(),
                     session_id,
@@ -87,21 +90,23 @@ impl SessionStoreConfig {
         Ok(selected)
     }
 
-    fn federated_store_roots(&self) -> Result<Vec<(SessionStoreConfig, bool)>, SessionError> {
+    pub(super) fn federated_store_roots(
+        &self,
+    ) -> Result<Vec<(SessionStoreConfig, bool)>, SessionError> {
         let mut stores = vec![(self.clone(), false)];
-        let main_checkout =
-            memory_kernel::workspace::resolve_workspace_root_from_store_root(
-                &self.root,
-                ".session",
-            );
+        let main_checkout = memory_kernel::workspace::resolve_workspace_root_from_store_root(
+            &self.root, ".session",
+        );
         let worktree_root = main_checkout.join(".worktrees");
         let entries = match fs::read_dir(&worktree_root) {
             Ok(entries) => entries,
             Err(source) if source.kind() == std::io::ErrorKind::NotFound => return Ok(stores),
-            Err(source) => return Err(SessionError::Io {
-                path: worktree_root,
-                source,
-            }),
+            Err(source) => {
+                return Err(SessionError::Io {
+                    path: worktree_root,
+                    source,
+                });
+            }
         };
 
         let mut roots = BTreeSet::new();
@@ -115,10 +120,7 @@ impl SessionStoreConfig {
                 continue;
             }
             let store =
-                memory_kernel::workspace::resolve_store_root_at_fixed_workspace(
-                    &path,
-                    ".session",
-                );
+                memory_kernel::workspace::resolve_store_root_at_fixed_workspace(&path, ".session");
             if store.is_dir() {
                 roots.insert(store);
                 continue;
@@ -141,14 +143,16 @@ impl SessionStoreConfig {
             }
         }
 
-        stores.extend(roots.into_iter().map(|root| {
-            (SessionStoreConfig::new(root), true)
-        }));
+        stores.extend(
+            roots
+                .into_iter()
+                .map(|root| (SessionStoreConfig::new(root), true)),
+        );
         Ok(stores)
     }
 }
 
-fn federated_source_priority(
+pub(super) fn federated_source_priority(
     store_root: &Path,
     session_id: &str,
     is_worktree_store: bool,
@@ -162,11 +166,16 @@ fn federated_source_priority(
     let Some(layout_root) = worktree.parent() else {
         return 1;
     };
-    if layout_root.file_name().is_some_and(|name| name == session_id) {
+    if layout_root
+        .file_name()
+        .is_some_and(|name| name == session_id)
+    {
         return 3;
     }
     let short_id = session_id.get(..8).unwrap_or_default();
-    if layout_root.file_name().is_some_and(|name| name == ".worktrees")
+    if layout_root
+        .file_name()
+        .is_some_and(|name| name == ".worktrees")
         && worktree
             .file_name()
             .and_then(|name| name.to_str())

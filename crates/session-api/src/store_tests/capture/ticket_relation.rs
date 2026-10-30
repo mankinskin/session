@@ -1,14 +1,11 @@
-use crate::{
-    RelationStrength,
-    SessionHandoffPackage,
-};
+#[allow(unused_imports)]
+use super::*;
 
-const TARGET_TICKET: &str = "ticket-target";
+pub(super) use crate::{RelationStrength, SessionHandoffPackage};
 
-fn seed_strict_session(
-    config: &SessionStoreConfig,
-    tempdir: &TempDir,
-) {
+pub(super) const TARGET_TICKET: &str = "ticket-target";
+
+pub(super) fn seed_strict_session(config: &SessionStoreConfig, tempdir: &TempDir) {
     let worktree_path = managed_worktree(
         tempdir,
         "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -27,7 +24,7 @@ fn seed_strict_session(
         .unwrap();
 }
 
-fn seed_linked_session(config: &SessionStoreConfig) {
+pub(super) fn seed_linked_session(config: &SessionStoreConfig) {
     let mut request = SessionCaptureRequest::copilot(sample_payload(
         "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         Some("conversation-linked"),
@@ -38,7 +35,7 @@ fn seed_linked_session(config: &SessionStoreConfig) {
     config.persist_capture(request).unwrap();
 }
 
-fn seed_mentioned_session(config: &SessionStoreConfig) {
+pub(super) fn seed_mentioned_session(config: &SessionStoreConfig) {
     config
         .capture_copilot_hook(sample_payload(
             "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
@@ -49,9 +46,7 @@ fn seed_mentioned_session(config: &SessionStoreConfig) {
         .unwrap();
     config
         .init_runtime_context(SessionRuntimeInitRequest {
-            session_id: Some(
-                "cccccccc-cccc-4ccc-8ccc-cccccccccccc".to_string(),
-            ),
+            session_id: Some("cccccccc-cccc-4ccc-8ccc-cccccccccccc".to_string()),
             ..Default::default()
         })
         .unwrap();
@@ -83,7 +78,7 @@ fn seed_mentioned_session(config: &SessionStoreConfig) {
 /// Mentions the ticket id only in transcript text, never in metadata, links,
 /// or a handoff package. Must be excluded at every tier (AC2: no tier scans
 /// `transcript.json` text).
-fn seed_transcript_only_session(config: &SessionStoreConfig) {
+pub(super) fn seed_transcript_only_session(config: &SessionStoreConfig) {
     config
         .capture_copilot_hook(sample_payload(
             "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
@@ -94,7 +89,7 @@ fn seed_transcript_only_session(config: &SessionStoreConfig) {
         .unwrap();
 }
 
-fn seed_unrelated_session(config: &SessionStoreConfig) {
+pub(super) fn seed_unrelated_session(config: &SessionStoreConfig) {
     config
         .capture_copilot_hook(sample_payload(
             "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
@@ -105,9 +100,8 @@ fn seed_unrelated_session(config: &SessionStoreConfig) {
         .unwrap();
 }
 
-fn seeded_config(tempdir: &TempDir) -> SessionStoreConfig {
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+pub(super) fn seeded_config(tempdir: &TempDir) -> SessionStoreConfig {
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     seed_strict_session(&config, tempdir);
     seed_linked_session(&config);
     seed_mentioned_session(&config);
@@ -117,7 +111,7 @@ fn seeded_config(tempdir: &TempDir) -> SessionStoreConfig {
 }
 
 #[test]
-fn sessions_for_ticket_strict_matches_only_metadata_ticket_id() {
+pub(super) fn sessions_for_ticket_strict_matches_only_metadata_ticket_id() {
     let tempdir = TempDir::new().unwrap();
     let config = seeded_config(&tempdir);
 
@@ -157,7 +151,7 @@ fn sessions_for_ticket_strict_matches_only_metadata_ticket_id() {
 }
 
 #[test]
-fn sessions_for_ticket_linked_includes_strict_and_links_but_not_mentioned() {
+pub(super) fn sessions_for_ticket_linked_includes_strict_and_links_but_not_mentioned() {
     let tempdir = TempDir::new().unwrap();
     let config = seeded_config(&tempdir);
 
@@ -166,8 +160,7 @@ fn sessions_for_ticket_linked_includes_strict_and_links_but_not_mentioned() {
         .unwrap();
     matches.sort_by(|left, right| left.session_id.cmp(&right.session_id));
 
-    let ids: Vec<&str> =
-        matches.iter().map(|row| row.session_id.as_str()).collect();
+    let ids: Vec<&str> = matches.iter().map(|row| row.session_id.as_str()).collect();
     assert_eq!(
         ids,
         vec![
@@ -190,7 +183,7 @@ fn sessions_for_ticket_linked_includes_strict_and_links_but_not_mentioned() {
 }
 
 #[test]
-fn sessions_for_ticket_mentioned_includes_all_structured_tiers_only() {
+pub(super) fn sessions_for_ticket_mentioned_includes_all_structured_tiers_only() {
     let tempdir = TempDir::new().unwrap();
     let config = seeded_config(&tempdir);
 
@@ -199,8 +192,7 @@ fn sessions_for_ticket_mentioned_includes_all_structured_tiers_only() {
         .unwrap();
     matches.sort_by(|left, right| left.session_id.cmp(&right.session_id));
 
-    let ids: Vec<&str> =
-        matches.iter().map(|row| row.session_id.as_str()).collect();
+    let ids: Vec<&str> = matches.iter().map(|row| row.session_id.as_str()).collect();
     assert_eq!(
         ids,
         vec![
@@ -221,10 +213,9 @@ fn sessions_for_ticket_mentioned_includes_all_structured_tiers_only() {
 /// discoverable at the strict tier immediately afterward, with no
 /// backfill or transcript reading involved.
 #[test]
-fn check_in_worktree_forward_captures_ticket_linkage_for_immediate_discovery() {
+pub(super) fn check_in_worktree_forward_captures_ticket_linkage_for_immediate_discovery() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         "f1111111-1111-4111-8111-111111111111",
@@ -258,10 +249,9 @@ fn check_in_worktree_forward_captures_ticket_linkage_for_immediate_discovery() {
 /// Ticket e4d4c667: a single corrupt/malformed session entry must not
 /// abort the whole scan; skip it and keep returning the readable ones.
 #[test]
-fn sessions_for_ticket_skips_unreadable_session_and_returns_the_rest() {
+pub(super) fn sessions_for_ticket_skips_unreadable_session_and_returns_the_rest() {
     let tempdir = TempDir::new().unwrap();
-    let config =
-        SessionStoreConfig::new(tempdir.path().join("store"));
+    let config = SessionStoreConfig::new(tempdir.path().join("store"));
     let worktree_path = managed_worktree(
         &tempdir,
         "f2222222-2222-4222-8222-222222222222",
@@ -286,8 +276,7 @@ fn sessions_for_ticket_skips_unreadable_session_and_returns_the_rest() {
         .join("sessions")
         .join("f3333333-3333-4333-8333-333333333333");
     std::fs::create_dir_all(&corrupt_dir).unwrap();
-    std::fs::write(corrupt_dir.join("session.json"), b"{ not valid json")
-        .unwrap();
+    std::fs::write(corrupt_dir.join("session.json"), b"{ not valid json").unwrap();
     std::fs::write(corrupt_dir.join("transcript.json"), b"{}").unwrap();
 
     let matches = config

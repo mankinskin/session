@@ -1,3 +1,6 @@
+#[allow(unused_imports)]
+use super::*;
+
 impl SessionStoreConfig {
     /// Best-effort worktree/ticket inference at Copilot capture time
     /// (ticket bba9b313, root cause of e5f8a2c1's empty `sessions_for_ticket`
@@ -37,13 +40,10 @@ impl SessionStoreConfig {
     ) -> Result<(), SessionError> {
         let mut record = match self.read_session(session_id) {
             Ok(record) => record,
-            Err(SessionError::NotFound { .. }) => {
-                self.new_inferred_record(session_id)
-            },
+            Err(SessionError::NotFound { .. }) => self.new_inferred_record(session_id),
             Err(error) => return Err(error),
         };
-        if record.metadata.worktree.is_some()
-            || self.worktree_registry_entry(session_id)?.is_some()
+        if record.metadata.worktree.is_some() || self.worktree_registry_entry(session_id)?.is_some()
         {
             return Ok(());
         }
@@ -51,8 +51,8 @@ impl SessionStoreConfig {
         let Some(branch) = current_git_branch(working_dir) else {
             return Ok(());
         };
-        let worktree_path = current_git_toplevel(working_dir)
-            .unwrap_or_else(|| working_dir.to_path_buf());
+        let worktree_path =
+            current_git_toplevel(working_dir).unwrap_or_else(|| working_dir.to_path_buf());
 
         let ticket_store_root = self.ticket_store_root();
         let ticket_store = if ticket_store_root.exists() {
@@ -61,9 +61,7 @@ impl SessionStoreConfig {
             None
         };
         let ticket_id = parse_agent_branch_short_id(&branch)
-            .and_then(|short_id| {
-                resolve_ticket_prefix(ticket_store.as_ref(), &short_id)
-            });
+            .and_then(|short_id| resolve_ticket_prefix(ticket_store.as_ref(), &short_id));
 
         if !paths_refer_to_same_directory(&worktree_path, main_checkout) {
             record.metadata.worktree = Some(SessionWorktreeAssignment {
@@ -102,18 +100,15 @@ impl SessionStoreConfig {
         let Some(existing_assignment) = &record.metadata.worktree else {
             return Ok(false);
         };
-        if !paths_refer_to_same_directory(
-            &existing_assignment.path,
-            main_checkout,
-        ) {
+        if !paths_refer_to_same_directory(&existing_assignment.path, main_checkout) {
             return Ok(false);
         }
 
         let Some(branch) = current_git_branch(working_dir) else {
             return Ok(false);
         };
-        let worktree_path = current_git_toplevel(working_dir)
-            .unwrap_or_else(|| working_dir.to_path_buf());
+        let worktree_path =
+            current_git_toplevel(working_dir).unwrap_or_else(|| working_dir.to_path_buf());
         record.metadata.worktree = Some(SessionWorktreeAssignment {
             path: worktree_path,
             branch,
@@ -148,8 +143,7 @@ impl SessionStoreConfig {
     ) -> Result<(), SessionError> {
         let mut record = match self.read_session(session_id) {
             Ok(record) => record,
-            Err(SessionError::NotFound { .. }) =>
-                self.new_inferred_record(session_id),
+            Err(SessionError::NotFound { .. }) => self.new_inferred_record(session_id),
             Err(error) => return Err(error),
         };
         if record.metadata.worktree.is_some() {
@@ -169,10 +163,7 @@ impl SessionStoreConfig {
     }
 
     /// Minimal record for a session that has not been captured yet.
-    fn new_inferred_record(
-        &self,
-        session_id: &str,
-    ) -> SessionRecord {
+    pub(super) fn new_inferred_record(&self, session_id: &str) -> SessionRecord {
         let now = chrono::Utc::now();
         SessionRecord {
             schema_version: SESSION_SCHEMA_VERSION,
@@ -211,7 +202,7 @@ impl SessionStoreConfig {
 /// binary, or any other resolution failure. Returns `Some("HEAD")` for a
 /// detached HEAD, which never matches the `agent/<short-id>-<slug>` shape
 /// and so yields no ticket id downstream.
-fn current_git_branch(working_dir: &Path) -> Option<String> {
+pub(super) fn current_git_branch(working_dir: &Path) -> Option<String> {
     let output = std::process::Command::new("git")
         .current_dir(working_dir)
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
@@ -227,7 +218,7 @@ fn current_git_branch(working_dir: &Path) -> Option<String> {
 /// Resolves the working tree root via `git rev-parse --show-toplevel`.
 /// Returns `None` when git is unavailable or the directory is not inside a
 /// work tree; callers fall back to the raw working directory.
-fn current_git_toplevel(working_dir: &Path) -> Option<PathBuf> {
+pub(super) fn current_git_toplevel(working_dir: &Path) -> Option<PathBuf> {
     let output = std::process::Command::new("git")
         .current_dir(working_dir)
         .args(["rev-parse", "--show-toplevel"])
@@ -240,10 +231,7 @@ fn current_git_toplevel(working_dir: &Path) -> Option<PathBuf> {
     (!path.is_empty()).then_some(PathBuf::from(path))
 }
 
-fn paths_refer_to_same_directory(
-    left: &Path,
-    right: &Path,
-) -> bool {
+pub(super) fn paths_refer_to_same_directory(left: &Path, right: &Path) -> bool {
     match (left.canonicalize(), right.canonicalize()) {
         (Ok(left), Ok(right)) => left == right,
         _ => left
