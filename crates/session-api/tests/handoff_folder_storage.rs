@@ -11,11 +11,15 @@ use session_api::{
 };
 use std::{collections::BTreeMap, path::PathBuf};
 
-fn setup_test_store() -> (SessionStoreConfig, PathBuf) {
+fn setup_test_store() -> (SessionStoreConfig, tempfile::TempDir) {
     let temp_dir = tempfile::tempdir().expect("create temp dir");
-    let store_root = temp_dir.path().to_path_buf();
-    let config = SessionStoreConfig::new(&store_root);
-    (config, store_root)
+    let sources = temp_dir.path().join("session/crates/session-api/src");
+    std::fs::create_dir_all(&sources).expect("create handoff target directory");
+    for file in ["lib.rs", "error.rs", "store.rs"] {
+        std::fs::write(sources.join(file), b"").expect("create handoff target fixture");
+    }
+    let config = SessionStoreConfig::new(temp_dir.path());
+    (config, temp_dir)
 }
 
 fn init_test_session(config: &SessionStoreConfig, session_id: &str) {
@@ -267,6 +271,7 @@ fn legacy_flat_json_handoffs_still_load() {
 
     // Now simulate a legacy flat file by writing directly to handoffs_dir
     let handoffs_dir = store_root
+        .path()
         .join(".session")
         .join("sessions")
         .join(session_id)
@@ -412,7 +417,7 @@ fn handoff_markdown_renders_upward_context_and_resolved_ticket_table() {
         uuid::Uuid::parse_str("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb").expect("valid phase id");
     let ticket_id =
         uuid::Uuid::parse_str("11111111-1111-4111-8111-111111111111").expect("valid ticket id");
-    let ticket_store_root = store_root.join(".ticket");
+    let ticket_store_root = store_root.path().join(".ticket");
     let ticket_store = ticket_api::storage::TicketStore::open_or_init(&ticket_store_root)
         .expect("open ticket store");
     for (id, title) in [(epic_id, "Program objective"), (phase_id, "Delivery phase")] {
@@ -588,6 +593,7 @@ fn create_handoff_result_rejects_dangling_edge_before_writing_files() {
     // workflow_add_edge validates both endpoints exist, so a dangling edge is
     // injected directly into the persisted session manifest.
     let manifest_path = _temp_dir
+        .path()
         .join("sessions")
         .join(session_id)
         .join("session.json");
@@ -613,7 +619,11 @@ fn create_handoff_result_rejects_dangling_edge_before_writing_files() {
         result.map(|r| r.record.handoff_id)
     );
 
-    let handoffs_dir = _temp_dir.join("sessions").join(session_id).join("handoffs");
+    let handoffs_dir = _temp_dir
+        .path()
+        .join("sessions")
+        .join(session_id)
+        .join("handoffs");
     if handoffs_dir.exists() {
         let entries: Vec<_> = std::fs::read_dir(&handoffs_dir)
             .expect("read handoffs dir")
@@ -662,7 +672,11 @@ fn create_handoff_result_rejects_unresolved_diagnostics_before_writing_files() {
         result.map(|r| r.record.handoff_id)
     );
 
-    let handoffs_dir = _temp_dir.join("sessions").join(session_id).join("handoffs");
+    let handoffs_dir = _temp_dir
+        .path()
+        .join("sessions")
+        .join(session_id)
+        .join("handoffs");
     if handoffs_dir.exists() {
         let entries: Vec<_> = std::fs::read_dir(&handoffs_dir)
             .expect("read handoffs dir")

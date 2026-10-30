@@ -12,6 +12,7 @@ pub mod move_domain;
 pub mod peek;
 pub mod price_loader;
 pub mod quality_gate;
+pub mod session_intake;
 pub mod store;
 pub mod subagent_rollup;
 pub mod tool_metrics;
@@ -73,10 +74,15 @@ pub use peek::{
 pub use quality_gate::{
     QualityGate, QualityGateOutcome, QualityGatePhase, post_delegation_gate, pre_delegation_gate,
 };
+pub use session_intake::{
+    SESSION_INTAKE_SCHEMA_VERSION, SessionIntake, SessionIntakeLinkState, SessionIntakeLinkage,
+    SessionIntakeRecord,
+};
 pub use store::{
     PersistedSessionEvents, PersistedSessionManifest, PersistedSessionTranscript, RelationStrength,
     SessionQuery, SessionQueryDiagnostic, SessionQueryResult, SessionRuntimePaths,
-    SessionStoreConfig, SessionStorePaths, SessionStorePlan, SessionTicketBackfillReport,
+    SessionIntakeOperation, SessionStoreConfig, SessionStorePaths, SessionStorePlan,
+    SessionTicketBackfillReport,
     SessionWorktreeCheckInReceipt, SessionWorktreeCheckInRequest,
     SessionWorktreeUnassignReceipt, SessionWorktreeUnassignRequest, TicketSessionMatch,
 };

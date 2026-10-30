@@ -200,7 +200,10 @@ mod config {
     include!("store/config/ticket_backfill.rs");
     include!("store/config/worktree_capture_inference.rs");
     include!("store/config/terminals.rs");
+    include!("store/config/session_intake.rs");
 }
+
+pub use config::SessionIntakeOperation;
 
 #[cfg(test)]
 pub(crate) use config::WorktreeCheckInFailurePoint;

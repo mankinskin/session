@@ -149,6 +149,24 @@ pub enum SessionError {
     )]
     WorkspaceFinished { session_id: String },
 
+    #[error("session {session_id} has no persisted manifest; intake requires an existing Session")]
+    IntakeSessionNotFound { session_id: String },
+    #[error("session {session_id} has no submitted intake for request_id `{request_id}`")]
+    IntakeMissing { session_id: String, request_id: String },
+    #[error("request_id `{request_id}` of session {session_id} was already submitted with different bytes (existing sha256 {existing_digest}, submitted sha256 {submitted_digest})")]
+    IntakeIdempotencyConflict {
+        session_id: String,
+        request_id: String,
+        existing_digest: String,
+        submitted_digest: String,
+    },
+    #[error("intake request_id `{0}` must be 1-128 characters of [A-Za-z0-9._-] starting with a letter or digit")]
+    InvalidIntakeRequestId(String),
+    #[error("intake {request_id} of session {session_id} has a conflicting Mission linkage: {reason}")]
+    IntakeLinkageConflict { session_id: String, request_id: String, reason: String },
+    #[error("persisted intake state at {path} is inconsistent: {reason}")]
+    IntakeCorrupt { path: PathBuf, reason: String },
+
     #[error(
         "concurrent mutation conflict for workspace session {session_id}: \
          another mutation holds the runtime lock"

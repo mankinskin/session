@@ -8,13 +8,15 @@ use session_api::{
     SessionHandoffUpwardContextRole, SessionRuntimeInitRequest, SessionStoreConfig,
     SessionValidationGate,
 };
-use std::path::PathBuf;
-
-fn setup_test_store() -> (SessionStoreConfig, PathBuf) {
+fn setup_test_store() -> (SessionStoreConfig, tempfile::TempDir) {
     let temp_dir = tempfile::tempdir().expect("create temp dir");
-    let store_root = temp_dir.path().to_path_buf();
-    let config = SessionStoreConfig::new(&store_root);
-    (config, store_root)
+    let sources = temp_dir.path().join("session/crates/session-api/src");
+    std::fs::create_dir_all(&sources).expect("create handoff target directory");
+    for file in ["lib.rs", "error.rs", "store.rs"] {
+        std::fs::write(sources.join(file), b"").expect("create handoff target fixture");
+    }
+    let config = SessionStoreConfig::new(temp_dir.path());
+    (config, temp_dir)
 }
 
 fn init_test_session(config: &SessionStoreConfig, session_id: &str) {
@@ -254,6 +256,7 @@ fn ready_handoff_missing_upward_context_fails_before_writing_files() {
     ));
     assert!(
         !store_root
+            .path()
             .join(".session")
             .join("sessions")
             .join(session_id)
