@@ -5,7 +5,7 @@ description: "Use while performing edits, builds, and tests inside a worktree-ba
 ## 3. Work
 
 - For a worktree-backed task, every read, edit, build, and test runs with the worktree as the working directory. A command run from the repository root is a bug — it touches the wrong checkout.
-- Before the first edit, run the recursive submodule branch check in [worktree-submodule-branch-check.instructions.md](worktree-submodule-branch-check.instructions.md). Do not edit any file — top level or inside a submodule — until every populated submodule prints the expected feature branch.
+- Before the first edit or build, and after any submodule population or branch change, run the recursive check in [worktree-submodule-branch-check.instructions.md](worktree-submodule-branch-check.instructions.md). Every checkout must be attached: parent `main` requires child `main`; feature parents permit `main` or feature children. Untouched children may remain on `main`. Before editing a child, put it and its intermediate ancestors on the matching session feature branches and align their immediate parents' tracking configuration. Do not edit or build while any populated submodule is detached.
 - Never run `git checkout`, `git switch`, or `git stash` in the repository root from inside an implementation session.
 - Keep the claimed file list current with `board_update_files` when scope shifts.
 - Refresh `board_heartbeat` before the TTL elapses on long tasks.

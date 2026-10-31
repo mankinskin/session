@@ -25,33 +25,57 @@ Immediately continue into 7 (Merge) in the same session — do not stop after ma
 
 ### Bottom-up integration sequence (canonical)
 
-The superproject records submodules as gitlinks. **Every gitlink recorded by the superproject MUST be contained in the corresponding submodule's `main` branch.** The prior failure treated the gitlink as the record of truth while the submodule branch was left behind, leaving orphaned commits reachable only through the gitlink and vulnerable to `git gc`.
+The superproject records submodules as gitlinks. During feature work, every
+gitlink must be contained in the child's selected attached branch; a feature
+superproject may reference feature-child commits. **Before and after integration
+into superproject `main`, every gitlink must be contained in child `main`.**
+Recursively, an immediate parent on `main` requires child checkouts on `main`;
+a feature parent permits `main` or feature children. See the
+[branch/tracking contract](../../../../.agents/instructions/repository/submodule.instructions.md#branch-integration-and-gitlinks).
+Commit hashes remain Git's storage format, not a substitute for branch
+attachment. The prior failure left orphaned commits reachable only through
+gitlinks and vulnerable to `git gc`.
 
 Never merge the superproject branch while any affected submodule branch is unmerged. For a change spanning submodules and the superproject, run this sequence from the superproject root:
 
 1. **Pin before rewriting history.** In each affected submodule, pin the feature tip before rebasing: `git -C <sm> branch rescue/pre-rebase-<short-sha> <sha>`. Also pin any recorded gitlink that will be superseded: `git -C <sm> branch rescue/gitlink-<short-sha> <gitlink-sha>`.
-2. **Integrate each affected submodule, deepest first.** Rebase `agent/<full-session-uuid>/<slug>` onto that submodule's `main`, resolve conflicts there, validate it, then fast-forward: `git -C <sm> checkout main && git -C <sm> merge --ff-only agent/<full-session-uuid>/<slug>`.
-3. **Bump gitlinks on the superproject feature branch.** Run `git add <sm>` for every merged submodule and commit the pointer updates, so the feature branch records each submodule's new `main` tip.
-4. **Verify containment before the superproject merge.** Run the invariant loop below; all five entries must print `ok`.
+2. **Integrate each affected submodule, deepest first.** Rebase `agent/<full-session-uuid>/<slug>` onto that submodule's `main`, resolve conflicts there and validate it. Before switching any child superproject to `main`, integrate its descendants and restore its `.gitmodules` tracking to `main` with `update = merge` or `rebase`; commit those task-owned changes on its feature branch. Then fast-forward its authorized main checkout: `git -C <sm> checkout main && git -C <sm> merge --ff-only agent/<full-session-uuid>/<slug>`. Do not force-switch a branch occupied by another linked worktree.
+3. **Bump gitlinks on the superproject feature branch.** Run `git add <sm>` for every merged submodule and stage the task-owned `.gitmodules` changes restoring child `main` tracking. Commit these updates, so the feature branch records each submodule's new `main` tip and tracking configuration. Resolve local overrides too.
+4. **Verify containment before the superproject merge.** Run the recursive invariant check below; every declared submodule, including nested and untouched children, must pass. Also verify branch attachment and indexed tracking under the submodule contract.
 5. **Rebase and integrate the superproject last.** Rebase `agent/<full-session-uuid>/<slug>` onto superproject `main`, resolve conflicts on the feature branch, then fast-forward superproject `main` with `git merge --ff-only agent/<full-session-uuid>/<slug>`.
-6. **Re-verify containment after the superproject merge.** Run the same loop again; all five entries must print `ok`.
+6. **Re-verify after the superproject merge.** Repeat the recursive containment, attached-branch and tracking checks. Every parent and child in the integrated main checkout must be on `main`.
 
 ```bash
-for sm in context-stack memory-api memory-viewers viewer-api workflow-tools; do
-  link=$(git ls-tree HEAD "$sm" | awk '{print $3}')
-  if git -C "$sm" merge-base --is-ancestor "$link" main; then
-    echo "ok   $sm $link"
-  else
-    echo "BAD  $sm $link not contained in $sm main"
-  fi
-done
+rtk git submodule status --recursive
+rtk git submodule foreach --recursive '
+  branch=$(git symbolic-ref --quiet --short HEAD) || exit 1
+  test "$branch" = main || {
+    echo "BAD $displaypath: expected main, found $branch" >&2
+    exit 1
+  }
+  git merge-base --is-ancestor "$sha1" refs/heads/main || {
+    echo "BAD $displaypath: recorded gitlink $sha1 not contained in main" >&2
+    exit 1
+  }
+  echo "ok $displaypath $sha1"
+'
 ```
 
-`git submodule status` prefixes `+` when the checked-out submodule HEAD differs from the recorded gitlink and `-` when the submodule is uninitialized. A clean integration shows neither marker for any of the five submodules.
+`git submodule status --recursive` prefixes `+` for a checkout differing from
+the recorded gitlink, `-` for an uninitialized child, and `U` for conflicts.
+Reject these markers at the clean-integration gate. `foreach` skips
+uninitialized children, so its success never waives the status check.
+Neither command validates `.gitmodules` tracking or local overrides; run
+the branch/tracking guard too. Rescue branches preserve history but do not
+authorize a checkout under a parent on `main`.
 
 `worktree-ctl merge` automates the nested fast-forwards and enforces the containment invariant itself (it checks gitlink containment before and after, and refuses an unmerged submodule branch), but the manual sequence above remains authoritative for the rescue-branch pinning step, which no `worktree-ctl` subcommand performs.
 
 `worktree-ctl merge` (and therefore `sync`) also self-heals a gitlink violation when there is exactly one safe resolution: if a submodule's recorded gitlink is a strict fast-forward ahead of that submodule's local `main` — reachable only through a detached HEAD or an unnamed commit, with no divergence to arbitrate — it fast-forwards `main` to the recorded commit automatically and reports `auto-fixed gitlink: <submodule> local main fast-forwarded to <sha>`; `--dry-run` reports the same action as `auto-fix gitlink: ...` without mutating anything. A violation is left for manual resolution whenever the fix is not unique: true divergence (recorded commit and local `main` share no fast-forward path) or a recorded commit missing from the submodule's object database still error out exactly as before.
+
+Containment repair alone is not branch-policy compliance. After any tool
+repair, attach the authorized checkout branches and recheck tracking and
+recursive parent/child rules before further work.
 
 ### One-command shorthand: `worktree-ctl sync`
 

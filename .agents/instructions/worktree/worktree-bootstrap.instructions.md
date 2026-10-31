@@ -39,9 +39,21 @@ worktree. Git mutates the shared submodule `core.worktree` setting and can
 orphan the main checkout or another session's nested checkout. `worktree-ctl`
 already creates detached nested submodule worktrees from the recorded gitlinks.
 
-**Before the first edit**, run the recursive branch verification in
-[worktree-submodule-branch-check.instructions.md](worktree-submodule-branch-check.instructions.md) — bootstrap leaves every nested submodule detached, not on
-the feature branch.
+Detached population is a temporary provisioning state, not a usable working
+checkout. **Before edits, builds or tests**, attach each populated child to
+`main` or an appropriate feature branch and run the
+[recursive branch verification](worktree-submodule-branch-check.instructions.md).
+Parent `main` requires child `main`; feature parents permit `main` or feature
+children. Untouched children may stay on `main`; task-owned edits need matching
+session feature branches, including intermediate ancestors. Align each
+immediate parent's `.gitmodules` branch/update tracking. Do not force-switch
+or move commits backward; if `main` is already checked out in another linked
+worktree, use an allowed feature branch rather than bypassing Git's protection.
+
+If `init.sh` builds, tests or edits before branch attachment, use `new` to defer
+initialization, attach and verify the branches, then run the documented
+initializer. A completed `bootstrap` alone is not evidence of branch-policy
+compliance.
 
 ## 1b. Rename Only When Scope Changes
 

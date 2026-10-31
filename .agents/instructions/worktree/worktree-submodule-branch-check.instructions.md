@@ -1,5 +1,5 @@
 ---
-description: "Use before the first edit inside a worktree-backed task, and again after any mid-session submodule init, to verify every submodule — recursively — is checked out on the expected feature branch rather than main or a detached HEAD."
+description: "Use before edits or builds in a worktree-backed task, and after submodule initialization, to verify recursive attached branches and feature branches for task-owned edits."
 ---
 
 ## Why this check exists
@@ -27,14 +27,16 @@ git -C <worktree> branch --show-current
 git -C <worktree> submodule foreach --recursive 'echo "$sm_path: $(git branch --show-current)"'
 ```
 
-Every line must print `agent/<full-session-uuid>/<slug>` (top level) or a
-name containing that same branch (nested submodules may use their own
-`agent/<full-session-uuid>/<slug>` cut inside that submodule, but never
-`main` and never blank/detached). A blank line means detached HEAD; `main`
-means the submodule was never switched. Either result is an escalation
-trigger per [worktree-workflow.instructions.md](worktree-workflow.instructions.md#escalation-triggers) — stop and cut/checkout the matching branch in that
-submodule before editing anything under it, do not edit first and fix
-after.
+The top level must print `agent/<full-session-uuid>/<slug>`. Every nested
+checkout must be attached: an immediate parent on `main` requires child
+`main`; a feature parent permits child `main` or a feature branch. Untouched
+children may remain on `main`. Before editing a child in this worktree,
+cut/checkout its matching session feature branch and make sure every ancestor
+between it and the worktree root is also on a feature branch. Never edit
+first and repair branches afterward. A blank line is detached HEAD: stop and
+attach the intended branch without discarding work or moving commits backward.
+The general configuration and gitlink checks remain in the
+[submodule contract](../../../../.agents/instructions/repository/submodule.instructions.md#branch-integration-and-gitlinks).
 
 This check is not one-and-done: re-run it after every `git submodule
 update --init <name>` performed mid-session (a submodule initialized late,
