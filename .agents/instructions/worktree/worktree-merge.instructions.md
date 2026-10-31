@@ -31,7 +31,7 @@ superproject may reference feature-child commits. **Before and after integration
 into superproject `main`, every gitlink must be contained in child `main`.**
 Recursively, an immediate parent on `main` requires child checkouts on `main`;
 a feature parent permits `main` or feature children. See the
-[branch/tracking contract](../../../../.agents/instructions/repository/submodule.instructions.md#branch-integration-and-gitlinks).
+[branch/tracking contract](https://github.com/mankinskin/workflow-tools/blob/main/.agents/instructions/repository/submodule.instructions.md#branch-integration-and-gitlinks).
 Commit hashes remain Git's storage format, not a substitute for branch
 attachment. The prior failure left orphaned commits reachable only through
 gitlinks and vulnerable to `git gc`.

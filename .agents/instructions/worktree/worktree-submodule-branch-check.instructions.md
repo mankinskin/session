@@ -36,7 +36,7 @@ between it and the worktree root is also on a feature branch. Never edit
 first and repair branches afterward. A blank line is detached HEAD: stop and
 attach the intended branch without discarding work or moving commits backward.
 The general configuration and gitlink checks remain in the
-[submodule contract](../../../../.agents/instructions/repository/submodule.instructions.md#branch-integration-and-gitlinks).
+[submodule contract](https://github.com/mankinskin/workflow-tools/blob/main/.agents/instructions/repository/submodule.instructions.md#branch-integration-and-gitlinks).
 
 This check is not one-and-done: re-run it after every `git submodule
 update --init <name>` performed mid-session (a submodule initialized late,
