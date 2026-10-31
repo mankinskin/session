@@ -65,7 +65,7 @@ verify the selected entity authority and revisions before any execution.
 
 ## Capture Hook
 
-VS Code loads [.github/hooks/hooks.json](../../../../../context-engine/.github/hooks/hooks.json) through [.vscode/settings.json](../../../../../context-engine/.vscode/settings.json). `session-capture-hook --from-hook-stdin` accepts the Copilot hook payload and emits `{}` on success or intentional skip. It records session events and transcript capture without changing Git worktrees.
+VS Code loads .github/hooks/hooks.json (`../../../../../context-engine/.github/hooks/hooks.json`) through .vscode/settings.json (`../../../../../context-engine/.vscode/settings.json`). `session-capture-hook --from-hook-stdin` accepts the Copilot hook payload and emits `{}` on success or intentional skip. It records session events and transcript capture without changing Git worktrees.
 
 The hook uses `MCP_MAIN_CHECKOUT` when set, otherwise its current directory, to locate the main checkout. An explicit `--store-root` is honored. Without one, the resolver selects the registered worktree store when available and otherwise the main checkout canonical `.workflow-tools/session` store. Bare `.session` remains a legacy compatibility layout.
 

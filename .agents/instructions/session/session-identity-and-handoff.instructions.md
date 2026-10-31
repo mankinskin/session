@@ -98,7 +98,7 @@ Resolve every placeholder from the current session and its claimed ticket; never
 
 ### Feedback-Summary Segment
 
-Per [feedback-turn-visibility.instructions.md](../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md), a response that has called `feedback_session_summary` appends one optional trailing segment to either footer form: `| feedback: <n> new entries this turn` (or `| feedback: none` when the summary is empty). The count is scoped to the agent's best-effort derived turn number, not the whole session — see that instruction for how the turn number is derived. Place it last, after `ticket:`:
+Per feedback-turn-visibility.instructions.md (`../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md`), a response that has called `feedback_session_summary` appends one optional trailing segment to either footer form: `| feedback: <n> new entries this turn` (or `| feedback: none` when the summary is empty). The count is scoped to the agent's best-effort derived turn number, not the whole session — see that instruction for how the turn number is derived. Place it last, after `ticket:`:
 
 ```
 session: <uuid> | checkout: main | ticket: <short-id> <title> | feedback: 2 new entries this turn
@@ -108,13 +108,13 @@ session: <uuid> | checkout: main | ticket: <short-id> <title> | feedback: 2 new 
 session: <uuid> | worktree: .worktrees/<uuid>/<slug> | branch: agent/<uuid>/<slug> | ticket: <short-id> <title> | feedback: none
 ```
 
-Omit the segment entirely only when [feedback-turn-visibility.instructions.md](../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md) does not apply to the current response (for example, a dispatched sub-agent following its own return contract); otherwise render `feedback: none` rather than dropping the segment silently.
+Omit the segment entirely only when feedback-turn-visibility.instructions.md (`../../../../.agents/instructions/workflow/feedback-turn-visibility.instructions.md`) does not apply to the current response (for example, a dispatched sub-agent following its own return contract); otherwise render `feedback: none` rather than dropping the segment silently.
 
-The footer applies to sub-agents too: a sub-agent's single returned message carries the footer, so a write-and-die Worker's one step remains attributable after the session is gone. See [write-and-die.instructions.md](../../../../.agents/instructions/workflow/write-and-die.instructions.md).
+The footer applies to sub-agents too: a sub-agent's single returned message carries the footer, so a write-and-die Worker's one step remains attributable after the session is gone. See write-and-die.instructions.md (`../../../../.agents/instructions/workflow/write-and-die.instructions.md`).
 
 ## Inspecting a Prior Session
 
-[session-artifacts.instructions.md](../../../../.agents/instructions/workflow/session-artifacts.instructions.md) owns the precedence rule: read durable artifacts first (ticket, then spec, then handoff package); use a bounded transcript slice only when durable artifacts are insufficient; never dump a raw transcript.
+session-artifacts.instructions.md (`../../../../.agents/instructions/workflow/session-artifacts.instructions.md`) owns the precedence rule: read durable artifacts first (ticket, then spec, then handoff package); use a bounded transcript slice only when durable artifacts are insufficient; never dump a raw transcript.
 
 Which sessions touched a ticket:
 
@@ -166,7 +166,7 @@ The structured form is `handoff.json` in the same directory. `session.exe handof
 
 ### Normalize what you find
 
-Convert every prior-session finding to `scope | finding | outcome | blocker | pointer` before carrying the finding forward, as required by [session-artifacts.instructions.md](../../../../.agents/instructions/workflow/session-artifacts.instructions.md).
+Convert every prior-session finding to `scope | finding | outcome | blocker | pointer` before carrying the finding forward, as required by session-artifacts.instructions.md (`../../../../.agents/instructions/workflow/session-artifacts.instructions.md`).
 
 ## Known Defect
 
