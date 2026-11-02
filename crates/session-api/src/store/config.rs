@@ -12,6 +12,8 @@ pub use capture_query::*;
 mod worktree_runtime;
 #[allow(unused_imports)]
 pub use worktree_runtime::*;
+#[path = "config/mission_handoff.rs"]
+mod mission_handoff;
 #[path = "config/runtime_workflow.rs"]
 mod runtime_workflow;
 #[allow(unused_imports)]
