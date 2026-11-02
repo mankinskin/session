@@ -162,7 +162,50 @@ pub(super) fn args_from_hook_stdin(mut args: Args) -> Result<Args, SessionError>
     {
         args.tool_response_chars = Some(tool_response.chars().count() as u64);
     }
+    if args.transcript_path.as_os_str().is_empty() {
+        if let Some(path) = args
+            .session_id
+            .as_deref()
+            .and_then(|id| copilot_session_state_transcript(id, copilot_home()))
+        {
+            tracing::debug!(transcript_path = %path.display(), "derived Copilot session-state transcript path");
+            args.transcript_path = path;
+        }
+    }
     Ok(args)
+}
+
+/// Copilot SDK/CLI hook payloads carry `sessionId` but no transcript path; the
+/// host writes the transcript to `<copilot home>/session-state/<id>/events.jsonl`.
+fn copilot_home() -> Option<PathBuf> {
+    if let Some(home) = env::var_os("COPILOT_HOME").filter(|value| !value.is_empty()) {
+        return Some(PathBuf::from(home));
+    }
+    ["HOME", "USERPROFILE"]
+        .iter()
+        .find_map(|key| env::var_os(key).filter(|value| !value.is_empty()))
+        .map(|home| PathBuf::from(home).join(".copilot"))
+}
+
+pub(super) fn copilot_session_state_transcript(
+    session_id: &str,
+    copilot_home: Option<PathBuf>,
+) -> Option<PathBuf> {
+    let is_safe_segment = !session_id.is_empty()
+        && session_id != "."
+        && session_id != ".."
+        && session_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+    if !is_safe_segment {
+        return None;
+    }
+    Some(
+        copilot_home?
+            .join("session-state")
+            .join(session_id)
+            .join("events.jsonl"),
+    )
 }
 
 pub(super) fn normalize_transcript_path(path: &Path) -> PathBuf {

@@ -11,7 +11,7 @@ use super::{
     checkout_for_store_root, infer_capture_worktree, initialize_session_routing,
     resolve_capture_store_root,
 };
-use crate::args::normalize_transcript_path;
+use crate::args::{copilot_session_state_transcript, normalize_transcript_path};
 
 struct PoisonTolerantMutex(Mutex<()>);
 
@@ -254,6 +254,22 @@ fn capture_inference_uses_resolved_store_parent_not_process_directory() {
             .unwrap(),
         worktree.canonicalize().unwrap()
     );
+}
+
+#[test]
+fn copilot_session_state_transcript_derives_events_path() {
+    let home = PathBuf::from("/home/user/.copilot");
+    assert_eq!(
+        copilot_session_state_transcript("b6118c07-c59c-4956", Some(home.clone())),
+        Some(home.join("session-state/b6118c07-c59c-4956/events.jsonl"))
+    );
+    for unsafe_id in ["", ".", "..", "../x", "a/b", "a\\b"] {
+        assert_eq!(
+            copilot_session_state_transcript(unsafe_id, Some(home.clone())),
+            None
+        );
+    }
+    assert_eq!(copilot_session_state_transcript("abc", None), None);
 }
 
 #[test]
